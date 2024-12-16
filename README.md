@@ -93,3 +93,21 @@ If you're using VSCode in Linux (or MacOS), you should have `.vscode/c_cpp_prope
     "version": 4
 }
 ```
+
+## Functions in database
+All functions' name are included in db.h
+Functions that need intput (PGconn *conn,...), just type 'conn'
+- struct Player getPlayerInfo(PGconn *conn, int player_id);
+  Output is a struct type Player, containing all information of the player.
+- void createPlayer(PGconn *conn, int player_id, char *fullname, char gender, char *date_of_birth, int age, char *country, char *password, float balance, int rank, char *registration_date);
+  Output is none.
+  This function insert a player into database. Notice this function can insert the same player many times.
+- void deletePlayer(PGconn *conn, int player_id);
+  Output is none.
+  This function delete a player from database.
+- int signup(PGconn *conn, char *username, char *password);
+  Output is an integer representing if signup is successful or not (REGISTER_OK: 0, USERNAME_USED: 1, INVALID_USERNAME: 2, INVALID_PASSWORD: 3, SERVER_ERROR: -1)
+  If signup is REGISTER_OK, it insert a new player to database with player_id = number of existing player + 1
+- int login(PGconn *conn, char *username, char *password);
+  Output is an integer representing if login is successful or not (LOGIN_OK: 0, NO_USER_FOUND: 1, SERVER_ERROR: -1)
+  
