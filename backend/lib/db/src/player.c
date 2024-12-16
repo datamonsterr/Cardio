@@ -74,8 +74,8 @@ struct Player getPlayerInfo(PGconn *conn, int player_id) {
 }
 
 
-// // input is player_id
-// // void function so no output, used to delete player
+// input is player_id
+// void function so no output, used to delete player
 void deletePlayer(PGconn *conn, int player_id) {
     char query[256];
     snprintf(query, sizeof(query), "DELETE FROM player WHERE player_id = %d RETURNING *", player_id);
@@ -93,8 +93,8 @@ void deletePlayer(PGconn *conn, int player_id) {
 }
 
 
-// // no need input
-// // output is the list of players in ranking board
+// no need input
+// output is the list of players in ranking board
 struct Ranking *getRankingInfo(PGconn *conn) {
     char query[256];
     snprintf(query, sizeof(query), "SELECT * FROM ranking ORDER BY balance DESC");
