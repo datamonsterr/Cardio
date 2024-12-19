@@ -1,77 +1,46 @@
 #include <stdio.h>
-#include "mpack.h"
 #include <string.h>
-
-void write_messagepack(char *buffer, size_t *size)
-{
-    mpack_writer_t writer;
-    mpack_writer_init(&writer, buffer, 1024);
-
-    // Write data
-    mpack_start_map(&writer, 2); // Start a map with 2 key-value pairs
-
-    mpack_write_cstr(&writer, "name");
-    mpack_write_cstr(&writer, "John Doe");
-
-    mpack_write_cstr(&writer, "age");
-    mpack_write_u32(&writer, 30);
-
-    mpack_finish_map(&writer); // Finish the map
-
-    // Get the size of the written data
-    *size = mpack_writer_buffer_used(&writer);
-
-    // Check for errors
-    if (mpack_writer_destroy(&writer) != mpack_ok)
-    {
-        fprintf(stderr, "Error encoding data to MessagePack format\n");
-        return;
-    }
-
-    printf("Serialized %zu bytes!\n", *size);
-}
-
-void read_messagepack(const char *buffer, size_t size)
-{
-    mpack_reader_t reader;
-    mpack_reader_init_data(&reader, buffer, size);
-
-    // Parse data
-    mpack_expect_map(&reader);
-
-    for (size_t i = 0; i < 2; i++)
-    {                                                           // Loop through 2 key-value pairs
-        const char *key = mpack_expect_cstr_alloc(&reader, 32); // Max key length: 32
-        if (strcmp(key, "name") == 0)
-        {
-            const char *name = mpack_expect_cstr_alloc(&reader, 64); // Max value length: 64
-            printf("Name: %s\n", name);
-            free((void *)name);
-        }
-        else if (strcmp(key, "age") == 0)
-        {
-            uint32_t age = mpack_expect_u32(&reader);
-            printf("Age: %u\n", age);
-        }
-        free((void *)key);
-    }
-
-    mpack_done_map(&reader);
-
-    // Check for errors
-    if (mpack_reader_destroy(&reader) != mpack_ok)
-    {
-        fprintf(stderr, "Error decoding MessagePack data\n");
-    }
-}
+#include "mpack.h"
+#include "generic_map.h"
+#include "server.h"
 
 int main(void)
 {
-    char buffer[1024];
-    size_t size = 0;
+    int listenfd = create_listen_socket("127.0.0.1", "5500", 10);
 
-    write_messagepack(buffer, &size);
-    read_messagepack(buffer, size);
+    while (1)
+    {
+        int client_fd = accept_connection(listenfd);
+        char buffer[MAXLINE];
+        Map *m = map_create(string_compare, free, free);
+        int n = recv_login_request(client_fd, buffer, MAXLINE, m);
+        if (n < 0)
+        {
+            perror("recv_login_request");
+            close(client_fd);
+            continue;
+        }
 
-    return 0;
+        MapEntry *entry = map_search(m, "user");
+        if (entry == NULL)
+        {
+            fprintf(stderr, "user not found\n");
+            close(client_fd);
+            continue;
+        }
+
+        char *user = (char *)entry->value;
+        printf("user: %s\n", user);
+
+        entry = map_search(m, "pass");
+        if (entry == NULL)
+        {
+            fprintf(stderr, "pass not found\n");
+            close(client_fd);
+            continue;
+        }
+
+        char *pass = (char *)entry->value;
+        close(client_fd);
+    }
 }
