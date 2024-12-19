@@ -9,7 +9,7 @@ project(Kasino_db C) # SET PROJECT NAME HERE, start with Kasino_{name}
 
 file(GLOB_RECURSE SOURCES "src/*.c")
 
-set(LIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/lib) # SET LIB DIR HERE, this is relative directory of "lib" folder from this Cmake dir 
+set(LIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..) # SET LIB DIR HERE, this is relative directory of "lib" folder from this Cmake dir 
 list(APPEND ALL_LIBS db) # APPEND LIB HERE (directory name of lib)
 
 

@@ -3,7 +3,13 @@
 
 int main() {
     // char *conninfo = "dbname=cardio user=vietanh password=vietzanh204 host=localhost port=5432";
-    connection(PGconn *conn);
+    PGconn *conn = PQconnectdb(conninfo);
+
+    if (PQstatus(conn)!=CONNECTION_OK) {
+        printf("Connection to database fails: %s\n", PQerrorMessage(conn));
+        PQfinish(conn);
+        exit(1);
+    }
 
 // -----------------------------------------------------------
     // printf("Connection established\n");
@@ -23,7 +29,7 @@ int main() {
     //     printf("%d\t%d\n",leaderboard[i].player_id,leaderboard[i].balance);
     // }
     // -------------------------------------------------------------------------
-    int choice;
+int choice;
     printf("Signup: 1\nLogin: 2\n");
     scanf("%d",&choice);
 

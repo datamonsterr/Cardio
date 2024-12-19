@@ -1,5 +1,4 @@
 #include <string.h>
-
 #include "card.h"
 
 void card_init(Card *aCardPtr, int suit, int rank)
