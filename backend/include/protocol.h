@@ -28,4 +28,4 @@ struct
 Header *decode_header(char *data);
 Packet *decode_packet(char *data);
 
-char *encode_packet(Header *header, char *payload);
+char *encode_packet(__uint8_t protocol_ver, __uint16_t packet_type, char *payload, size_t payload_len);

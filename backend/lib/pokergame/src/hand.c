@@ -59,7 +59,7 @@ int hand_toString(Hand *aHandPtr)
     return -1;
   for (i = 0; i < aHandPtr->cardsHeld; i++)
   {
-    char *str = card_toString(&aHandPtr->cards[i]);
+    char *str = card_toString(aHandPtr->cards[i]);
     if (str)
     {
     }

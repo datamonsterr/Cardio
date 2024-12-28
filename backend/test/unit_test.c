@@ -14,21 +14,10 @@ TEST(test_decode_packet)
 
 TEST(test_encode_packet)
 {
-    Header *header = malloc(sizeof(Header));
-    header->packet_len = 10;
-    header->protocol_ver = 1;
-    header->packet_type = 0;
-
     char *data = "hello";
-    Packet *packet = malloc(sizeof(Packet));
-    packet->header = *header;
-
-    memcpy(packet->data, data, header->packet_len - sizeof(Header));
-    char *encoded = encode_packet(header, packet->data);
+    char *encoded = encode_packet(1, 0, data, 5);
     ASSERT(compare_raw_bytes(encoded, "\x00\x0A\x01\x00\x00hello", 10) == 1);
-    free(header);
     free(encoded);
-    free(packet);
 }
 
 int main()

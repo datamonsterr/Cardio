@@ -10,13 +10,14 @@ project(Kasino_pokergame C) # SET PROJECT NAME HERE
 file(GLOB_RECURSE SOURCES "src/*.c")
 
 set(LIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..) # SET LIB DIR HERE
-list(APPEND ALL_LIBS pokergame card utils) # APPEND LIB HERE
+list(APPEND ALL_LIBS pokergame card) # APPEND LIB HERE
 
 
 foreach(LIB IN LISTS ALL_LIBS)
     list(APPEND ALL_LIBS "${LIB_DIR}/${LIB}/include")
     list(APPEND ALL_LIBRARIES "${LIB_DIR}/${LIB}/build/libKasino_${LIB}.a")
 endforeach()
+list(APPEND ALL_LIBS "${LIB_DIR}/utils")
 
 add_library(${PROJECT_NAME} ${SOURCES})
 

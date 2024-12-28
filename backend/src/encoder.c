@@ -1,10 +1,16 @@
 #include "main.h"
 
-char *encode_packet(Header *header, char *payload)
+char *encode_packet(__uint8_t protocol_ver, __uint16_t packet_type, char *payload, size_t payload_len)
 {
     // header is all numbers, we need to turn it into bytes: length is __uint16_t, protocol_ver is __uint8_t, packet_type is __uint16_t
     // payload is a string, we need to turn it into bytes
     // we need to allocate a new buffer to store the bytes
+
+    Header *header = malloc(sizeof(Header));
+
+    header->packet_len = payload_len + sizeof(Header);
+    header->protocol_ver = protocol_ver;
+    header->packet_type = packet_type;
 
     char *buffer = malloc(header->packet_len + sizeof(Header));
 
@@ -21,6 +27,7 @@ char *encode_packet(Header *header, char *payload)
 
     // copy the payload into the buffer
     memcpy(buffer + sizeof(Header), payload, header->packet_len - sizeof(Header));
+    free(header);
 
     return buffer;
 }

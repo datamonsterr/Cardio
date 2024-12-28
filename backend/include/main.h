@@ -15,5 +15,6 @@
 #include "mpack.h"
 #include "protocol.h"
 #include "server.h"
+#include "db.h"
 
 int compare_raw_bytes(char *b1, char *b2, int len);

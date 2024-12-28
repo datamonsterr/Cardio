@@ -1,84 +1,104 @@
-#include <netdb.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <string.h>
+#include "main.h"
 
-#define MAXLINE 1024
+int main(int argc, char *argv[])
+{
+    if (argc != 3)
+    {
+        fprintf(stderr, "usage: %s [host] [port]\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
 
-// int main(int argc, char *argv[])
-// {
-//     if (argc != 3)
-//     {
-//         fprintf(stderr, "usage: %s [host] [port]\n", argv[0]);
-//         exit(1);
-//     }
+    int servfd;
+    struct addrinfo hints, *res;
 
-//     int servfd;
-//     struct addrinfo hints, *res;
+    // Prepare for getaddrinfo
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
 
-//     memset(&hints, 0, sizeof hints);
-//     hints.ai_family = AF_UNSPEC;
-//     hints.ai_socktype = SOCK_STREAM;
+    if (getaddrinfo(argv[1], argv[2], &hints, &res) != 0)
+    {
+        perror("getaddrinfo");
+        exit(EXIT_FAILURE);
+    }
 
-//     if (getaddrinfo(argv[1], argv[2], &hints, &res) != 0)
-//     {
-//         perror("getaddrinfo");
-//         exit(1);
-//     }
+    // Create socket
+    servfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    if (servfd == -1)
+    {
+        perror("socket");
+        freeaddrinfo(res);
+        exit(EXIT_FAILURE);
+    }
 
-//     servfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-//     if (servfd == -1)
-//     {
-//         perror("socket");
-//         exit(1);
-//     }
+    // Connect to the server
+    if (connect(servfd, res->ai_addr, res->ai_addrlen) == -1)
+    {
+        perror("connect");
+        freeaddrinfo(res);
+        close(servfd);
+        exit(EXIT_FAILURE);
+    }
 
-//     if (connect(servfd, res->ai_addr, res->ai_addrlen) == -1)
-//     {
-//         perror("connect");
-//         exit(1);
-//     }
+    char recv_buffer[MAXLINE];
 
-//     char input[MAXLINE];
-//     char recv_buffer[MAXLINE];
+    while (1)
+    {
+        printf("Enter username <space> password: ");
 
-//     while (1)
-//     {
-//         printf("Enter a message: ");
-//         if (fgets(input, MAXLINE, stdin) == NULL)
-//         {
-//             printf("Error reading input. Exiting...\n");
-//             break;
-//         }
+        char username[30];
+        char password[30];
 
-//         size_t len = strlen(input);
-//         if (len > 0 && input[len - 1] == '\n')
-//         {
-//             input[len - 1] = '\0';
-//         }
+        // Use safer input to avoid overflow
+        if (scanf("%29s %29s", username, password) != 2)
+        {
+            fprintf(stderr, "Invalid input. Please enter username and password.\n");
+            continue;
+        }
 
-//         if (send(servfd, input, strlen(input), 0) == -1)
-//         {
-//             perror("send");
-//             break;
-//         }
+        // Initialize MPack writer
+        mpack_writer_t writer;
+        char buffer[4096];
+        mpack_writer_init(&writer, buffer, 4096);
 
-//         memset(recv_buffer, 0, sizeof(recv_buffer));
+        // Write data to the MPack map
+        mpack_start_map(&writer, 2);
+        mpack_write_cstr(&writer, "username");
+        mpack_write_cstr(&writer, username);
+        mpack_write_cstr(&writer, "password");
+        mpack_write_cstr(&writer, password);
+        mpack_finish_map(&writer);
 
-//         ssize_t recv_len = recv(servfd, recv_buffer, sizeof(recv_buffer) - 1, 0);
-//         if (recv_len == -1)
-//         {
-//             perror("recv");
-//             break;
-//         }
-//         recv_buffer[recv_len] = '\0';
+        // Check for MPack errors
 
-//         printf("Received: %s\n", recv_buffer);
-//     }
+        // Retrieve MPack buffer
+        const char *data = writer.buffer;
+        size_t size = mpack_writer_buffer_used(&writer);
 
-//     freeaddrinfo(res);
-//     close(servfd);
+        // Encode the packet
+        char *encoded_message = encode_packet(1, 100, data, size);
 
-//     return 0;
-// }
+        // Send the encoded message
+        if (send(servfd, encoded_message, size + 5, 0) == -1)
+        { // Include header size (5 bytes)
+            perror("send");
+            free(encoded_message);
+            break;
+        }
+        mpack_error_t error = mpack_writer_destroy(&writer);
+        if (error != mpack_ok)
+        {
+            fprintf(stderr, "MPack encoding error: %s\n", mpack_error_to_string(error));
+            break;
+        }
+
+        // Free dynamically allocated memory
+        free(encoded_message);
+    }
+
+    // Clean up resources
+    freeaddrinfo(res);
+    close(servfd);
+
+    return 0;
+}
