@@ -1,10 +1,10 @@
 #pragma once
 #include "main.h"
-#include <arpa/inet.h>
-#include <netdb.h>
+#define MAXEVENTS 100
 
-int create_listen_socket(const char *ipaddr, const char *port, int backlog);
+void *get_in_addr(struct sockaddr *sa);
+int get_listener_socket(const char *ipaddr, const char *port, int backlog);
+int set_nonblocking(int sockfd);
 int accept_connection(int listenfd);
-int recv_login_request(int fd, char *msg, int buffer_size, Map *data);
-
-Map *decode_msgpack(const char *data, size_t len);
+void close_connection(int fd);
+void server_perror(const char *msg);

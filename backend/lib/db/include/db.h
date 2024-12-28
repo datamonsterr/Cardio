@@ -5,9 +5,9 @@
 #include <libpq-fe.h>
 #include <ctype.h>
 #include <stdbool.h>
-// #include <msgpack.h> 
+// #include <msgpack.h>
 
-#define conninfo "dbname=cardio user=vietanh password=vietzanh204 host=localhost port=5432"
+#define conninfo "dbname=cardio user=postgres password=1234 host=localhost port=5433"
 #define REGISTER_OK 0
 #define USERNAME_USED 1
 #define INVALID_USERNAME 2
@@ -17,7 +17,8 @@
 #define NO_USER_FOUND 1
 #define SERVER_ERROR -1
 
-struct Player {
+struct Player
+{
     int player_id;
     char *fullname;
     char gender;
@@ -31,19 +32,22 @@ struct Player {
     char *registration_date;
 };
 
-struct Ranking {
+struct Ranking
+{
     int balance;
     int player_id;
 };
 
-struct Friend {
+struct Friend
+{
     int friendship_id;
     int player1_id;
     int player2_id;
     char *friend_time;
 };
 
-struct Room {
+struct Room
+{
     int room_id;
     int min_player;
     int max_layer;
@@ -51,7 +55,8 @@ struct Room {
     char *status;
 };
 
-struct Match {
+struct Match
+{
     int match_id;
     int room_id;
     int winner;
@@ -62,22 +67,25 @@ struct Match {
     unsigned char *progress;
 };
 
-struct Host {
+struct Host
+{
     int host_id;
 };
 
-struct Seat {
+struct Seat
+{
     int seat_number;
     int player_id;
     int room_id;
     char *sit;
 };
 
-struct History {
+struct History
+{
     int match_id;
 };
 
-// This function connect to database. 
+// This function connect to database.
 // Output is none if connection is ok, or an error message if connection is failed.
 void connection(PGconn *conn);
 
@@ -88,13 +96,12 @@ void createPlayer(PGconn *conn, int player_id, char *fullname, char gender, char
 // This function delete a player from database or return an error message if delete failed.
 void deletePlayer(PGconn *conn, int player_id);
 // This function return the leaderboard or an error message if failed.
-struct Ranking* getRankingInfo(PGconn *conn);
+struct Ranking *getRankingInfo(PGconn *conn);
 
-
-bool validate_username(char *username); 
+bool validate_username(char *username);
 bool validate_password(char *password);
 // This function take input: username, password.
-// If username and password are valid, it create a new player in database 
+// If username and password are valid, it create a new player in database
 // new player_id = number of existed player + 1
 int signup(PGconn *conn, char *username, char *password);
 // This function take input: username, password

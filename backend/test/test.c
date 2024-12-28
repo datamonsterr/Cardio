@@ -1,32 +1,38 @@
 #include "test.h"
 
-TEST(test_decode_msgpack)
+TEST(test_decode_packet)
 {
-    char buffer[MAXLINE];
+    char *data = "\x00\x0A\x01\x00\x00hello";
 
-    mpack_writer_t writer;
-    mpack_writer_init(&writer, buffer, MAXLINE);
-    mpack_start_map(&writer, 2);
-    mpack_write_cstr(&writer, "user");
-    mpack_write_cstr(&writer, "admin");
-    mpack_write_cstr(&writer, "pass");
-    mpack_write_cstr(&writer, "admin");
-    mpack_finish_map(&writer);
+    Packet *packet = decode_packet(data);
 
-    uint16_t len = mpack_writer_buffer_used(&writer);
-    memcpy(buffer, writer.buffer, len);
-    mpack_writer_destroy(&writer);
+    ASSERT(packet->header.packet_len == 10);
+    ASSERT(packet->header.protocol_ver == 1);
+    ASSERT(packet->header.packet_type == 0);
+    ASSERT(compare_raw_bytes(packet->data, "hello", 5) == 1);
+}
 
-    Map *m = decode_msgpack(buffer, len);
-    MapEntry *entry = map_search(m, "user");
-    ASSERT(entry != NULL);
-    ASSERT_STR_EQ((char *)entry->value, "admin");
-    entry = map_search(m, "pass");
-    ASSERT(entry != NULL);
-    ASSERT_STR_EQ((char *)entry->value, "admin");
+TEST(test_encode_packet)
+{
+    Header *header = malloc(sizeof(Header));
+    header->packet_len = 10;
+    header->protocol_ver = 1;
+    header->packet_type = 0;
+
+    char *data = "hello";
+    Packet *packet = malloc(sizeof(Packet));
+    packet->header = *header;
+
+    memcpy(packet->data, data, header->packet_len - sizeof(Header));
+    char *encoded = encode_packet(header, packet->data);
+    ASSERT(compare_raw_bytes(encoded, "\x00\x0A\x01\x00\x00hello", 10) == 1);
+    free(header);
+    free(encoded);
+    free(packet);
 }
 
 int main()
 {
-    RUN_TEST(test_decode_msgpack);
+    RUN_TEST(test_decode_packet);
+    RUN_TEST(test_encode_packet);
 }

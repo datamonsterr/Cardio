@@ -1,46 +1,88 @@
-#include <stdio.h>
-#include <string.h>
-#include "mpack.h"
-#include "generic_map.h"
-#include "server.h"
+#include "main.h"
 
 int main(void)
 {
-    int listenfd = create_listen_socket("127.0.0.1", "5500", 10);
+    int listener = get_listener_socket("127.0.0.1", "8080", 100);
 
-    while (1)
+    if (listener == -1)
     {
-        int client_fd = accept_connection(listenfd);
-        char buffer[MAXLINE];
-        Map *m = map_create(string_compare, free, free);
-        int n = recv_login_request(client_fd, buffer, MAXLINE, m);
-        if (n < 0)
+        return 1;
+    }
+
+    int epoll_fd = epoll_create1(0);
+
+    if (epoll_fd == -1)
+    {
+        perror("epoll_create1");
+        return 1;
+    }
+
+    struct epoll_event event;
+    event.events = EPOLLIN;
+    event.data.fd = listener;
+
+    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, listener, &event) == -1)
+    {
+        perror("epoll_ctl");
+        return 1;
+    }
+
+    struct epoll_event *events = calloc(MAXEVENTS, sizeof(event));
+
+    if (events == NULL)
+    {
+        perror("calloc");
+        return 1;
+    }
+
+    for (;;)
+    {
+        int n = epoll_wait(epoll_fd, events, MAXEVENTS, -1);
+
+        for (int i = 0; i < n; i++)
         {
-            perror("recv_login_request");
-            close(client_fd);
-            continue;
+            if (events[i].data.fd == listener)
+            {
+                int client_fd = accept_connection(listener);
+
+                if (client_fd == -1)
+                {
+                    continue;
+                }
+
+                set_nonblocking(client_fd);
+
+                event.events = EPOLLIN | EPOLLET;
+                event.data.fd = client_fd;
+
+                if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &event) == -1)
+                {
+                    perror("epoll_ctl");
+                    return 1;
+                }
+            }
+            else
+            {
+                char buf[MAXLINE];
+                memset(buf, 0, MAXLINE);
+
+                int nbytes = recv(events[i].data.fd, buf, MAXLINE, 0);
+
+                if (nbytes <= 0)
+                {
+                    close(events[i].data.fd);
+                    continue;
+                }
+
+                Packet *packet = decode_packet(buf);
+
+                printf("Packet length: %d\n", packet->header.packet_len);
+                printf("Protocol version: %d\n", packet->header.protocol_ver);
+                printf("Packet type: %d\n", packet->header.packet_type);
+                printf("Data: %s\n", packet->data);
+
+                free(packet);
+            }
         }
-
-        MapEntry *entry = map_search(m, "user");
-        if (entry == NULL)
-        {
-            fprintf(stderr, "user not found\n");
-            close(client_fd);
-            continue;
-        }
-
-        char *user = (char *)entry->value;
-        printf("user: %s\n", user);
-
-        entry = map_search(m, "pass");
-        if (entry == NULL)
-        {
-            fprintf(stderr, "pass not found\n");
-            close(client_fd);
-            continue;
-        }
-
-        char *pass = (char *)entry->value;
-        close(client_fd);
     }
 }

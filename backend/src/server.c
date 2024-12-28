@@ -1,47 +1,89 @@
 #include "main.h"
 
-struct addrinfo *server_addr_init(const char *ipaddr, const char *port)
+// Get sockaddr, IPv4 or IPv6:
+void *get_in_addr(struct sockaddr *sa)
 {
-    struct addrinfo hints, *res;
-    hints.ai_socktype = SOCK_STREAM; // TCP
-    hints.ai_family = AF_UNSPEC;     // Support both IPv4 IPv6
-    int status;
-    if ((status = getaddrinfo(ipaddr, port, &hints, &res)) != 0)
+    if (sa->sa_family == AF_INET)
     {
-        fprintf(stderr, "server_addr_init getaddrinfo error: %d", status);
+        return &(((struct sockaddr_in *)sa)->sin_addr);
+    }
+
+    return &(((struct sockaddr_in6 *)sa)->sin6_addr);
+}
+
+// Return a listening socket
+int get_listener_socket(const char *host, const char *port, int backlog)
+{
+    int listener; // Listening socket descriptor
+    int yes = 1;  // For setsockopt() SO_REUSEADDR, below
+    int rv;
+
+    struct addrinfo hints, *ai, *p;
+
+    // Get us a socket and bind it
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE;
+    if ((rv = getaddrinfo(host, port, &hints, &ai)) != 0)
+    {
+        fprintf(stderr, "get_listener_socket: %s\n", gai_strerror(rv));
         exit(1);
     }
-    return res;
+
+    for (p = ai; p != NULL; p = p->ai_next)
+    {
+        listener = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+        if (listener < 0)
+        {
+            continue;
+        }
+
+        // Lose the pesky "address already in use" error message
+        setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
+
+        if (bind(listener, p->ai_addr, p->ai_addrlen) < 0)
+        {
+            close(listener);
+            continue;
+        }
+
+        break;
+    }
+
+    freeaddrinfo(ai); // All done with this
+
+    // If we got here, it means we didn't get bound
+    if (p == NULL)
+    {
+        return -1;
+    }
+
+    // Listen
+    if (listen(listener, backlog) == -1)
+    {
+        return -1;
+    }
+
+    return listener;
 }
 
-void server_perror(const char *msg)
+int set_nonblocking(int sockfd)
 {
-    fprintf(stderr, "server.c error: %s\n", msg);
-    exit(1);
-}
-
-int create_listen_socket(const char *ipaddr, const char *port, int backlog)
-{
-    struct addrinfo *res = server_addr_init(ipaddr, port);
-
-    int listenfd = socket(res->ai_family, res->ai_socktype, 0);
-    if (listenfd < 0)
+    int flags = fcntl(sockfd, F_GETFL, 0);
+    if (flags == -1)
     {
-        server_perror("socket");
+        perror("fcntl F_GETFL");
+        return -1;
     }
 
-    if (bind(listenfd, res->ai_addr, res->ai_addrlen) < 0)
+    if (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) == -1)
     {
-        server_perror("bind");
+        perror("fcntl F_SETFL");
+        return -1;
     }
 
-    if (listen(listenfd, backlog) < 0)
-    {
-        server_perror("listen");
-    }
-    freeaddrinfo(res);
-
-    return listenfd;
+    return 0;
 }
 
 int accept_connection(int listenfd)
@@ -64,30 +106,8 @@ void close_connection(int fd)
     }
 }
 
-int recv_login_request(int fd, char *msg, int buffer_size, Map *data)
+void server_perror(const char *msg)
 {
-    int bytes_received = recv(fd, msg, buffer_size, 0);
-    if (bytes_received < 0)
-    {
-        server_perror("recv");
-        return -1;
-    }
-
-    char content[MAXLINE];
-
-    memcpy(content, msg + 3, bytes_received - 3);
-
-    data = decode_msgpack(msg, bytes_received);
-
-    if (data == NULL)
-    {
-        return -1;
-    }
-
-    return 1;
-}
-
-int send_login_response(int fd, const char *response, int len, Map data) // Return the number of bytes sent
-{
-    return 0;
+    fprintf(stderr, "%s: %s\n", msg, strerror(errno));
+    exit(1);
 }

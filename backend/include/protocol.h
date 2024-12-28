@@ -1,6 +1,5 @@
 #pragma once
-
-#include <unistd.h>
+#define MAXLINE 66531
 
 #define PROTOCOL_V1 0x01
 
@@ -13,9 +12,20 @@
 #define PACKET_UPDATE_GS 600
 #define PACKET_LEAVE_ROOM 700
 
-struct
+typedef struct __attribute__((packed))
 {
     __uint16_t packet_len;
     __uint8_t protocol_ver;
     __uint16_t packet_type;
-} typedef Header;
+} Header;
+
+struct
+{
+    Header header;
+    char data[MAXLINE];
+} typedef Packet;
+
+Header *decode_header(char *data);
+Packet *decode_packet(char *data);
+
+char *encode_packet(Header *header, char *payload);
