@@ -74,14 +74,25 @@ int main(void)
                     continue;
                 }
 
-                Packet *packet = decode_packet(buf);
+                Header *header = decode_header(buf);
 
-                printf("Packet length: %d\n", packet->header.packet_len);
-                printf("Protocol version: %d\n", packet->header.protocol_ver);
-                printf("Packet type: %d\n", packet->header.packet_type);
-                printf("Data: %s\n", packet->data);
+                if (header == NULL)
+                {
+                    close(events[i].data.fd);
+                    continue;
+                }
 
-                free(packet);
+                switch (header->packet_type)
+                {
+                case 100: // Login
+                    handle_login_request(events[i].data.fd, buf, nbytes);
+                    break;
+
+                default:
+                    break;
+                }
+
+                free(header);
             }
         }
     }

@@ -1,6 +1,6 @@
 #include "../include/db.h"
 
-int login(PGconn *conn, char *username, char *password) {
+int dbLogin(PGconn *conn, char *username, char *password) {
     char query[256];
     snprintf(query, sizeof(query), "select password from player where fullname = '%s';", username);
 

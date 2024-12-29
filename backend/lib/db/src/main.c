@@ -18,14 +18,14 @@ int main()
     // printf("Host: %s\n", PQhost(conn));
     // printf("Database name: %s\n", PQdb(conn));
 
-    // createPlayer(conn, 10, "Vanh", 'M', "2004-04-09", 20, "Vietnam", "vietzanh204", 100, 1, "2024-04-11");
+    // dbCreateUser(conn, 10, "Vanh", 'M', "2004-04-09", 20, "Vietnam", "vietzanh204", 100, 1, "2024-04-11");
 
-    // deletePlayer(conn, 10);
+    // dbDeleteUser(conn, 10);
 
-    // createPlayer(conn, 10, "Vanh1", 'M', "2004-04-09", 20, "Vietnam", "vietzanh204", 100, 1, "2024-04-11");
-    // createPlayer(conn, 20, "Vanh2", 'M', "2000-04-09", 24, "Vietnam", "vietzanh204", 200, 1, "2024-04-11");
+    // dbCreateUser(conn, 10, "Vanh1", 'M', "2004-04-09", 20, "Vietnam", "vietzanh204", 100, 1, "2024-04-11");
+    // dbCreateUser(conn, 20, "Vanh2", 'M', "2000-04-09", 24, "Vietnam", "vietzanh204", 200, 1, "2024-04-11");
 
-    // struct Ranking* leaderboard = getRankingInfo(conn);
+    // struct Ranking* leaderboard = dbGetScoreBoard(conn);
     // for (int i=0;i<sizeof(leaderboard) / sizeof(leaderboard[0].balance);i++) {
     //     printf("%d\t%d\n",leaderboard[i].player_id,leaderboard[i].balance);
     // }
@@ -45,12 +45,12 @@ int main()
         scanf("%s", password);
 
         printf("Signup result: ");
-        int signup_result = signup(conn, username, password);
+        int signup_result = dbSignup(conn, username, password);
         switch (signup_result)
         {
         case REGISTER_OK:
-            // createPlayer(conn, rand(), username, 'M', "2004-04-09", 20, "Vietnam", password, -1.0, -1, "2024-04-11");
-            // createPlayer(conn, 10, "Vanh", 'M', "2004-04-09", 20, "Vietnam", "vietzanh204", 100, 1, "2024-04-11");
+            // dbCreateUser(conn, rand(), username, 'M', "2004-04-09", 20, "Vietnam", password, -1.0, -1, "2024-04-11");
+            // dbCreateUser(conn, 10, "Vanh", 'M', "2004-04-09", 20, "Vietnam", "vietzanh204", 100, 1, "2024-04-11");
             printf("REGISTOR_OK\n");
             break;
         case USERNAME_USED:
@@ -78,7 +78,7 @@ int main()
         scanf("%s", password);
 
         printf("Login result: ");
-        int login_result = login(conn, username, password);
+        int login_result = dbLogin(conn, username, password);
         switch (login_result)
         {
         case LOGIN_OK:

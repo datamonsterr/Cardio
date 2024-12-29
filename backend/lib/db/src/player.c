@@ -2,7 +2,7 @@
 
 // input is player's information
 // void function so no output, used to create player and insert player in ranking board
-void createPlayer(PGconn *conn, int player_id, char *fullname, char gender, char *date_of_birth, int age, char *country, char *password, float balance, int rank, char *registration_date)
+void dbCreateUser(PGconn *conn, int player_id, char *fullname, char gender, char *date_of_birth, int age, char *country, char *password, float balance, int rank, char *registration_date)
 {
     char query[256];
     snprintf(query, sizeof(query), "INSERT INTO player (player_id, fullname, gender, date_of_birth, age, country, password, avatar, balance, rank, registration_date) "
@@ -33,11 +33,11 @@ void createPlayer(PGconn *conn, int player_id, char *fullname, char gender, char
 }
 
 // input is 'conn' - the connection pointer, and player_id;
-// output is information of player in form of struct Player
-struct Player getPlayerInfo(PGconn *conn, int player_id)
+// output is information of player in form of struct dbUser
+struct dbUser dbGetUserInfo(PGconn *conn, int player_id)
 {
     char query[256];
-    struct Player player;
+    struct dbUser player;
     snprintf(query, sizeof(query), "SELECT * FROM player WHERE player_id = %d", player_id);
 
     PGresult *res = PQexec(conn, query);
@@ -80,7 +80,7 @@ struct Player getPlayerInfo(PGconn *conn, int player_id)
 
 // input is player_id
 // void function so no output, used to delete player
-void deletePlayer(PGconn *conn, int player_id)
+void dbDeleteUser(PGconn *conn, int player_id)
 {
     char query[256];
     snprintf(query, sizeof(query), "DELETE FROM player WHERE player_id = %d RETURNING *", player_id);
@@ -100,7 +100,7 @@ void deletePlayer(PGconn *conn, int player_id)
 
 // no need input
 // output is the list of players in ranking board
-struct Ranking *getRankingInfo(PGconn *conn)
+struct Ranking *dbGetScoreBoard(PGconn *conn)
 {
     char query[256];
     snprintf(query, sizeof(query), "SELECT * FROM ranking ORDER BY balance DESC");

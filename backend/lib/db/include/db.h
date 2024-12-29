@@ -17,7 +17,7 @@
 #define NO_USER_FOUND 1
 #define SERVER_ERROR -1
 
-struct Player
+struct dbUser
 {
     int player_id;
     char *fullname;
@@ -90,20 +90,18 @@ struct History
 void connection(PGconn *conn);
 
 // This function return a struct of player if success, or an error message if failed.
-struct Player getPlayerInfo(PGconn *conn, int player_id);
+struct dbUser dbGetUserInfo(PGconn *conn, int player_id);
 // This function create a player in database or return an error message if create failed.
-void createPlayer(PGconn *conn, int player_id, char *fullname, char gender, char *date_of_birth, int age, char *country, char *password, float balance, int rank, char *registration_date);
+void dbCreateUser(PGconn *conn, int player_id, char *fullname, char gender, char *date_of_birth, int age, char *country, char *password, float balance, int rank, char *registration_date);
 // This function delete a player from database or return an error message if delete failed.
-void deletePlayer(PGconn *conn, int player_id);
+void dbDeleteUser(PGconn *conn, int player_id);
 // This function return the leaderboard or an error message if failed.
-struct Ranking *getRankingInfo(PGconn *conn);
+struct Ranking *dbGetScoreBoard(PGconn *conn);
 
-bool validate_username(char *username);
-bool validate_password(char *password);
 // This function take input: username, password.
 // If username and password are valid, it create a new player in database
 // new player_id = number of existed player + 1
-int signup(PGconn *conn, char *username, char *password);
+int dbSignup(PGconn *conn, char *username, char *password);
 // This function take input: username, password
-// If username and password are valid and exist in database, return login successful
-int login(PGconn *conn, char *username, char *password);
+// If username and password are valid and exist in database, return dbLogin successful
+int dbLogin(PGconn *conn, char *username, char *password);
