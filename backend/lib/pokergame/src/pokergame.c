@@ -324,71 +324,71 @@
 //   return 0;
 // }
 
-/*validate player input regarding which cards they want to discard. reject invalid numeric input*/
-int check_input(int adiscard, int *maxthrown, int *maxdiscards)
-{
-  int k = 0;
-  if (adiscard > 6 || adiscard < 0)
-  {
-    printf("You did not enter a valid option. Please try again\n");
-    return 1;
-  }
-  for (k = 0; k < *maxthrown; k++)
-  {
-    if ((adiscard - 1) == maxdiscards[k])
-    {
-      printf("     You already discarded that card.\n");
-      return 2;
-    }
-  }
-  return 0;
-}
+// /*validate player input regarding which cards they want to discard. reject invalid numeric input*/
+// int check_input(int adiscard, int *maxthrown, int *maxdiscards)
+// {
+//   int k = 0;
+//   if (adiscard > 6 || adiscard < 0)
+//   {
+//     printf("You did not enter a valid option. Please try again\n");
+//     return 1;
+//   }
+//   for (k = 0; k < *maxthrown; k++)
+//   {
+//     if ((adiscard - 1) == maxdiscards[k])
+//     {
+//       printf("     You already discarded that card.\n");
+//       return 2;
+//     }
+//   }
+//   return 0;
+// }
 
-/*calculate the max amount the computer is willing to bet, based on expected value*/
-int get_max_incremental_bet(Player *player, int expectedvalue, int maxcumulbet)
-{
-  double maxbet = (INITIALMONEY) * ((float)expectedvalue / CARDVALUES);
-  int maxbeti = maxbet;
-  int bet = maxbeti - player->bet;
-  // printf("\ncomputer: maxbet:%f, bet:%d, expval:%d, maxcumulbet:%d, playerbet:%d, playermoney:%d\n",maxbet,bet,expectedvalue,maxcumulbet,player->bet,player->money);
-  // bet only if the incremental amount the computer is willing to bet is greater than what is needed to call
-  if (bet >= maxcumulbet - player->bet)
-  {
-    // all in if the bet amount is greater than amount the player has or if money is low and the computer has a pair
-    if (bet > player->money || (player->money < 30 && expectedvalue > 13 * 2))
-      return player->money;
-    return bet;
-  }
-  else if (player->bet == maxcumulbet)
-  { // if the incremental bet isn't higher than what is needed to call, but the player is the highest bet already, stay
-    return 0;
-  }
-  else
-  { // otherwise fold
-    player->fold = FOLDED;
-    return -1;
-  }
-}
+// /*calculate the max amount the computer is willing to bet, based on expected value*/
+// int get_max_incremental_bet(Player *player, int expectedvalue, int maxcumulbet)
+// {
+//   double maxbet = (INITIALMONEY) * ((float)expectedvalue / CARDVALUES);
+//   int maxbeti = maxbet;
+//   int bet = maxbeti - player->bet;
+//   // printf("\ncomputer: maxbet:%f, bet:%d, expval:%d, maxcumulbet:%d, playerbet:%d, playermoney:%d\n",maxbet,bet,expectedvalue,maxcumulbet,player->bet,player->money);
+//   // bet only if the incremental amount the computer is willing to bet is greater than what is needed to call
+//   if (bet >= maxcumulbet - player->bet)
+//   {
+//     // all in if the bet amount is greater than amount the player has or if money is low and the computer has a pair
+//     if (bet > player->money || (player->money < 30 && expectedvalue > 13 * 2))
+//       return player->money;
+//     return bet;
+//   }
+//   else if (player->bet == maxcumulbet)
+//   { // if the incremental bet isn't higher than what is needed to call, but the player is the highest bet already, stay
+//     return 0;
+//   }
+//   else
+//   { // otherwise fold
+//     player->fold = FOLDED;
+//     return -1;
+//   }
+// }
 
-// get a valid amount from the human player to add to their bet
-int get_incremental_bet(Player *player, int currentbet)
-{
-  int abet = 0;
-  scanf("%d", &abet);
-  if (abet < 0)
-  {
-    player->fold = FOLDED;
-    return -1;
-  }
-  if (abet < (currentbet - player->bet))
-  {
-    printf("You must add at least %d to the pool. Please try again. (Enter -1 to fold).", currentbet - player->bet);
-    return get_incremental_bet(player, currentbet);
-  }
-  if (abet > player->money)
-  {
-    printf("You only have $%d. Please try again. (Enter -1 to fold).", player->money);
-    return get_incremental_bet(player, currentbet);
-  }
-  return abet;
-}
+// // get a valid amount from the human player to add to their bet
+// int get_incremental_bet(Player *player, int currentbet)
+// {
+//   int abet = 0;
+//   scanf("%d", &abet);
+//   if (abet < 0)
+//   {
+//     player->fold = FOLDED;
+//     return -1;
+//   }
+//   if (abet < (currentbet - player->bet))
+//   {
+//     printf("You must add at least %d to the pool. Please try again. (Enter -1 to fold).", currentbet - player->bet);
+//     return get_incremental_bet(player, currentbet);
+//   }
+//   if (abet > player->money)
+//   {
+//     printf("You only have $%d. Please try again. (Enter -1 to fold).", player->money);
+//     return get_incremental_bet(player, currentbet);
+//   }
+//   return abet;
+// }

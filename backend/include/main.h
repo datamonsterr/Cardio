@@ -18,3 +18,5 @@
 #include "db.h"
 
 int compare_raw_bytes(char *b1, char *b2, int len);
+#define MAXLINE 65540
+#define dbconninfo "dbname=cardio user=postgres password=1234 host=localhost port=5432"
