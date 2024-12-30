@@ -21,12 +21,13 @@ typedef struct __attribute__((packed))
 
 struct
 {
-    Header header;
+    Header *header;
     char data[MAXLINE];
 } typedef Packet;
 
 Header *decode_header(char *data);
 Packet *decode_packet(char *data);
+void free_packet(Packet *packet);
 
 char *encode_packet(__uint8_t protocol_ver, __uint16_t packet_type, char *payload, size_t payload_len);
 
@@ -37,3 +38,4 @@ struct
 } typedef LoginRequest;
 
 LoginRequest *decode_login_request(char *data);
+char *encode_error_message(char *msg);

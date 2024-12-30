@@ -21,3 +21,9 @@
 #define dbconninfo "dbname=cardio user=postgres password=1234 host=localhost port=5432"
 
 int compare_raw_bytes(char *b1, char *b2, int len);
+
+struct
+{
+    char *data;
+    size_t len;
+} typedef RawBytes;

@@ -1,6 +1,12 @@
 #include "main.h"
 
-char *encode_packet(__uint8_t protocol_ver, __uint16_t packet_type, char *payload, size_t payload_len)
+void free_packet(Packet *packet)
+{
+    free(packet->header);
+    free(packet);
+}
+
+RawBytes *encode_packet(__uint8_t protocol_ver, __uint16_t packet_type, char *payload, size_t payload_len)
 {
     // header is all numbers, we need to turn it into bytes: length is __uint16_t, protocol_ver is __uint8_t, packet_type is __uint16_t
     // payload is a string, we need to turn it into bytes
@@ -27,9 +33,13 @@ char *encode_packet(__uint8_t protocol_ver, __uint16_t packet_type, char *payloa
 
     // copy the payload into the buffer
     memcpy(buffer + sizeof(Header), payload, header->packet_len - sizeof(Header));
+
+    RawBytes *raw_bytes = malloc(sizeof(RawBytes));
+    raw_bytes->data = buffer;
+    raw_bytes->len = header->packet_len;
     free(header);
 
-    return buffer;
+    return raw_bytes;
 }
 
 Header *decode_header(char *data)
@@ -47,8 +57,8 @@ Packet *decode_packet(char *data)
 {
     Packet *packet = malloc(sizeof(Packet));
 
-    packet->header = *decode_header(data);
-    memccpy(packet->data, data + sizeof(Header), packet->header.packet_len - sizeof(Header), packet->header.packet_len - sizeof(Header));
+    packet->header = decode_header(data);
+    memccpy(packet->data, data + sizeof(Header), packet->header->packet_len - sizeof(Header), packet->header->packet_len - sizeof(Header));
 
     return packet;
 }
@@ -69,4 +79,30 @@ LoginRequest *decode_login_request(char *data) // login payload: {username: "vie
     strcpy(login_request->password, password);
 
     return login_request;
+}
+
+RawBytes *encode_error_message(char *msg)
+{
+    mpack_writer_t writer;
+    char buffer[100];
+    mpack_writer_init(&writer, buffer, 100);
+
+    mpack_start_map(&writer, 1);
+    mpack_write_cstr(&writer, "err");
+    mpack_write_cstr(&writer, msg);
+    mpack_finish_map(&writer);
+
+    if (mpack_writer_destroy(&writer) != mpack_ok)
+    {
+        fprintf(stderr, "An error occurred encoding the message\n");
+        return NULL;
+    }
+
+    RawBytes *raw_bytes = malloc(sizeof(RawBytes));
+
+    raw_bytes->len = mpack_writer_buffer_used(&writer);
+    raw_bytes->data = malloc(raw_bytes->len);
+    memcpy(raw_bytes->data, buffer, raw_bytes->len);
+
+    return raw_bytes;
 }
