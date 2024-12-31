@@ -85,6 +85,7 @@ int main(void)
                 switch (header->packet_type)
                 {
                 case 100: // Login
+                    printf("Login request from client %d\n", events[i].data.fd);
                     handle_login_request(events[i].data.fd, buf, nbytes);
                     break;
 

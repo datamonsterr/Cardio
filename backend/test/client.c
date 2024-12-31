@@ -63,9 +63,9 @@ int main(int argc, char *argv[])
 
         // Write data to the MPack map
         mpack_start_map(&writer, 2);
-        mpack_write_cstr(&writer, "username");
+        mpack_write_cstr(&writer, "user");
         mpack_write_cstr(&writer, username);
-        mpack_write_cstr(&writer, "password");
+        mpack_write_cstr(&writer, "pass");
         mpack_write_cstr(&writer, password);
         mpack_finish_map(&writer);
 
@@ -76,10 +76,10 @@ int main(int argc, char *argv[])
         size_t size = mpack_writer_buffer_used(&writer);
 
         // Encode the packet
-        char *encoded_message = encode_packet(1, 100, data, size);
+        RawBytes *encoded_message = encode_packet(1, 100, data, size);
 
         // Send the encoded message
-        if (send(servfd, encoded_message, size + 5, 0) == -1)
+        if (send(servfd, encoded_message->data, encoded_message->len, 0) == -1)
         { // Include header size (5 bytes)
             perror("send");
             free(encoded_message);
@@ -90,6 +90,44 @@ int main(int argc, char *argv[])
         {
             fprintf(stderr, "MPack encoding error: %s\n", mpack_error_to_string(error));
             break;
+        }
+
+        if (recv(servfd, recv_buffer, MAXLINE, 0) == -1)
+        {
+            perror("recv");
+            break;
+        }
+
+        // Decode the response
+        Header *header = decode_header(recv_buffer);
+        if (header == NULL)
+        {
+            fprintf(stderr, "Invalid header\n");
+            break;
+        }
+
+        if (header->packet_type == 100)
+        {
+            mpack_reader_t reader;
+            mpack_reader_init(&reader, recv_buffer + sizeof(Header), header->packet_len - sizeof(Header), header->packet_len - sizeof(Header));
+            // if there is error, the payload will contains 2 fields: res and msg, if not, it will contains only res
+
+            mpack_expect_map_max(&reader, 1);
+            mpack_expect_cstr_match(&reader, "res");
+            int res = mpack_expect_u16(&reader);
+
+            if (res == R_LOGIN_OK)
+            {
+                printf("Login success with code %d\n", res);
+            }
+            else
+            {
+                printf("Login failed with code %d\n", res);
+            }
+        }
+        else
+        {
+            fprintf(stderr, "Invalid packet type\n");
         }
 
         // Free dynamically allocated memory

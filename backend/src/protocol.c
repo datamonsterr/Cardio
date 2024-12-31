@@ -69,10 +69,17 @@ LoginRequest *decode_login_request(char *data) // login payload: {username: "vie
     mpack_reader_init_data(&reader, data, 1024);
 
     mpack_expect_map_max(&reader, 2);
-    mpack_expect_cstr_match(&reader, "username");
+
+    mpack_expect_cstr_match(&reader, "user");
     const char *username = mpack_expect_cstr_alloc(&reader, 30);
-    mpack_expect_cstr_match(&reader, "password");
+    mpack_expect_cstr_match(&reader, "pass");
     const char *password = mpack_expect_cstr_alloc(&reader, 30);
+
+    if (mpack_reader_destroy(&reader) != mpack_ok)
+    {
+        fprintf(stderr, "An error occurred decoding the message\n");
+        return NULL;
+    }
 
     LoginRequest *login_request = malloc(sizeof(LoginRequest));
     strcpy(login_request->username, username);
@@ -81,20 +88,19 @@ LoginRequest *decode_login_request(char *data) // login payload: {username: "vie
     return login_request;
 }
 
-RawBytes *encode_error_message(char *msg)
+RawBytes *encode_response(int res)
 {
     mpack_writer_t writer;
     char buffer[100];
     mpack_writer_init(&writer, buffer, 100);
-
     mpack_start_map(&writer, 1);
-    mpack_write_cstr(&writer, "err");
-    mpack_write_cstr(&writer, msg);
+    mpack_write_cstr(&writer, "res");
+    mpack_write_u16(&writer, res);
     mpack_finish_map(&writer);
 
     if (mpack_writer_destroy(&writer) != mpack_ok)
     {
-        fprintf(stderr, "An error occurred encoding the message\n");
+        fprintf(stderr, "Encode response: An error occurred encoding the message\n");
         return NULL;
     }
 
@@ -103,6 +109,33 @@ RawBytes *encode_error_message(char *msg)
     raw_bytes->len = mpack_writer_buffer_used(&writer);
     raw_bytes->data = malloc(raw_bytes->len);
     memcpy(raw_bytes->data, buffer, raw_bytes->len);
+
+    return raw_bytes;
+}
+
+RawBytes *encode_response_msg(int res, char *msg)
+{
+    mpack_writer_t writer;
+    char buffer[1024];
+    mpack_writer_init(&writer, buffer, 1024);
+    mpack_start_map(&writer, 2);
+    mpack_write_cstr(&writer, "res");
+    mpack_write_u16(&writer, res);
+    mpack_write_cstr(&writer, "msg");
+    mpack_write_cstr(&writer, msg);
+    mpack_finish_map(&writer);
+
+    RawBytes *raw_bytes = malloc(sizeof(RawBytes));
+
+    raw_bytes->len = mpack_writer_buffer_used(&writer);
+    raw_bytes->data = malloc(raw_bytes->len);
+    memcpy(raw_bytes->data, buffer, raw_bytes->len);
+
+    if (mpack_writer_destroy(&writer) != mpack_ok)
+    {
+        fprintf(stderr, "Encode response msg: An error occurred encoding the message\n");
+        return NULL;
+    }
 
     return raw_bytes;
 }

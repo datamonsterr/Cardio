@@ -6,11 +6,13 @@ int handle_login_request(int client_fd, char *data, size_t data_len)
     Packet *packet = decode_packet(data);
     if (packet->header->packet_type != 100)
     {
+        fprintf(stderr, "Handle login: invalid packet type\n");
         return -1;
     }
 
     if (packet->header->packet_len != data_len)
     {
+        fprintf(stderr, "Handle login: invalid packet length\n");
         return -1;
     }
 
@@ -18,20 +20,27 @@ int handle_login_request(int client_fd, char *data, size_t data_len)
     int res = dbLogin(conn, login_request->username, login_request->password);
     if (res == LOGIN_OK)
     {
-        char *msg = "Login successful";
-        char *response = encode_packet(PROTOCOL_V1, 100, msg, strlen(msg));
-        sendall(client_fd, response, 16);
+        RawBytes *raw_bytes = encode_response(R_LOGIN_OK);
+        RawBytes *response = encode_packet(PROTOCOL_V1, 100, raw_bytes->data, raw_bytes->len);
+        sendall(client_fd, response->data, (int *)&(response->len));
         free(response);
+        free(raw_bytes);
+        free(login_request);
+        fprintf(stdout, "Handle login: Login success from socket %d\n", client_fd);
+        return LOGIN_OK;
     }
-    else
-    {
-        char *msg = encode_error_message("Login failed");
-        char *response = encode_packet(PROTOCOL_V1, 100, msg, strlen(msg));
-        sendall(client_fd, response, 13);
-        free(response);
-    }
+
+    RawBytes *raw_bytes = encode_response(R_LOGIN_NOT_OK);
+    RawBytes *response = encode_packet(PROTOCOL_V1, 100, raw_bytes->data, raw_bytes->len);
+    sendall(client_fd, response->data, (int *)&(response->len));
+    fprintf(stderr, "Handle login: Login failed from socket %d\n", client_fd);
 
     PQfinish(conn);
 
+    free(response);
+    free(raw_bytes);
     free_packet(packet);
+    free(login_request);
+
+    return -1;
 }
