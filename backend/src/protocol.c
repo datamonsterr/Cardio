@@ -71,9 +71,9 @@ LoginRequest *decode_login_request(char *data) // login payload: {username: "vie
     mpack_expect_map_max(&reader, 2);
 
     mpack_expect_cstr_match(&reader, "user");
-    const char *username = mpack_expect_cstr_alloc(&reader, 30);
+    const char *username = mpack_expect_cstr_alloc(&reader, 32);
     mpack_expect_cstr_match(&reader, "pass");
-    const char *password = mpack_expect_cstr_alloc(&reader, 30);
+    const char *password = mpack_expect_cstr_alloc(&reader, 32);
 
     if (mpack_reader_destroy(&reader) != mpack_ok)
     {

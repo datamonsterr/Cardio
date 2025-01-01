@@ -15,6 +15,7 @@
 #include "mpack.h"
 #include "protocol.h"
 #include "server.h"
+#include "game.h"
 #include "db.h"
 
 #define dbconninfo "dbname=cardio user=postgres password=1234 host=localhost port=5433"

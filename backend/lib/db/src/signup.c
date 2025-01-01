@@ -44,63 +44,45 @@ bool validate_password(char *password)
     return alpha && digit;
 }
 
-int dbSignup(PGconn *conn, char *username, char *password)
+int dbSignup(PGconn *conn, struct dbUser *user)
 {
-    if (!validate_username(username))
+    if (!validate_username(user->username))
     {
-        return INVALID_USERNAME;
+        fprintf(stderr, "dbSignup: Invalid username %s\n", user->username);
+        return DB_ERROR;
     }
 
-    if (!validate_password(password))
+    if (!validate_password(user->password))
     {
-        return INVALID_PASSWORD;
+        fprintf(stderr, "dbSignup: Invalid password\n");
+        return DB_ERROR;
+    }
+
+    if (strlen(user->email) == 0 || strlen(user->phone) == 0)
+    {
+        fprintf(stderr, "dbSignup: Email or phone is empty\n");
+        return -1;
     }
 
     char query[256];
-    snprintf(query, sizeof(query), "select player_id from player where fullname = '%s';", username);
+    snprintf(query, sizeof(query), "select user_id from \"User\" where email = '%s' OR phone = '%s' OR username = '%s';", user->email, user->phone, user->username);
 
     PGresult *res = PQexec(conn, query);
     if (PQresultStatus(res) != PGRES_TUPLES_OK)
     {
-        fprintf(stderr, "PostgreSQL error: %s\n", PQerrorMessage(conn));
+        fprintf(stderr, "PstgreSQL error: %s\n", PQerrorMessage(conn));
         PQclear(res);
-        return SERVER_ERROR;
+        return DB_ERROR;
     }
 
     if (PQntuples(res) > 0)
     {
         PQclear(res);
-        return USERNAME_USED;
+        return DB_ERROR;
     }
 
-    PQclear(res);
-    snprintf(query, sizeof(query), "select count(player_id) + 1 as new_playerID  from player;");
-    res = PQexec(conn, query);
-    int new_playerID;
-    if (PQresultStatus(res) == PGRES_TUPLES_OK)
-    {
-        if (PQntuples(res) == 1)
-        {
-            new_playerID = atoi(PQgetvalue(res, 0, 0));
-            dbCreateUser(conn, new_playerID, username, 'M', "2004-04-09", 20, "Vietnam", password, -1.0, -1, "2024-04-11");
-            PQclear(res);
-            return REGISTER_OK;
-        }
-        else
-        {
-            PQclear(res);
-            return SERVER_ERROR;
-        }
-    }
-
-    // snprintf(query, sizeof(query), "insert into player (player_id, fullname, gender, date_of_birth, age, country, password, avatar, balance, rank, registration_date) values (%d,'%s','',null,20,null,'%s',null,-1.0,-1,null);", new_playerID, username, password);
-    // res = PQexec(conn, query);
-    // if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-    //     fprintf(stderr, "PstgreSQL error: %s\n", PQerrorMessage(conn));
-    //     PQclear(res);
-    //     return SERVER_ERROR;
-    // }
+    dbCreateUser(conn, user);
 
     PQclear(res);
-    return REGISTER_OK;
+    return DB_OK;
 }

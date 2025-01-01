@@ -1,67 +1,67 @@
 #include "main.h"
 #include "game.h"
 
-RoomList *init_room_list(size_t capacity)
+TableList *init_table_list(size_t capacity)
 {
-    RoomList *room_list = malloc(sizeof(RoomList));
-    if (room_list == NULL)
+    TableList *table_list = malloc(sizeof(TableList));
+    if (table_list == NULL)
     {
         return NULL;
     }
-    room_list->rooms = malloc(capacity * sizeof(Room));
-    if (room_list->rooms == NULL)
+    table_list->tables = malloc(capacity * sizeof(Table));
+    if (table_list->tables == NULL)
     {
-        free(room_list);
+        free(table_list);
         return NULL;
     }
-    room_list->size = 0;
-    room_list->capacity = capacity;
-    return room_list;
+    table_list->size = 0;
+    table_list->capacity = capacity;
+    return table_list;
 }
-int add_room(RoomList *room_list, Room room)
+int add_table(TableList *table_list, Table table)
 {
-    if (room_list->size == room_list->capacity)
+    if (table_list->size == table_list->capacity)
     {
-        Room *new_rooms = realloc(room_list->rooms, room_list->capacity * 2 * sizeof(Room));
-        if (new_rooms == NULL)
+        Table *new_tables = realloc(table_list->tables, table_list->capacity * 2 * sizeof(Table));
+        if (new_tables == NULL)
         {
             return -1;
         }
-        room_list->rooms = new_rooms;
-        room_list->capacity *= 2;
+        table_list->tables = new_tables;
+        table_list->capacity *= 2;
     }
-    room_list->rooms[room_list->size] = room;
-    room_list->size++;
+    table_list->tables[table_list->size] = table;
+    table_list->size++;
     return 0;
 }
-int remove_room(RoomList *room_list, int id)
+int remove_table(TableList *table_list, int id)
 {
-    int index = find_room_by_id(room_list, id);
+    int index = find_table_by_id(table_list, id);
     if (index == -1)
     {
         return -1;
     }
-    for (int i = index; i < room_list->size - 1; i++)
+    for (int i = index; i < table_list->size - 1; i++)
     {
-        room_list->rooms[i] = room_list->rooms[i + 1];
+        table_list->tables[i] = table_list->tables[i + 1];
     }
-    room_list->size--;
+    table_list->size--;
     return 0;
 }
-Room *find_room_by_id(RoomList *room_list, int id)
+int find_table_by_id(TableList *table_list, int id)
 {
-    for (int i = 0; i < room_list->size; i++)
+    for (int i = 0; i < table_list->size; i++)
     {
-        if (room_list->rooms[i].id == id)
+        if (table_list->tables[i].id == id)
         {
-            return &room_list->rooms[i];
+            return i;
         }
     }
-    return NULL;
+    return -1;
 }
 
-void free_room_list(RoomList *room_list)
+void free_table_list(TableList *table_list)
 {
-    free(room_list->rooms);
-    free(room_list);
+    free(table_list->tables);
+    free(table_list);
 }

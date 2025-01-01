@@ -41,7 +41,9 @@ int main(void)
 
         for (int i = 0; i < n; i++)
         {
-            if (events[i].data.fd == listener)
+            int sockfd = events[i].data.fd;
+            conn_data_t *conn_data = events[i].data.ptr;
+            if (sockfd == listener)
             {
                 int client_fd = accept_connection(listener);
 
@@ -52,25 +54,22 @@ int main(void)
 
                 set_nonblocking(client_fd);
 
-                event.events = EPOLLIN | EPOLLET;
-                event.data.fd = client_fd;
-
-                if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &event) == -1)
+                if (add_connection_to_epoll(epoll_fd, client_fd) == -1)
                 {
-                    perror("epoll_ctl");
+                    fprintf(stderr, "main: Cannot add client to epoll");
                     return 1;
-                }
+                };
             }
             else
             {
                 char buf[MAXLINE];
                 memset(buf, 0, MAXLINE);
 
-                int nbytes = recv(events[i].data.fd, buf, MAXLINE, 0);
+                int nbytes = recv(sockfd, buf, MAXLINE, 0);
 
                 if (nbytes <= 0)
                 {
-                    close(events[i].data.fd);
+                    close_connection(epoll_fd, sockfd);
                     continue;
                 }
 
@@ -78,15 +77,20 @@ int main(void)
 
                 if (header == NULL)
                 {
-                    close(events[i].data.fd);
+                    close_connection(epoll_fd, sockfd);
                     continue;
                 }
 
                 switch (header->packet_type)
                 {
                 case 100: // Login
-                    printf("Login request from client %d\n", events[i].data.fd);
-                    handle_login_request(events[i].data.fd, buf, nbytes);
+                    printf("Login request from client %d\n", sockfd);
+                    handle_login_request(conn_data, sockfd, buf, nbytes);
+                    break;
+
+                case 200: // Signup
+                    printf("Signup request from client %d\n", sockfd);
+                    // handle_signup_request(events[i].data.fd, buf, nbytes);
                     break;
 
                 default:

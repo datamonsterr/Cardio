@@ -10,25 +10,26 @@ project(Kasino_db C) # SET PROJECT NAME HERE, start with Kasino_{name}
 file(GLOB_RECURSE SOURCES "src/*.c")
 list(FILTER SOURCES EXCLUDE REGEX ".*main.c$")
 
+file(GLOB_RECURSE TESTS "test/unit_test.c")
+list(APPEND TESTS ${SOURCES})
+
 set(LIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..) # SET LIB DIR HERE, this is relative directory of "lib" folder from this Cmake dir 
-list(APPEND ALL_LIBS db) # APPEND LIB HERE (directory name of lib)
 
-
-foreach(LIB IN LISTS ALL_LIBS)
-    list(APPEND ALL_INCLUDES "${LIB_DIR}/${LIB}/include")
-    list(APPEND ALL_LIBRARIES "${LIB_DIR}/${LIB}/build/libKasino_${LIB}.a")
-endforeach()
+set(ALL_INCLUDES ${LIB_DIR}/utils ${LIB_DIR}/db/include /usr/include/postgresql) # SET ALL INCLUDES HERE
 
 add_library(${PROJECT_NAME} ${SOURCES})
+
+set(test Kasino_db_test)
+add_executable(${test} ${TESTS})
 
 find_package(PostgreSQL REQUIRED)
 
 target_include_directories(${PROJECT_NAME} PUBLIC ${ALL_INCLUDES})
-target_include_directories(${PROJECT_NAME} PUBLIC /usr/include/postgresql)
-target_link_libraries(${PROJECT_NAME} PUBLIC ${ALL_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} PostgreSQL::PostgreSQL)
 
-add_executable(Kasino_db_test src/main.c src/player.c src/signup.c src/login.c)
-target_link_libraries(Kasino_db_test PostgreSQL::PostgreSQL)
+target_include_directories(${test} PUBLIC ${ALL_INCLUDES})
+target_include_directories(${test} PUBLIC /usr/include/postgresql)
+target_link_libraries(${test} PostgreSQL::PostgreSQL)
 
 
 

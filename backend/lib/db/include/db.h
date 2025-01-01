@@ -7,101 +7,54 @@
 #include <stdbool.h>
 // #include <msgpack.h>
 
-#define conninfo "dbname=cardio user=postgres password=1234 host=localhost port=5433"
-#define REGISTER_OK 0
-#define USERNAME_USED 1
-#define INVALID_USERNAME 2
-#define INVALID_PASSWORD 3
-#define SERVER_ERROR -1
-#define LOGIN_OK 0
-#define NO_USER_FOUND 1
-#define SERVER_ERROR -1
+#define conninfo "dbname=cardio user=root password=1234 host=localhost port=5433"
+#define DB_ERROR -200
+#define DB_OK -100
 
 struct dbUser
 {
-    int player_id;
-    char *fullname;
-    char gender;
-    char *date_of_birth;
-    int age;
-    char *country;
-    char *password;
-    unsigned char *avatar;
-    float balance;
-    int rank;
-    char *registration_date;
+    int user_id;
+    int balance;
+    char username[32];
+    char fullname[64];
+    char email[64];
+    char password[32];
+    char country[32];
+    char phone[16];
+    char dob[16];
+    char registration_date[16];
+    char gender[8];
 };
 
-struct Ranking
+struct dbRanking
 {
     int balance;
-    int player_id;
+    int user_id;
 };
 
-struct Friend
+struct dbFriend
 {
-    int friendship_id;
-    int player1_id;
-    int player2_id;
-    char *friend_time;
-};
-
-struct Room
-{
-    int room_id;
-    int min_player;
-    int max_layer;
-    int host_id;
-    char *status;
-};
-
-struct Match
-{
-    int match_id;
-    int room_id;
-    int winner;
-    char *status;
-    char *match_date;
-    char *start_time;
-    char *end_time;
-    unsigned char *progress;
-};
-
-struct Host
-{
-    int host_id;
-};
-
-struct Seat
-{
-    int seat_number;
-    int player_id;
-    int room_id;
-    char *sit;
-};
-
-struct History
-{
-    int match_id;
+    int user_id_1;
+    int user_id_2;
 };
 
 // This function connect to database.
 // Output is none if connection is ok, or an error message if connection is failed.
 void connection(PGconn *conn);
 
-// This function return a struct of player if success, or an error message if failed.
-struct dbUser dbGetUserInfo(PGconn *conn, int player_id);
-// This function create a player in database or return an error message if create failed.
-void dbCreateUser(PGconn *conn, int player_id, char *fullname, char gender, char *date_of_birth, int age, char *country, char *password, float balance, int rank, char *registration_date);
-// This function delete a player from database or return an error message if delete failed.
-void dbDeleteUser(PGconn *conn, int player_id);
+// This function return a struct of user if success, or an error message if failed.
+struct dbUser dbGetUserInfo(PGconn *conn, int user_id);
+// This function create a user in database or return an error message if create failed.
+void dbCreateUser(PGconn *conn, struct dbUser *user);
+// This function delete a user from database or return an error message if delete failed.
+void dbDeleteUser(PGconn *conn, int user_id);
 // This function return the leaderboard or an error message if failed.
-struct Ranking *dbGetScoreBoard(PGconn *conn);
+struct dbRanking *dbGetScoreBoard(PGconn *conn);
 
 // This function take input: username, password.
-// If username and password are valid, it create a new player in database
-// new player_id = number of existed player + 1
-int dbSignup(PGconn *conn, char *username, char *password);
+// If username and password are valid, it create a new user in database
+// new user_id = number of existed user + 1
+int dbSignup(PGconn *conn, struct dbUser *user);
 // This function take input: username, password
 // If username and password are valid and exist in database, return dbLogin successful
 int dbLogin(PGconn *conn, char *username, char *password);

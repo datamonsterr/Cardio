@@ -9,17 +9,17 @@ struct
     int max_player;
     int min_bet;
     int max_bet;
-} typedef Room;
+} typedef Table;
 
 typedef struct
 {
-    Room *rooms;     // Dynamic array of rooms
+    Table *tables;   // Dynamic array of rooms
     size_t size;     // Current number of rooms
     size_t capacity; // Maximum capacity before resizing
-} RoomList;
+} TableList;
 
-RoomList *init_room_list(size_t capacity);          // returns pointer to RoomList, NULL on failure
-int add_room(RoomList *room_list, Room room);       // returns 0 on success, -1 on failure
-int remove_room(RoomList *room_list, int id);       // returns 0 on success, -1 on failure
-Room *find_room_by_id(RoomList *room_list, int id); // returns index of room in list, -1 if not found
-void free_room_list(RoomList *room_list);
+TableList *init_table_list(size_t capacity);         // returns pointer to TableList, NULL on failure
+int add_table(TableList *table_list, Table room);    // returns 0 on success, -1 on failure
+int remove_table(TableList *table_list, int id);     // returns 0 on success, -1 on failure
+int find_table_by_id(TableList *table_list, int id); // returns index of room in list, -1 if not found
+void free_table_list(TableList *table_list);
