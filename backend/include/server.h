@@ -33,3 +33,9 @@ int update_conn_data(int epoll_fd, int client_fd, conn_data_t *conn_data);
 // Handler
 void handle_login_request(conn_data_t *conn_data, char *data, size_t data_len);
 void handle_signup_request(conn_data_t *conn_data, char *data, size_t data_len);
+void handle_create_table_request(conn_data_t *conn_data, char *data, size_t data_len, TableList *table_list);
+void handle_get_all_tables_request(conn_data_t *conn_data, char *data, size_t data_len, TableList *table_list);
+void handle_join_table_request(conn_data_t *conn_data, char *data, size_t data_len, TableList *table_list);
+
+int leave_table(conn_data_t *conn_data, TableList *table_list);
+int join_table(conn_data_t *conn_data, TableList *table_list, int table_id);

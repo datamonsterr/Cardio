@@ -104,3 +104,179 @@ void handle_signup_request(conn_data_t *conn_data, char *data, size_t data_len)
     free_packet(packet);
     free(signup_request);
 }
+
+void handle_create_table_request(conn_data_t *conn_data, char *data, size_t data_len, TableList *table_list)
+{
+    Packet *packet = decode_packet(data, data_len);
+    int is_valid = 1;
+
+    if (packet->header->packet_type != 300)
+    {
+        logger(MAIN_LOG, "Error", "Handle create table: invalid packet type");
+        is_valid = 0;
+    }
+
+    if (packet->header->packet_len != data_len)
+    {
+        logger(MAIN_LOG, "Error", "Handle create table: invalid packet length");
+        is_valid = 0;
+    }
+
+    if (conn_data->user_id == 0)
+    {
+        logger(MAIN_LOG, "Error", "Handle create table: User not logged in");
+        is_valid = 0;
+    }
+
+    if (conn_data->table_id != 0)
+    {
+        logger(MAIN_LOG, "Error", "Handle create table: User already at a table");
+        is_valid = 0;
+    }
+
+    if (is_valid == 0)
+    {
+        RawBytes *raw_bytes = encode_response(R_CREATE_TABLE_NOT_OK);
+        RawBytes *response = encode_packet(PROTOCOL_V1, 300, raw_bytes->data, raw_bytes->len);
+        if (sendall(conn_data->fd, response->data, (int *)&(response->len)) == -1)
+        {
+            logger(MAIN_LOG, "Error", "Handle create table: Cannot send response");
+        }
+        free(response);
+        free(raw_bytes);
+        free_packet(packet);
+        return;
+    }
+
+    CreateTableRequest *create_table_request = decode_create_table_request(packet->data);
+    Table *table;
+    int res = add_table(table_list, create_table_request->table_name, create_table_request->max_player, create_table_request->min_bet);
+    int is_join_ok = join_table(conn_data, table_list, res);
+    RawBytes *raw_bytes = malloc(sizeof(RawBytes));
+    RawBytes *response = malloc(sizeof(RawBytes));
+    if (res > 0 && is_join_ok >= 0)
+    {
+        raw_bytes = encode_response(R_CREATE_TABLE_OK);
+        response = encode_packet(PROTOCOL_V1, 300, raw_bytes->data, raw_bytes->len);
+        logger(MAIN_LOG, "Info", "Handle create table: Create table success");
+    }
+    else
+    {
+        raw_bytes = encode_response(R_CREATE_TABLE_NOT_OK);
+        response = encode_packet(PROTOCOL_V1, 300, raw_bytes->data, raw_bytes->len);
+        char *msg;
+        sprintf(msg, "Handle create table: Create table failed res = %d, is_join = %d", res, is_join_ok);
+        logger(MAIN_LOG, "Error", msg);
+    }
+
+    if (sendall(conn_data->fd, response->data, (int *)&(response->len)) == -1)
+    {
+        logger(MAIN_LOG, "Error", "Handle create table: Cannot send response");
+    }
+
+    free(response);
+    free(raw_bytes);
+    free_packet(packet);
+    free(create_table_request);
+}
+
+void handle_get_all_tables_request(conn_data_t *conn_data, char *data, size_t data_len, TableList *table_list)
+{
+    Packet *packet = decode_packet(data, data_len);
+
+    if (packet->header->packet_type != PACKET_TABLES)
+    {
+        logger(MAIN_LOG, "Error", "Handle get all tables: invalid packet type");
+    }
+
+    if (packet->header->packet_len != data_len)
+    {
+        logger(MAIN_LOG, "Error", "Handle get all tables: invalid packet length");
+    }
+
+    RawBytes *raw_bytes = encode_full_tables_response(table_list);
+    RawBytes *response = encode_packet(PROTOCOL_V1, PACKET_TABLES, raw_bytes->data, raw_bytes->len);
+    if (sendall(conn_data->fd, response->data, (int *)&(response->len)) == -1)
+    {
+        logger(MAIN_LOG, "Error", "Handle get all tables: Cannot send response");
+    }
+
+    free(response);
+    free_packet(packet);
+}
+void handle_join_table_request(conn_data_t *conn_data, char *data, size_t data_len, TableList *table_list)
+{
+    Packet *packet = decode_packet(data, data_len);
+
+    int is_valid = 1;
+
+    if (packet->header->packet_type != PACKET_JOIN_TABLE)
+    {
+        logger(MAIN_LOG, "Error", "Handle join table: invalid packet type");
+        is_valid = 0;
+    }
+
+    if (packet->header->packet_len != data_len)
+    {
+        logger(MAIN_LOG, "Error", "Handle join table: invalid packet length");
+        is_valid = 0;
+    }
+
+    if (conn_data->user_id == 0)
+    {
+        logger(MAIN_LOG, "Error", "Handle join table: User not logged in");
+        is_valid = 0;
+    }
+
+    if (conn_data->table_id != 0)
+    {
+        logger(MAIN_LOG, "Error", "Handle join table: User already at a table");
+        is_valid = 0;
+    }
+
+    if (is_valid == 0)
+    {
+        RawBytes *raw_bytes = encode_response(R_JOIN_TABLE_NOT_OK);
+        RawBytes *response = encode_packet(PROTOCOL_V1, PACKET_JOIN_TABLE, raw_bytes->data, raw_bytes->len);
+        if (sendall(conn_data->fd, response->data, (int *)&(response->len)) == -1)
+        {
+            logger(MAIN_LOG, "Error", "Handle join table: Cannot send response");
+        }
+        free(response);
+        free(raw_bytes);
+        free_packet(packet);
+        return;
+    }
+
+    int table_id = decode_join_table_request(packet->data);
+
+    int res = join_table(conn_data, table_list, table_id);
+    printf("res = %d\n", res);
+    RawBytes *raw_bytes = malloc(sizeof(RawBytes));
+    RawBytes *response = malloc(sizeof(RawBytes));
+    if (res >= 0)
+    {
+        logger(MAIN_LOG, "Info", "Handle join table: Join table success");
+        raw_bytes = encode_response(R_JOIN_TABLE_OK);
+    }
+    else if (res == -2)
+    {
+        logger(MAIN_LOG, "Error", "Handle join table: Table is full");
+        raw_bytes = encode_response(R_JOIN_TABLE_FULL);
+    }
+    else
+    {
+        logger(MAIN_LOG, "Error", "Handle join table: Unknown error");
+        raw_bytes = encode_response(R_JOIN_TABLE_NOT_OK);
+    }
+
+    response = encode_packet(PROTOCOL_V1, PACKET_JOIN_TABLE, raw_bytes->data, raw_bytes->len);
+    if (sendall(conn_data->fd, response->data, (int *)&(response->len)) == -1)
+    {
+        logger(MAIN_LOG, "Error", "Handle join table: Cannot send response");
+    }
+    free(response);
+    free(raw_bytes);
+    free_packet(packet);
+    return;
+}

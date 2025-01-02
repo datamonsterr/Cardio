@@ -4,13 +4,18 @@ TEST(test_decode_packet)
 {
     char *data = "hello";
     RawBytes *encoded = encode_packet(1, 100, data, strlen(data));
+    RawBytes *encoded_null = encode_packet(1, 100, NULL, 0);
 
     Packet *packet = decode_packet(encoded->data, encoded->len);
+    Packet *packet_null = decode_packet(encoded_null->data, encoded_null->len);
 
     ASSERT(packet->header->packet_len == 10);
     ASSERT(packet->header->protocol_ver == 1);
     ASSERT(packet->header->packet_type == 100);
     ASSERT(compare_raw_bytes(packet->data, "hello", 5) == 1);
+
+    ASSERT(packet_null->header->packet_len == 5);
+    ASSERT(packet_null->header->packet_type == 100);
     free_packet(packet);
 }
 
@@ -196,6 +201,62 @@ TEST(test_logger)
     fclose(f);
 }
 
+TEST(test_encode_full_tables_resp)
+{
+    TableList *table_list = init_table_list(3);
+    add_table(table_list, "Table 1", 5, 100);
+    add_table(table_list, "Table 2", 3, 130);
+
+    RawBytes *encoded = encode_full_tables_response(table_list);
+
+    mpack_reader_t reader;
+    mpack_reader_init(&reader, encoded->data, 1024, 1024);
+    mpack_expect_map_max(&reader, 2);
+    mpack_expect_cstr_match(&reader, "size");
+    int size = mpack_expect_i32(&reader);
+    ASSERT(size == table_list->size);
+
+    mpack_expect_cstr_match(&reader, "tables");
+    mpack_expect_array_max(&reader, size);
+    for (int i = 0; i < size; i++)
+    {
+        mpack_expect_map_max(&reader, 5);
+
+        mpack_expect_cstr_match(&reader, "id");
+        int id = mpack_expect_i32(&reader);
+        mpack_expect_cstr_match(&reader, "name");
+        const char *name = mpack_expect_cstr_alloc(&reader, 32);
+        mpack_expect_cstr_match(&reader, "max_player");
+        int max_player = mpack_expect_i32(&reader);
+        mpack_expect_cstr_match(&reader, "min_bet");
+        int min_bet = mpack_expect_i32(&reader);
+        mpack_expect_cstr_match(&reader, "current_player");
+        int current_player = mpack_expect_i32(&reader);
+
+        ASSERT(strcmp(name, table_list->tables[i].name) == 0);
+    }
+}
+
+TEST(test_decode_join_table_req)
+{
+    mpack_writer_t writer;
+    char buffer[1024];
+    mpack_writer_init(&writer, buffer, 1024);
+    mpack_start_map(&writer, 1);
+    mpack_write_cstr(&writer, "table_id");
+    mpack_write_i32(&writer, 1);
+    mpack_finish_map(&writer);
+
+    char *data = writer.buffer;
+    RawBytes *encoded = encode_packet(1, PACKET_JOIN_TABLE, data, mpack_writer_buffer_used(&writer));
+    Packet *decoded = decode_packet(encoded->data, encoded->len);
+
+    ASSERT(decoded->header->packet_type == PACKET_JOIN_TABLE);
+    ASSERT(decoded->header->packet_len == encoded->len);
+
+    mpack_reader_t reader;
+}
+
 int main()
 {
     RUN_TEST(test_db_conn);
@@ -207,4 +268,6 @@ int main()
     RUN_TEST(test_decode_signup_request);
     RUN_TEST(test_decode_create_table_request);
     RUN_TEST(test_logger);
+    RUN_TEST(test_encode_full_tables_resp);
+    RUN_TEST(test_decode_join_table_req);
 }

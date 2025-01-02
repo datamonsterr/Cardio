@@ -41,6 +41,8 @@ int main(void)
         return 1;
     }
 
+    TableList *table_list = init_table_list(1000);
+
     for (;;)
     {
         int n = epoll_wait(epoll_fd, events, MAXEVENTS, -1);
@@ -102,6 +104,10 @@ int main(void)
                 else if (nbytes == 0)
                 {
                     logger(MAIN_LOG, "Info", "Client disconnected");
+                    if (conn_data->table_id > 0)
+                    {
+                        leave_table(conn_data, table_list);
+                    }
                     close_connection(epoll_fd, conn_data);
                     continue;
                 }
@@ -116,14 +122,29 @@ int main(void)
 
                 switch (header->packet_type)
                 {
-                case 100: // Login
+                case PACKET_LOGIN:
                     logger(MAIN_LOG, "Info", "Login request from client");
                     handle_login_request(conn_data, buf, nbytes);
                     break;
 
-                case 200: // Signup
+                case PACKET_SIGNUP:
                     logger(MAIN_LOG, "Info", "Signup request from client");
                     handle_signup_request(conn_data, buf, nbytes);
+                    break;
+
+                case PACKET_CREATE_TABLE:
+                    logger(MAIN_LOG, "Info", "Create table request from client");
+                    handle_create_table_request(conn_data, buf, nbytes, table_list);
+                    break;
+
+                case PACKET_TABLES:
+                    logger(MAIN_LOG, "Info", "Get all tables request from client");
+                    handle_get_all_tables_request(conn_data, buf, nbytes, table_list);
+                    break;
+
+                case PACKET_JOIN_TABLE: // Join table
+                    logger(MAIN_LOG, "Info", "Join table request from client");
+                    handle_join_table_request(conn_data, buf, nbytes, table_list);
                     break;
 
                 default:

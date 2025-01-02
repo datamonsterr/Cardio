@@ -20,6 +20,7 @@
 #define PACKET_JOIN_TABLE 400
 #define R_JOIN_TABLE_OK 401
 #define R_JOIN_TABLE_NOT_OK 402
+#define R_JOIN_TABLE_FULL 403
 
 #define PACKET_TABLES 500
 
@@ -91,21 +92,19 @@ struct CreateTableRequest
 
 // Decode create TABLE request
 // Table request will be in the form of: {"name": "table_name", "max_player": 5, "min_bet": 100}
-CreateTableRequest *decode_create_table_request(char *payload); // TODO
+CreateTableRequest *decode_create_table_request(char *payload);
+// Find all tables in table list and encode them into a response which is an array of tables
+// For example: [{"id": 1, "name": "Table 1", "max_player": 5, "min_bet": 100, "current_player": 1}, ...]
+RawBytes *encode_full_tables_response(TableList *table_list);
+// Decode join TABLE request
+int decode_join_table_request(char *payload);
 
 // Todo
-
-// Decode join TABLE request
-RawBytes *decode_join_table_request(char *payload);
-
 // Decode refresh tables request
 RawBytes *decode_refresh_tables_request(char *payload);
 
 // Encode update tables response
 RawBytes *encode_update_tables_response(TableList *new_tables);
-
-// Encode Full Table
-RawBytes *encode_full_tables_response(TableList *table_list, int table_id);
 
 // Encode scoreboard response
 RawBytes *encode_scoreboard_response();

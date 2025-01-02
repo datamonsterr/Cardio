@@ -34,6 +34,19 @@ RawBytes *encode_packet(__uint8_t protocol_ver, __uint16_t packet_type, char *pa
     buffer[4] = packet_type_be & 0xFF;        // Low byte
 
     // Copy the payload into the buffer
+    if (payload == NULL)
+    {
+        if (payload_len != 0)
+        {
+            fprintf(stderr, "Payload length mismatch\n");
+            free(buffer);
+            return NULL;
+        }
+        RawBytes *raw_bytes = malloc(sizeof(RawBytes));
+        raw_bytes->data = buffer;
+        raw_bytes->len = 5;
+        return raw_bytes;
+    }
     memcpy(buffer + sizeof(Header), payload, payload_len);
 
     // Wrap the raw bytes in a structure
@@ -46,7 +59,7 @@ RawBytes *encode_packet(__uint8_t protocol_ver, __uint16_t packet_type, char *pa
     }
 
     raw_bytes->data = buffer;
-    raw_bytes->len = ntohs(packet_len);
+    raw_bytes->len = len;
 
     return raw_bytes;
 }
@@ -289,4 +302,69 @@ CreateTableRequest *decode_create_table_request(char *payload)
     create_table_request->min_bet = min_bet;
 
     return create_table_request;
+}
+
+RawBytes *encode_full_tables_response(TableList *table_list)
+{
+    mpack_writer_t writer;
+    char buffer[MAXLINE];
+    mpack_writer_init(&writer, buffer, MAXLINE);
+    mpack_start_map(&writer, 2);
+    mpack_write_cstr(&writer, "size");
+    mpack_write_i32(&writer, table_list->size);
+
+    mpack_write_cstr(&writer, "tables");
+    mpack_start_array(&writer, table_list->size);
+    for (int i = 0; i < table_list->size; i++)
+    {
+        mpack_start_map(&writer, 5);
+        mpack_write_cstr(&writer, "id");
+        mpack_write_i32(&writer, table_list->tables[i].id);
+        mpack_write_cstr(&writer, "name");
+        mpack_write_cstr(&writer, table_list->tables[i].name);
+        mpack_write_cstr(&writer, "max_player");
+        mpack_write_i32(&writer, table_list->tables[i].max_player);
+        mpack_write_cstr(&writer, "min_bet");
+        mpack_write_i32(&writer, table_list->tables[i].min_bet);
+        mpack_write_cstr(&writer, "current_player");
+        mpack_write_i32(&writer, table_list->tables[i].current_player);
+        mpack_finish_map(&writer);
+    }
+
+    mpack_finish_array(&writer);
+    mpack_finish_map(&writer);
+
+    char *data = writer.buffer;
+    if (mpack_writer_destroy(&writer) != mpack_ok)
+    {
+        fprintf(stderr, "MPack encoding error: %s\n", mpack_error_to_string(mpack_writer_destroy(&writer)));
+        return NULL;
+    }
+
+    RawBytes *raw_bytes = malloc(sizeof(RawBytes));
+    raw_bytes->len = mpack_writer_buffer_used(&writer);
+    raw_bytes->data = malloc(raw_bytes->len);
+
+    memcpy(raw_bytes->data, data, raw_bytes->len);
+
+    return raw_bytes;
+}
+
+int decode_join_table_request(char *payload)
+{
+    mpack_reader_t reader;
+    mpack_reader_init(&reader, payload, 100, 100);
+
+    mpack_expect_map_max(&reader, 1);
+
+    mpack_expect_cstr_match(&reader, "table_id");
+    int table_id = mpack_expect_i32(&reader);
+
+    if (mpack_reader_destroy(&reader) != mpack_ok)
+    {
+        fprintf(stderr, "decode_join_table_request: An error occurred decoding the message %s\n", mpack_error_to_string(mpack_reader_destroy(&reader)));
+        return -1;
+    }
+
+    return table_id;
 }
