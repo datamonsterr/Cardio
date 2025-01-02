@@ -16,7 +16,7 @@ typedef struct
     int fd;                  // File descriptor for the connection
     char username[32];       // Player's username
     unsigned int user_id;    // Player's ID
-    float balance;           // Chips the player has
+    unsigned int balance;    // Chips the player has
     unsigned short table_id; // Game table ID (0 if not at a table)
     size_t buffer_len;       // Length of valid data in the buffer
     bool is_active;          // Player's activity status
@@ -30,5 +30,6 @@ int close_connection(int epoll_fd, conn_data_t *conn_data);
 // Update connection data
 int update_conn_data(int epoll_fd, int client_fd, conn_data_t *conn_data);
 
-// Hadnler
-int handle_login_request(conn_data_t *conn_data, int client_fd, char *data, size_t data_len);
+// Handler
+void handle_login_request(conn_data_t *conn_data, char *data, size_t data_len);
+void handle_signup_request(conn_data_t *conn_data, char *data, size_t data_len);

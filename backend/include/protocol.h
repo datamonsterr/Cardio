@@ -29,11 +29,11 @@
 #define R_LEAVE_TABLE_OK 701
 #define R_LEAVE_TABLE_NOT_OK 702
 
-struct
+typedef struct __attribute__((packed))
 {
     char *data;
     size_t len;
-} typedef RawBytes;
+} RawBytes;
 
 typedef struct __attribute__((packed))
 {
@@ -45,16 +45,19 @@ typedef struct __attribute__((packed))
 struct
 {
     Header *header;
-    char data[MAXLINE];
+    char *data;
 } typedef Packet;
 
+// Decode first 5 bytes of the packet and turn it into a Header struct. Also, apply network to host byte order conversion
 Header *decode_header(char *data);
-Packet *decode_packet(char *data);
+// Split the packet into header and payload
+Packet *decode_packet(char *data, size_t data_len);
 void free_packet(Packet *packet);
 
+// Encode a packet with the given protocol version, packet type, payload and payload length. Apply host to network byte order conversion in the header
 RawBytes *encode_packet(__uint8_t protocol_ver, __uint16_t packet_type, char *payload, size_t payload_len);
 
-struct
+struct LoginRequest
 {
     char username[32];
     char password[32];
@@ -64,10 +67,22 @@ LoginRequest *decode_login_request(char *data);
 RawBytes *encode_response_msg(int res, char *msg);
 RawBytes *encode_response(int res);
 
-// Todo
+struct SignupRequest
+{
+    char username[32];
+    char password[32];
+    char fullname[64];
+    char email[64];
+    char phone[16];
+    char dob[16];
+    char country[32];
+    char gender[8];
+} typedef SignupRequest;
 
 // Decode signup request
-RawBytes *decode_signup_request(char *payload);
+SignupRequest *decode_signup_request(char *payload);
+
+// Todo
 
 // Decode create TABLE request
 RawBytes *decode_create_table_request(char *payload);

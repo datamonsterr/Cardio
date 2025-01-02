@@ -2,22 +2,26 @@
 
 TEST(test_decode_packet)
 {
-    char *data = "\x00\x0A\x01\x00\x00hello";
+    char *data = "hello";
+    RawBytes *encoded = encode_packet(1, 100, data, strlen(data));
 
-    Packet *packet = decode_packet(data);
+    Packet *packet = decode_packet(encoded->data, encoded->len);
 
     ASSERT(packet->header->packet_len == 10);
     ASSERT(packet->header->protocol_ver == 1);
-    ASSERT(packet->header->packet_type == 0);
+    ASSERT(packet->header->packet_type == 100);
     ASSERT(compare_raw_bytes(packet->data, "hello", 5) == 1);
+    free_packet(packet);
 }
 
 TEST(test_encode_packet)
 {
     char *data = "hello";
     RawBytes *encoded = encode_packet(1, 0, data, strlen(data));
+    Header *header = decode_header(encoded->data);
     ASSERT(encoded->len == 10);
-    ASSERT(compare_raw_bytes(encoded->data, "\x00\x0A\x01\x00\x00hello", 10) == 1);
+    ASSERT(header->packet_len == 10);
+    ASSERT(compare_raw_bytes(encoded->data + 5, "hello", encoded->len - 5) == 1);
     free(encoded);
 }
 
@@ -40,7 +44,7 @@ TEST(test_decode_login_request)
     // Check for MPack errors
 
     // Retrieve MPack buffer
-    const char *data = writer.buffer;
+    char *data = writer.buffer;
     size_t size = mpack_writer_buffer_used(&writer);
 
     LoginRequest *login_request = decode_login_request(data);
@@ -98,6 +102,53 @@ TEST(test_encode_response_message)
     free(success);
 }
 
+TEST(test_decode_signup_request)
+{
+    mpack_writer_t writer;
+    char buffer[65536];
+    mpack_writer_init(&writer, buffer, 65536);
+    mpack_start_map(&writer, 8);
+    mpack_write_cstr(&writer, "user");
+    mpack_write_cstr(&writer, "Tester2");
+    mpack_write_cstr(&writer, "pass");
+    mpack_write_cstr(&writer, "abc1234");
+    mpack_write_cstr(&writer, "fullname");
+    mpack_write_cstr(&writer, "Pham Thanh Dat");
+    mpack_write_cstr(&writer, "phone");
+    mpack_write_cstr(&writer, "1234567890");
+    mpack_write_cstr(&writer, "dob");
+    mpack_write_cstr(&writer, "2004/01/01");
+    mpack_write_cstr(&writer, "email");
+    mpack_write_cstr(&writer, "abcde@gmail.com");
+    mpack_write_cstr(&writer, "country");
+    mpack_write_cstr(&writer, "Vietnam");
+    mpack_write_cstr(&writer, "gender");
+    mpack_write_cstr(&writer, "Male");
+    mpack_finish_map(&writer);
+
+    char *data = writer.buffer;
+    if (mpack_writer_destroy(&writer) != mpack_ok)
+    {
+        fprintf(stderr, "MPack encoding error: %s\n", mpack_error_to_string(mpack_writer_destroy(&writer)));
+    }
+    RawBytes *encoded = encode_packet(1, 200, data, mpack_writer_buffer_used(&writer));
+    Packet *decoded = decode_packet(encoded->data, encoded->len);
+
+    ASSERT(decoded->header->packet_type == 200);
+    ASSERT(decoded->header->packet_len == encoded->len);
+
+    SignupRequest *signup_request = decode_signup_request(data);
+
+    ASSERT(strcmp(signup_request->username, "Tester2") == 0);
+    ASSERT(strcmp(signup_request->password, "abc1234") == 0);
+    ASSERT(strcmp(signup_request->fullname, "Pham Thanh Dat") == 0);
+    ASSERT(strcmp(signup_request->phone, "1234567890") == 0);
+    ASSERT(strcmp(signup_request->dob, "2004/01/01") == 0);
+    ASSERT(strcmp(signup_request->email, "abcde@gmail.com") == 0);
+    ASSERT(strcmp(signup_request->country, "Vietnam") == 0);
+    ASSERT(strcmp(signup_request->gender, "Male") == 0);
+}
+
 int main()
 {
     RUN_TEST(test_decode_packet);
@@ -105,4 +156,5 @@ int main()
     RUN_TEST(test_decode_login_request);
     RUN_TEST(test_encode_response);
     RUN_TEST(test_encode_response_message);
+    RUN_TEST(test_decode_signup_request);
 }

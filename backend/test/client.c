@@ -1,5 +1,11 @@
 #include "main.h"
 
+void display_menu()
+{
+    printf("1. Login\n");
+    printf("2. Signup\n");
+    printf("3. Exit\n");
+}
 int main(int argc, char *argv[])
 {
     if (argc != 3)
@@ -44,94 +50,243 @@ int main(int argc, char *argv[])
 
     while (1)
     {
-        printf("Enter username <space> password: ");
+        display_menu();
 
-        char username[30];
-        char password[30];
+        int choice;
+        printf("Enter your choice: ");
+        scanf("%d", &choice);
+        getchar(); // Consume newline
 
-        // Use safer input to avoid overflow
-        if (scanf("%29s %29s", username, password) != 2)
-        {
-            fprintf(stderr, "Invalid input. Please enter username and password.\n");
-            continue;
-        }
-
-        // Initialize MPack writer
+        char username[32];
+        char password[32];
+        char fullname[64];
+        char email[64];
+        char country[32];
+        char gender[8];
+        char phone[16];
+        char dob[16];
+        mpack_error_t error;
+        Header *header;
+        size_t size;
+        RawBytes *encoded_message;
+        char buffer[MAXLINE];
+        char *data;
         mpack_writer_t writer;
-        char buffer[4096];
-        mpack_writer_init(&writer, buffer, 4096);
 
-        // Write data to the MPack map
-        mpack_start_map(&writer, 2);
-        mpack_write_cstr(&writer, "user");
-        mpack_write_cstr(&writer, username);
-        mpack_write_cstr(&writer, "pass");
-        mpack_write_cstr(&writer, password);
-        mpack_finish_map(&writer);
-
-        // Check for MPack errors
-
-        // Retrieve MPack buffer
-        const char *data = writer.buffer;
-        size_t size = mpack_writer_buffer_used(&writer);
-
-        // Encode the packet
-        RawBytes *encoded_message = encode_packet(1, 100, data, size);
-
-        // Send the encoded message
-        if (send(servfd, encoded_message->data, encoded_message->len, 0) == -1)
-        { // Include header size (5 bytes)
-            perror("send");
-            free(encoded_message);
-            break;
-        }
-        mpack_error_t error = mpack_writer_destroy(&writer);
-        if (error != mpack_ok)
+        switch (choice)
         {
-            fprintf(stderr, "MPack encoding error: %s\n", mpack_error_to_string(error));
-            break;
-        }
+        case 1:
+            printf("Enter username <space> password: ");
 
-        if (recv(servfd, recv_buffer, MAXLINE, 0) == -1)
-        {
-            perror("recv");
-            break;
-        }
-
-        // Decode the response
-        Header *header = decode_header(recv_buffer);
-        if (header == NULL)
-        {
-            fprintf(stderr, "Invalid header\n");
-            break;
-        }
-
-        if (header->packet_type == 100)
-        {
-            mpack_reader_t reader;
-            mpack_reader_init(&reader, recv_buffer + sizeof(Header), header->packet_len - sizeof(Header), header->packet_len - sizeof(Header));
-            // if there is error, the payload will contains 2 fields: res and msg, if not, it will contains only res
-
-            mpack_expect_map_max(&reader, 1);
-            mpack_expect_cstr_match(&reader, "res");
-            int res = mpack_expect_u16(&reader);
-
-            if (res == R_LOGIN_OK)
+            // Use safer input to avoid overflow
+            if (scanf("%29s %29s", username, password) != 2)
             {
-                printf("Login success with code %d\n", res);
+                fprintf(stderr, "Invalid input. Please enter username and password.\n");
+                continue;
+            }
+
+            // Initialize MPack writer
+            mpack_writer_init(&writer, buffer, 4096);
+
+            // Write data to the MPack map
+            mpack_start_map(&writer, 2);
+            mpack_write_cstr(&writer, "user");
+            mpack_write_cstr(&writer, username);
+            mpack_write_cstr(&writer, "pass");
+            mpack_write_cstr(&writer, password);
+            mpack_finish_map(&writer);
+
+            // Retrieve MPack buffer
+            data = writer.buffer;
+            size = mpack_writer_buffer_used(&writer);
+
+            // Encode the packet
+            encoded_message = encode_packet(1, 100, data, size);
+
+            // Send the encoded message
+            if (send(servfd, encoded_message->data, encoded_message->len, 0) == -1)
+            {
+                perror("send");
+                free(encoded_message);
+                break;
+            }
+            error = mpack_writer_destroy(&writer);
+            if (error != mpack_ok)
+            {
+                fprintf(stderr, "MPack encoding error: %s\n", mpack_error_to_string(error));
+                break;
+            }
+
+            if (recv(servfd, recv_buffer, MAXLINE, 0) == -1)
+            {
+                perror("recv");
+                break;
+            }
+
+            // Decode the response
+            header = decode_header(recv_buffer);
+            if (header == NULL)
+            {
+                fprintf(stderr, "Invalid header\n");
+                break;
+            }
+
+            if (header->packet_type == 100)
+            {
+                mpack_reader_t reader;
+                mpack_reader_init(&reader, recv_buffer + sizeof(Header), header->packet_len - sizeof(Header), header->packet_len - sizeof(Header));
+                // if there is error, the payload will contains 2 fields: res and msg, if not, it will contains only res
+
+                mpack_expect_map_max(&reader, 1);
+                mpack_expect_cstr_match(&reader, "res");
+                int res = mpack_expect_u16(&reader);
+
+                if (res == R_LOGIN_OK)
+                {
+                    printf("Login success with code %d\n", res);
+                }
+                else
+                {
+                    printf("Login failed with code %d\n", res);
+                }
             }
             else
             {
-                printf("Login failed with code %d\n", res);
+                fprintf(stderr, "Invalid packet type\n");
             }
-        }
-        else
-        {
-            fprintf(stderr, "Invalid packet type\n");
+
+            // Free dynamically allocated memory
+            free(encoded_message);
+            break;
+        case 2:
+            printf("Username: ");
+            scanf("%31s", username);
+            printf("Password: ");
+            scanf("%31s", password);
+            printf("Fullname: ");
+            scanf("%63s", fullname);
+            printf("Phone: ");
+            scanf("%15s", phone);
+            printf("DOB: ");
+            scanf("%15s", dob);
+            printf("Email: ");
+            scanf("%63s", email);
+            printf("Country: ");
+            scanf("%15s", country);
+            printf("Gender: ");
+            scanf("%7s", gender);
+
+            /*          printf("Username: %s\n", username);
+                        printf("Password: %s\n", password);
+                        printf("Fullname: %s\n", fullname);
+                        printf("Phone: %s\n", phone);
+                        printf("DOB: %s\n", dob);
+                        printf("Email: %s\n", email);
+                        printf("Country: %s\n", country);
+                        printf("Gender: %s\n", gender);
+             */
+            // Initialize MPack writer
+            mpack_writer_init(&writer, buffer, MAXLINE);
+
+            // Write data to the MPack map
+            mpack_start_map(&writer, 8);
+            mpack_write_cstr(&writer, "user");
+            mpack_write_cstr(&writer, username);
+            mpack_write_cstr(&writer, "pass");
+            mpack_write_cstr(&writer, password);
+            mpack_write_cstr(&writer, "fullname");
+            mpack_write_cstr(&writer, fullname);
+            mpack_write_cstr(&writer, "phone");
+            mpack_write_cstr(&writer, phone);
+            mpack_write_cstr(&writer, "dob");
+            mpack_write_cstr(&writer, dob);
+            mpack_write_cstr(&writer, "email");
+            mpack_write_cstr(&writer, email);
+            mpack_write_cstr(&writer, "country");
+            mpack_write_cstr(&writer, country);
+            mpack_write_cstr(&writer, "gender");
+            mpack_write_cstr(&writer, gender);
+            mpack_finish_map(&writer);
+
+            // Retrieve MPack buffer
+            data = writer.buffer;
+            size = mpack_writer_buffer_used(&writer);
+
+            // Encode the packet
+            encoded_message = encode_packet(1, 200, data, size);
+            Header *encoded_header = decode_header(encoded_message->data);
+            printf("header len %hu\n", encoded_header->packet_len);
+            printf("header type %hu\n", encoded_header->packet_type);
+            printf("header ver %hhu\n", encoded_header->protocol_ver);
+
+            // printf("Sending login request len %zu\n", encoded_message->len);
+
+            error = mpack_writer_destroy(&writer);
+            if (error != mpack_ok)
+            {
+                fprintf(stderr, "MPack encoding error: %s\n", mpack_error_to_string(error));
+                break;
+            }
+            // Send the encoded message
+            if (send(servfd, encoded_message->data, encoded_message->len, 0) == -1)
+            {
+                perror("send");
+                free(encoded_message);
+                break;
+            }
+
+            if (recv(servfd, recv_buffer, MAXLINE, 0) == -1)
+            {
+                perror("recv");
+                break;
+            }
+
+            // Decode the response
+            header = decode_header(recv_buffer);
+            if (header == NULL)
+            {
+                fprintf(stderr, "Invalid header\n");
+                break;
+            }
+
+            if (header->packet_type == 200)
+            {
+                mpack_reader_t reader;
+                mpack_reader_init(&reader, recv_buffer + sizeof(Header), header->packet_len - sizeof(Header), header->packet_len - sizeof(Header));
+                // if there is error, the payload will contains 2 fields: res and msg, if not, it will contains only res
+
+                mpack_expect_map_max(&reader, 1);
+                mpack_expect_cstr_match(&reader, "res");
+                int res = mpack_expect_u16(&reader);
+
+                if (res == R_SIGNUP_OK)
+                {
+                    printf("Signup success with code %d\n", res);
+                }
+                else
+                {
+                    printf("Signup failed with code %d\n", res);
+                }
+            }
+            else
+            {
+                fprintf(stderr, "Invalid packet type\n");
+            }
+
+            break;
+
+        case 3:
+            close(servfd);
+            freeaddrinfo(res);
+            exit(EXIT_SUCCESS);
+            break;
+
+        default:
+            break;
         }
 
-        // Free dynamically allocated memory
-        free(encoded_message);
+        memset(recv_buffer, 0, MAXLINE);
+        memset(buffer, 0, MAXLINE);
     }
 
     // Clean up resources

@@ -8,57 +8,129 @@ void free_packet(Packet *packet)
 
 RawBytes *encode_packet(__uint8_t protocol_ver, __uint16_t packet_type, char *payload, size_t payload_len)
 {
-    // header is all numbers, we need to turn it into bytes: length is __uint16_t, protocol_ver is __uint8_t, packet_type is __uint16_t
-    // payload is a string, we need to turn it into bytes
-    // we need to allocate a new buffer to store the bytes
+    // Total packet length: header size + payload size
+    size_t len = sizeof(Header) + payload_len;
 
-    Header *header = malloc(sizeof(Header));
+    // Allocate memory for the entire packet
+    char *buffer = malloc(len);
+    if (buffer == NULL)
+    {
+        fprintf(stderr, "Failed to allocate memory for packet\n");
+        return NULL;
+    }
 
-    header->packet_len = payload_len + sizeof(Header);
-    header->protocol_ver = protocol_ver;
-    header->packet_type = packet_type;
+    // Encode the header
+    // Packet length (2 bytes)
+    __uint16_t packet_len = htons((__uint16_t)len);
+    buffer[0] = (packet_len >> 8) & 0xFF; // High byte
+    buffer[1] = packet_len & 0xFF;        // Low byte
 
-    char *buffer = malloc(header->packet_len + sizeof(Header));
+    // Protocol version (1 byte)
+    buffer[2] = protocol_ver;
 
-    // packet length is 2 bytes
-    buffer[0] = (header->packet_len >> 8) & 0xFF;
-    buffer[1] = header->packet_len & 0xFF;
+    // Packet type (2 bytes, big-endian)
+    __uint16_t packet_type_be = htons(packet_type);
+    buffer[3] = (packet_type_be >> 8) & 0xFF; // High byte
+    buffer[4] = packet_type_be & 0xFF;        // Low byte
 
-    // protocol version is 1 byte
-    buffer[2] = header->protocol_ver;
+    // Copy the payload into the buffer
+    memcpy(buffer + sizeof(Header), payload, payload_len);
 
-    // packet type is 2 bytes
-    buffer[3] = (header->packet_type >> 8) & 0xFF;
-    buffer[4] = header->packet_type & 0xFF;
-
-    // copy the payload into the buffer
-    memcpy(buffer + sizeof(Header), payload, header->packet_len - sizeof(Header));
-
+    // Wrap the raw bytes in a structure
     RawBytes *raw_bytes = malloc(sizeof(RawBytes));
+    if (raw_bytes == NULL)
+    {
+        fprintf(stderr, "Failed to allocate memory for RawBytes\n");
+        free(buffer);
+        return NULL;
+    }
+
     raw_bytes->data = buffer;
-    raw_bytes->len = header->packet_len;
-    free(header);
+    raw_bytes->len = ntohs(packet_len);
 
     return raw_bytes;
 }
 
 Header *decode_header(char *data)
 {
-    Header *header = malloc(sizeof(Header));
+    if (data == NULL)
+    {
+        fprintf(stderr, "decode_header: NULL data pointer\n");
+        return NULL;
+    }
 
-    header->packet_len = (data[0] << 8) | data[1];
-    header->protocol_ver = data[2];
-    header->packet_type = (data[3] << 8) | data[4];
+    Header *header = malloc(sizeof(Header));
+    if (header == NULL)
+    {
+        fprintf(stderr, "decode_header: Memory allocation failed\n");
+        return NULL;
+    }
+
+    header->packet_len = ntohs((data[0] << 8) | (unsigned char)data[1]);
+    header->protocol_ver = (unsigned char)data[2];
+    header->packet_type = ntohs((data[3] << 8) | (unsigned char)data[4]);
 
     return header;
 }
 
-Packet *decode_packet(char *data)
+Packet *decode_packet(char *data, size_t data_len)
 {
-    Packet *packet = malloc(sizeof(Packet));
+    if (data == NULL || data_len < sizeof(Header))
+    {
+        fprintf(stderr, "decode_packet: Invalid data or insufficient data length\n");
+        return NULL;
+    }
 
+    // Allocate memory for the Packet structure
+    Packet *packet = malloc(sizeof(Packet));
+    if (packet == NULL)
+    {
+        fprintf(stderr, "decode_packet: Memory allocation failed for Packet\n");
+        return NULL;
+    }
+
+    // Decode the header
     packet->header = decode_header(data);
-    memccpy(packet->data, data + sizeof(Header), packet->header->packet_len - sizeof(Header), packet->header->packet_len - sizeof(Header));
+    if (packet->header == NULL)
+    {
+        fprintf(stderr, "decode_packet: Failed to decode header\n");
+        free(packet);
+        return NULL;
+    }
+
+    // Validate the packet length (convert to host byte order for validation)
+    uint16_t packet_len = packet->header->packet_len;
+    if (packet_len > data_len)
+    {
+        fprintf(stderr, "decode_packet: Packet length mismatch (expected: %u, received: %zu)\n",
+                packet_len, data_len);
+        free(packet->header);
+        free(packet);
+        return NULL;
+    }
+
+    // Calculate payload length
+    size_t payload_len = packet_len - sizeof(Header);
+    if (payload_len > 0)
+    {
+        // Allocate memory for the payload
+        packet->data = malloc(payload_len);
+        if (packet->data == NULL)
+        {
+            fprintf(stderr, "decode_packet: Memory allocation failed for payload\n");
+            free(packet->header);
+            free(packet);
+            return NULL;
+        }
+
+        // Copy the payload data
+        memcpy(packet->data, data + sizeof(Header), payload_len);
+    }
+    else
+    {
+        // No payload
+        packet->data = NULL;
+    }
 
     return packet;
 }
@@ -138,4 +210,53 @@ RawBytes *encode_response_msg(int res, char *msg)
     }
 
     return raw_bytes;
+}
+
+SignupRequest *decode_signup_request(char *payload)
+{
+    mpack_reader_t reader;
+    mpack_reader_init_data(&reader, payload, 4096);
+
+    mpack_expect_map_max(&reader, 9);
+
+    mpack_expect_cstr_match(&reader, "user");
+    const char *username = mpack_expect_cstr_alloc(&reader, 32);
+    mpack_expect_cstr_match(&reader, "pass");
+    const char *password = mpack_expect_cstr_alloc(&reader, 32);
+
+    mpack_expect_cstr_match(&reader, "fullname");
+    const char *fullname = mpack_expect_cstr_alloc(&reader, 64);
+
+    mpack_expect_cstr_match(&reader, "phone");
+    const char *phone = mpack_expect_cstr_alloc(&reader, 16);
+
+    mpack_expect_cstr_match(&reader, "dob");
+    const char *dob = mpack_expect_cstr_alloc(&reader, 16);
+
+    mpack_expect_cstr_match(&reader, "email");
+    const char *email = mpack_expect_cstr_alloc(&reader, 64);
+
+    mpack_expect_cstr_match(&reader, "country");
+    const char *country = mpack_expect_cstr_alloc(&reader, 32);
+
+    mpack_expect_cstr_match(&reader, "gender");
+    const char *gender = mpack_expect_cstr_alloc(&reader, 8);
+
+    if (mpack_reader_destroy(&reader) != mpack_ok)
+    {
+        fprintf(stderr, "decode_signup_request: An error occurred decoding the message %s\n", mpack_error_to_string(mpack_reader_destroy(&reader)));
+        return NULL;
+    }
+
+    SignupRequest *signup_request = malloc(sizeof(SignupRequest));
+    strncpy(signup_request->username, username, 32);
+    strncpy(signup_request->password, password, 32);
+    strncpy(signup_request->fullname, fullname, 64);
+    strncpy(signup_request->email, email, 64);
+    strncpy(signup_request->country, country, 32);
+    strncpy(signup_request->phone, phone, 16);
+    strncpy(signup_request->dob, dob, 16);
+    strncpy(signup_request->gender, gender, 8);
+
+    return signup_request;
 }

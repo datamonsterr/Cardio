@@ -93,7 +93,9 @@ int accept_connection(int listenfd)
     int client_fd = accept(listenfd, (struct sockaddr *)&client_addr, &addr_size);
 
     // log the new connection address using get_in_addr
-    fprintf(stdout, "New connection from %s\n", inet_ntoa(((struct sockaddr_in *)&client_addr)->sin_addr));
+    char client_ip[INET6_ADDRSTRLEN];
+    inet_ntop(client_addr.ss_family, get_in_addr((struct sockaddr *)&client_addr), client_ip, sizeof client_ip);
+    fprintf(stdout, "New connection from %s\n", client_ip);
 
     if (client_fd < 0)
     {
@@ -149,6 +151,12 @@ conn_data_t *init_connection_data(int client_fd)
 int add_connection_to_epoll(int epoll_fd, int client_fd)
 {
     conn_data_t *conn_data = init_connection_data(client_fd);
+
+    if (!conn_data)
+    {
+        fprintf(stderr, "add_connection_to_epoll: Cannot initialize connection data\n");
+        return -1;
+    }
 
     // Set up epoll_event
     struct epoll_event event;
