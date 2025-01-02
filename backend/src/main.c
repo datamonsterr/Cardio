@@ -29,7 +29,7 @@ int main(void)
 
     if (set_nonblocking(listener) == -1)
     {
-        fprintf(stderr, "main: Cannot set nonblocking");
+        logger(MAIN_LOG, "Error", "Cannot set nonblocking");
         return 1;
     }
 
@@ -58,13 +58,13 @@ int main(void)
 
                 if (set_nonblocking(client_fd) == -1)
                 {
-                    fprintf(stderr, "main: Cannot set nonblocking");
+                    logger(MAIN_LOG, "Error", "Cannot set nonblocking");
                     return 1;
                 }
 
                 if (add_connection_to_epoll(epoll_fd, client_fd) == -1)
                 {
-                    fprintf(stderr, "main: Cannot add client to epoll");
+                    logger(MAIN_LOG, "Error", "Cannot add connection to epoll");
                     return 1;
                 }
             }
@@ -73,7 +73,7 @@ int main(void)
                 conn_data_t *conn_data = events[i].data.ptr;
                 if (!conn_data || conn_data->fd <= 0)
                 {
-                    fprintf(stderr, "Invalid connection data or fd\n");
+                    logger(MAIN_LOG, "Error", "Invalid connection data");
                     continue;
                 }
 
@@ -91,17 +91,17 @@ int main(void)
                             // No data available; try again later
                             continue;
                         }
-                        perror("recv");
+                        logger(MAIN_LOG, "Error", "Cannot receive data");
                         close_connection(epoll_fd, conn_data);
                         continue;
                     }
-                    fprintf(stderr, "main: Cannot receive data\n");
+                    logger(MAIN_LOG, "Error", "Cannot receive data");
                     close_connection(epoll_fd, conn_data);
                     continue;
                 }
                 else if (nbytes == 0)
                 {
-                    printf("Client %d disconnected\n", conn_data->fd);
+                    logger(MAIN_LOG, "Info", "Client disconnected");
                     close_connection(epoll_fd, conn_data);
                     continue;
                 }
@@ -109,7 +109,7 @@ int main(void)
 
                 if (header == NULL)
                 {
-                    fprintf(stderr, "main: Cannot decode header\n");
+                    logger(MAIN_LOG, "Error", "Cannot decode header");
                     close_connection(epoll_fd, conn_data);
                     continue;
                 }
@@ -117,12 +117,12 @@ int main(void)
                 switch (header->packet_type)
                 {
                 case 100: // Login
-                    printf("Login request from client %d\n", conn_data->fd);
+                    logger(MAIN_LOG, "Info", "Login request from client");
                     handle_login_request(conn_data, buf, nbytes);
                     break;
 
                 case 200: // Signup
-                    printf("Signup request from client %d\n", conn_data->fd);
+                    logger(MAIN_LOG, "Info", "Signup request from client");
                     handle_signup_request(conn_data, buf, nbytes);
                     break;
 

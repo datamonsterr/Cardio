@@ -149,12 +149,62 @@ TEST(test_decode_signup_request)
     ASSERT(strcmp(signup_request->gender, "Male") == 0);
 }
 
+TEST(test_db_conn)
+{
+    PGconn *conn = PQconnectdb(dbconninfo);
+    ASSERT(PQstatus(conn) == CONNECTION_OK);
+    PQfinish(conn);
+}
+
+TEST(test_decode_create_table_request)
+{
+    mpack_writer_t writer;
+    char buffer[1024];
+    mpack_writer_init(&writer, buffer, 1024);
+
+    mpack_start_map(&writer, 3);
+
+    mpack_write_cstr(&writer, "name");
+    mpack_write_cstr(&writer, "Table 1");
+    mpack_write_cstr(&writer, "max_player");
+    mpack_write_int(&writer, 5);
+    mpack_write_cstr(&writer, "min_bet");
+    mpack_write_int(&writer, 100);
+
+    mpack_finish_map(&writer);
+
+    char *data = writer.buffer;
+    CreateTableRequest *table_request = decode_create_table_request(data);
+
+    ASSERT(strcmp(table_request->table_name, "Table 1") == 0);
+    ASSERT(table_request->max_player == 5);
+    ASSERT(table_request->min_bet == 100);
+}
+
+TEST(test_logger)
+{
+    logger("test.log", "Info", "Test logger");
+    FILE *f = fopen("test.log", "r");
+    if (f == NULL)
+    {
+        fprintf(stderr, "Cannot open file\n");
+        return;
+    }
+    char line[1024];
+    fgets(line, 1024, f);
+    printf("Log: %s\n", line);
+    fclose(f);
+}
+
 int main()
 {
+    RUN_TEST(test_db_conn);
     RUN_TEST(test_decode_packet);
     RUN_TEST(test_encode_packet);
     RUN_TEST(test_decode_login_request);
     RUN_TEST(test_encode_response);
     RUN_TEST(test_encode_response_message);
     RUN_TEST(test_decode_signup_request);
+    RUN_TEST(test_decode_create_table_request);
+    RUN_TEST(test_logger);
 }

@@ -82,10 +82,18 @@ struct SignupRequest
 // Decode signup request
 SignupRequest *decode_signup_request(char *payload);
 
-// Todo
+struct CreateTableRequest
+{
+    char table_name[32];
+    int max_player;
+    int min_bet;
+} typedef CreateTableRequest;
 
 // Decode create TABLE request
-RawBytes *decode_create_table_request(char *payload);
+// Table request will be in the form of: {"name": "table_name", "max_player": 5, "min_bet": 100}
+CreateTableRequest *decode_create_table_request(char *payload); // TODO
+
+// Todo
 
 // Decode join TABLE request
 RawBytes *decode_join_table_request(char *payload);

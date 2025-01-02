@@ -25,7 +25,7 @@ foreach(SOURCE IN LISTS TEST_SOURCES)
 endforeach()
 
 set(LIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/lib) # SET LIB DIR HERE, this is relative directory of "lib" folder from this Cmake dir 
-list(APPEND ALL_LIBS card pokergame mpack db) # APPEND LIB HERE (directory name of lib)
+list(APPEND ALL_LIBS card pokergame mpack db logger) # APPEND LIB HERE (directory name of lib)
 
 
 foreach(LIB IN LISTS ALL_LIBS)

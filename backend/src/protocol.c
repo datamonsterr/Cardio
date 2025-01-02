@@ -260,3 +260,33 @@ SignupRequest *decode_signup_request(char *payload)
 
     return signup_request;
 }
+
+CreateTableRequest *decode_create_table_request(char *payload)
+{
+    mpack_reader_t reader;
+    mpack_reader_init_data(&reader, payload, 4096);
+
+    mpack_expect_map_max(&reader, 3);
+
+    mpack_expect_cstr_match(&reader, "name");
+    const char *table_name = mpack_expect_cstr_alloc(&reader, 32);
+
+    mpack_expect_cstr_match(&reader, "max_player");
+    int max_player = mpack_expect_i32(&reader);
+
+    mpack_expect_cstr_match(&reader, "min_bet");
+    int min_bet = mpack_expect_i32(&reader);
+
+    if (mpack_reader_destroy(&reader) != mpack_ok)
+    {
+        fprintf(stderr, "decode_create_table_request: An error occurred decoding the message %s\n", mpack_error_to_string(mpack_reader_destroy(&reader)));
+        return NULL;
+    }
+
+    CreateTableRequest *create_table_request = malloc(sizeof(CreateTableRequest));
+    strncpy(create_table_request->table_name, table_name, 32);
+    create_table_request->max_player = max_player;
+    create_table_request->min_bet = min_bet;
+
+    return create_table_request;
+}
