@@ -27,6 +27,12 @@ int main(void)
         return 1;
     }
 
+    if (set_nonblocking(listener) == -1)
+    {
+        logger(MAIN_LOG, "Error", "Cannot set nonblocking");
+        return 1;
+    }
+
     struct epoll_event *events = calloc(MAXEVENTS, sizeof(event));
 
     if (events == NULL)
@@ -34,6 +40,8 @@ int main(void)
         perror("calloc");
         return 1;
     }
+
+    TableList *table_list = init_table_list(1000);
 
     for (;;)
     {
@@ -50,38 +58,101 @@ int main(void)
                     continue;
                 }
 
-                set_nonblocking(client_fd);
-
-                event.events = EPOLLIN | EPOLLET;
-                event.data.fd = client_fd;
-
-                if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &event) == -1)
+                if (set_nonblocking(client_fd) == -1)
                 {
-                    perror("epoll_ctl");
+                    logger(MAIN_LOG, "Error", "Cannot set nonblocking");
+                    return 1;
+                }
+
+                if (add_connection_to_epoll(epoll_fd, client_fd) == -1)
+                {
+                    logger(MAIN_LOG, "Error", "Cannot add connection to epoll");
                     return 1;
                 }
             }
             else
             {
-                char buf[MAXLINE];
-                memset(buf, 0, MAXLINE);
-
-                int nbytes = recv(events[i].data.fd, buf, MAXLINE, 0);
-
-                if (nbytes <= 0)
+                conn_data_t *conn_data = events[i].data.ptr;
+                if (!conn_data || conn_data->fd <= 0)
                 {
-                    close(events[i].data.fd);
+                    logger(MAIN_LOG, "Error", "Invalid connection data");
                     continue;
                 }
 
-                Packet *packet = decode_packet(buf);
+                char buf[MAXLINE];
+                memset(buf, 0, MAXLINE);
 
-                printf("Packet length: %d\n", packet->header.packet_len);
-                printf("Protocol version: %d\n", packet->header.protocol_ver);
-                printf("Packet type: %d\n", packet->header.packet_type);
-                printf("Data: %s\n", packet->data);
+                int nbytes = recv(conn_data->fd, buf, MAXLINE, 0);
 
-                free(packet);
+                if (nbytes < 0)
+                {
+                    if (nbytes < 0)
+                    {
+                        if (errno == EAGAIN || errno == EWOULDBLOCK)
+                        {
+                            // No data available; try again later
+                            continue;
+                        }
+                        logger(MAIN_LOG, "Error", "Cannot receive data");
+                        close_connection(epoll_fd, conn_data);
+                        continue;
+                    }
+                    logger(MAIN_LOG, "Error", "Cannot receive data");
+                    close_connection(epoll_fd, conn_data);
+                    continue;
+                }
+                else if (nbytes == 0)
+                {
+                    logger(MAIN_LOG, "Info", "Client disconnected");
+                    if (conn_data->table_id > 0)
+                    {
+                        leave_table(conn_data, table_list);
+                    }
+                    close_connection(epoll_fd, conn_data);
+                    continue;
+                }
+                Header *header = decode_header(buf);
+
+                if (header == NULL)
+                {
+                    logger(MAIN_LOG, "Error", "Cannot decode header");
+                    close_connection(epoll_fd, conn_data);
+                    continue;
+                }
+
+                switch (header->packet_type)
+                {
+                case PACKET_LOGIN:
+                    logger(MAIN_LOG, "Info", "Login request from client");
+                    handle_login_request(conn_data, buf, nbytes);
+                    break;
+
+                case PACKET_SIGNUP:
+                    logger(MAIN_LOG, "Info", "Signup request from client");
+                    handle_signup_request(conn_data, buf, nbytes);
+                    break;
+
+                case PACKET_CREATE_TABLE:
+                    logger(MAIN_LOG, "Info", "Create table request from client");
+                    handle_create_table_request(conn_data, buf, nbytes, table_list);
+                    break;
+
+                case PACKET_TABLES:
+                    logger(MAIN_LOG, "Info", "Get all tables request from client");
+                    handle_get_all_tables_request(conn_data, buf, nbytes, table_list);
+                    break;
+
+                case PACKET_JOIN_TABLE: // Join table
+                    logger(MAIN_LOG, "Info", "Join table request from client");
+                    handle_join_table_request(conn_data, buf, nbytes, table_list);
+                    break;
+
+                default:
+                    break;
+                }
+
+                free(header);
+                memset(buf, 0, MAXLINE);
             }
         }
     }

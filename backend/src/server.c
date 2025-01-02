@@ -91,23 +91,117 @@ int accept_connection(int listenfd)
     struct sockaddr_storage client_addr;
     socklen_t addr_size = sizeof(client_addr);
     int client_fd = accept(listenfd, (struct sockaddr *)&client_addr, &addr_size);
+
+    // log the new connection address using get_in_addr
+    char client_ip[INET6_ADDRSTRLEN];
+    inet_ntop(client_addr.ss_family, get_in_addr((struct sockaddr *)&client_addr), client_ip, sizeof client_ip);
+    fprintf(stdout, "New connection from %s\n", client_ip);
+
     if (client_fd < 0)
     {
-        server_perror("accept");
+        fprintf(stderr, "accept_connection: Cannot accept connection\n");
+        return -1;
     }
     return client_fd;
 }
 
-void close_connection(int fd)
+int sendall(int socketfd, char *buf, int *len)
 {
-    if (close(fd) < 0)
+    int total = 0;        // how many bytes we've sent
+    int bytesleft = *len; // how many we have left to send
+    int n;
+
+    while (total < *len)
     {
-        server_perror("close");
+        n = send(socketfd, buf + total, bytesleft, 0);
+        if (n == -1)
+        {
+            break;
+        }
+        total += n;
+        bytesleft -= n;
     }
+
+    *len = total; // return number actually sent here
+
+    return n == -1 ? -1 : 0; // return -1 on failure, 0 on success
 }
 
-void server_perror(const char *msg)
+conn_data_t *init_connection_data(int client_fd)
 {
-    fprintf(stderr, "%s: %s\n", msg, strerror(errno));
-    exit(1);
+    conn_data_t *conn_data = malloc(sizeof(conn_data_t));
+    if (!conn_data)
+    {
+        fprintf(stderr, "init_connection_data: Cannot allocate memory for connection data\n");
+        close(client_fd);
+        return NULL;
+    }
+
+    conn_data->fd = client_fd;
+    memset(conn_data->username, 0, 32);
+    conn_data->user_id = 0;
+    conn_data->balance = 0;
+    conn_data->table_id = 0;
+    conn_data->buffer_len = 0;
+    conn_data->is_active = false;
+
+    return conn_data;
+}
+
+int add_connection_to_epoll(int epoll_fd, int client_fd)
+{
+    conn_data_t *conn_data = init_connection_data(client_fd);
+
+    if (!conn_data)
+    {
+        fprintf(stderr, "add_connection_to_epoll: Cannot initialize connection data\n");
+        return -1;
+    }
+
+    // Set up epoll_event
+    struct epoll_event event;
+    event.events = EPOLLIN | EPOLLET; // Edge-triggered input events
+    event.data.ptr = conn_data;       // Associate custom data
+
+    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &event) == -1)
+    {
+        fprintf(stderr, "add_connection_to_epoll: Cannot add client to epoll\n");
+        free(conn_data);
+        close(client_fd);
+        return -1;
+    }
+
+    fprintf(stdout, "Added client %d to epoll\n", client_fd);
+
+    return 0;
+}
+
+int update_conn_data(int epoll_fd, int client_fd, conn_data_t *conn_data)
+{
+    struct epoll_event event;
+    event.events = EPOLLIN | EPOLLET;
+    event.data.ptr = conn_data;
+
+    if (epoll_ctl(epoll_fd, EPOLL_CTL_MOD, client_fd, &event) == -1)
+    {
+        fprintf(stderr, "update_conn_data: Cannot update client data\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+int close_connection(int epoll_fd, conn_data_t *conn_data)
+{
+    if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, conn_data->fd, NULL) == -1)
+    {
+        fprintf(stderr, "close_connection: Cannot remove client from epoll\n");
+        return -1;
+    }
+
+    fprintf(stdout, "Closed connection from client %d\n", conn_data->fd);
+
+    free(conn_data);
+    close(conn_data->fd);
+    return 0;
 }
