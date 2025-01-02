@@ -102,6 +102,7 @@ int main(int argc, char *argv[])
 
             // Encode the packet
             encoded_message = encode_packet(1, 100, data, size);
+            printf("Sending login request len %zu\n", encoded_message->len);
 
             // Send the encoded message
             if (send(servfd, encoded_message->data, encoded_message->len, 0) == -1)

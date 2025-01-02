@@ -114,7 +114,7 @@ int main(void)
                     continue;
                 }
 
-                switch (ntohs(header->packet_type))
+                switch (header->packet_type)
                 {
                 case 100: // Login
                     printf("Login request from client %d\n", conn_data->fd);

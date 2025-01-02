@@ -29,7 +29,7 @@
 #define R_LEAVE_TABLE_OK 701
 #define R_LEAVE_TABLE_NOT_OK 702
 
-typedef struct __attribute__((packed))
+typedef struct
 {
     char *data;
     size_t len;
