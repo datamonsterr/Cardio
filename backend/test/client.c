@@ -215,12 +215,6 @@ int main(int argc, char *argv[])
 
             // Encode the packet
             encoded_message = encode_packet(1, 200, data, size);
-            Header *encoded_header = decode_header(encoded_message->data);
-            printf("header len %hu\n", encoded_header->packet_len);
-            printf("header type %hu\n", encoded_header->packet_type);
-            printf("header ver %hhu\n", encoded_header->protocol_ver);
-
-            // printf("Sending login request len %zu\n", encoded_message->len);
 
             error = mpack_writer_destroy(&writer);
             if (error != mpack_ok)

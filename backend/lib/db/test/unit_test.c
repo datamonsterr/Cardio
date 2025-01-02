@@ -27,21 +27,21 @@ TEST(test_db_signup)
     PGconn *conn = PQconnectdb(conninfo);
 
     struct dbUser user;
-    strcpy(user.username, "tester");
+    strcpy(user.username, "tester01abc");
     strcpy(user.fullname, "User Test 1");
-    strcpy(user.email, "test1@gmail.com");
+    strcpy(user.email, "test1abc@gmail.com");
     strcpy(user.password, "password12345");
     strcpy(user.country, "Vietnam");
     strcpy(user.gender, "Male");
-    strcpy(user.phone, "0123456789");
+    strcpy(user.phone, "03283617384");
     strcpy(user.dob, "2000-01-01");
 
-    // int signup_result = dbSignup(conn, &user);
+    int signup_result = dbSignup(conn, &user);
 
-    // ASSERT(signup_result == DB_OK);
+    ASSERT(signup_result == DB_OK);
 
     // Check if the user is created
-    int user_id = dbLogin(conn, "tester", "password12345");
+    int user_id = dbLogin(conn, "tester01abc", "password12345");
     if (user_id == DB_ERROR)
     {
         fprintf(stderr, "Login failed\n");

@@ -2,26 +2,41 @@
 
 // input is user's information
 // void function so no output, used to create user and insert user in ranking board
-void dbCreateUser(PGconn *conn, struct dbUser *u)
+int dbCreateUser(PGconn *conn, struct dbUser *u)
 {
-    char query[256];
-    snprintf(query, sizeof(query), "INSERT INTO \"User\" (username, full_name, email, phone, dob, password, country, gender, balance) "
-                                   "VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', 1000)",
-             u->username, u->fullname, u->email, u->phone, u->dob, u->password, u->country, u->gender);
+    const char *paramValues[] = {
+        u->username,
+        u->fullname,
+        u->email,
+        u->phone,
+        u->dob,
+        u->password,
+        u->country,
+        u->gender};
 
-    PGresult *res = PQexec(conn, query);
+    const char *query = "INSERT INTO \"User\" (username, full_name, email, phone, dob, password, country, gender, balance) "
+                        "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1000)";
+
+    PGresult *res = PQexecParams(conn,
+                                 query,
+                                 8,           // Number of parameters
+                                 NULL,        // Parameter types (can be NULL for text)
+                                 paramValues, // Parameter values
+                                 NULL,        // Parameter lengths (can be NULL for text)
+                                 NULL,        // Parameter formats (can be NULL for text)
+                                 0);          // Result format (0 = text, 1 = binary)
+
     if (PQresultStatus(res) != PGRES_COMMAND_OK)
     {
         fprintf(stderr, "\nCreating user failed: %s\n", PQerrorMessage(conn));
         PQclear(res);
-        return;
+        return DB_ERROR;
     }
 
     PQclear(res);
-    printf("\nuser created successfully.\n");
-    PQclear(res);
+    printf("\nUser created successfully.\n");
+    return DB_OK;
 }
-
 // input is 'conn' - the connection pointer, and user_id;
 // output is information of user in form of struct dbUser
 struct dbUser dbGetUserInfo(PGconn *conn, int user_id)

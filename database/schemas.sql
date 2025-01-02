@@ -10,8 +10,8 @@ CREATE TABLE "User"
     balance  INTEGER DEFAULT 0,
     registration_date DATE DEFAULT CURRENT_DATE,
     avatar_url VARCHAR(100),
-    username VARCHAR(100) NOT NULL UNIQUE,
-    full_name VARCHAR(100) NOT NULL
+    full_name VARCHAR(100) NOT NULL DEFAULT '',
+    username VARCHAR(100) NOT NULL UNIQUE
 );
 
 CREATE TABLE Friend

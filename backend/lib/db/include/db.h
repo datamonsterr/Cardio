@@ -45,7 +45,7 @@ void connection(PGconn *conn);
 // This function return a struct of user if success, or an error message if failed.
 struct dbUser dbGetUserInfo(PGconn *conn, int user_id);
 // This function create a user in database or return an error message if create failed.
-void dbCreateUser(PGconn *conn, struct dbUser *user);
+int dbCreateUser(PGconn *conn, struct dbUser *user);
 // This function delete a user from database or return an error message if delete failed.
 void dbDeleteUser(PGconn *conn, int user_id);
 // This function return the leaderboard or an error message if failed.

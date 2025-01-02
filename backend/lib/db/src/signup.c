@@ -2,15 +2,15 @@
 
 bool validate_username(char *username)
 {
-    // if contains at least 10 characters, only alphabetic
     if (strlen(username) < 5)
     {
         return false;
     }
 
+    // alphanumeric characters only
     for (int i = 0; i < strlen(username); i++)
     {
-        if (!isalpha(username[i]))
+        if (!isalnum(username[i]))
         {
             return false;
         }
@@ -54,14 +54,14 @@ int dbSignup(PGconn *conn, struct dbUser *user)
 
     if (!validate_password(user->password))
     {
-        fprintf(stderr, "dbSignup: Invalid password\n");
+        fprintf(stderr, "dbSignup: Invalid password %s\n", user->password);
         return DB_ERROR;
     }
 
     if (strlen(user->email) == 0 || strlen(user->phone) == 0)
     {
         fprintf(stderr, "dbSignup: Email or phone is empty\n");
-        return -1;
+        return DB_ERROR;
     }
 
     char query[256];
@@ -81,8 +81,6 @@ int dbSignup(PGconn *conn, struct dbUser *user)
         return DB_ERROR;
     }
 
-    dbCreateUser(conn, user);
-
     PQclear(res);
-    return DB_OK;
+    return dbCreateUser(conn, user);
 }
