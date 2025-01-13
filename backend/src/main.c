@@ -2,7 +2,7 @@
 
 int main(void)
 {
-    int listener = get_listener_socket("127.0.0.1", "8080", 100);
+    int listener = get_listener_socket("0.0.0.0", "8080", 100);
 
     if (listener == -1)
     {
@@ -148,6 +148,8 @@ int main(void)
                     break;
 
                 default:
+                    fprintf(stderr, "Header: %d\n", header->packet_type);
+                    handle_unknown_request(conn_data, buf, nbytes);
                     break;
                 }
 

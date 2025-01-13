@@ -280,3 +280,12 @@ void handle_join_table_request(conn_data_t *conn_data, char *data, size_t data_l
     free_packet(packet);
     return;
 }
+
+void handle_unknown_request(conn_data_t *conn_data, char *data, size_t data_len)
+{
+    fprintf(stderr, "Unknown request, received %ld bytes\n Send: ", data_len);
+    for (int i = 0; i < data_len; i++)
+    {
+        fprintf(stderr, "%d ", data[i]);
+    }
+}

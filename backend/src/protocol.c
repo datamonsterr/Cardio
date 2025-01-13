@@ -22,16 +22,14 @@ RawBytes *encode_packet(__uint8_t protocol_ver, __uint16_t packet_type, char *pa
     // Encode the header
     // Packet length (2 bytes)
     __uint16_t packet_len = htons((__uint16_t)len);
-    buffer[0] = (packet_len >> 8) & 0xFF; // High byte
-    buffer[1] = packet_len & 0xFF;        // Low byte
+    memcpy(buffer, &packet_len, sizeof(packet_len));
 
     // Protocol version (1 byte)
     buffer[2] = protocol_ver;
 
     // Packet type (2 bytes, big-endian)
     __uint16_t packet_type_be = htons(packet_type);
-    buffer[3] = (packet_type_be >> 8) & 0xFF; // High byte
-    buffer[4] = packet_type_be & 0xFF;        // Low byte
+    memcpy(buffer + 3, &packet_type_be, sizeof(packet_type_be));
 
     // Copy the payload into the buffer
     if (payload == NULL)
@@ -79,9 +77,9 @@ Header *decode_header(char *data)
         return NULL;
     }
 
-    header->packet_len = ntohs((data[0] << 8) | (unsigned char)data[1]);
-    header->protocol_ver = (unsigned char)data[2];
-    header->packet_type = ntohs((data[3] << 8) | (unsigned char)data[4]);
+    header->packet_len = ntohs(*(uint16_t *)&data[0]);  // Convert first 2 bytes
+    header->protocol_ver = (uint8_t)data[2];            // Single byte (no conversion needed)
+    header->packet_type = ntohs(*(uint16_t *)&data[3]); // Convert next 2 bytes
 
     return header;
 }
