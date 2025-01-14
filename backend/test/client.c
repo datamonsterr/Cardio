@@ -412,11 +412,11 @@ int main(int argc, char *argv[])
                     int id = mpack_expect_i32(&reader);
                     mpack_expect_cstr_match(&reader, "name");
                     const char *name = mpack_expect_cstr_alloc(&reader, 32);
-                    mpack_expect_cstr_match(&reader, "max_player");
+                    mpack_expect_cstr_match(&reader, "maxPlayer");
                     int max_player = mpack_expect_i32(&reader);
-                    mpack_expect_cstr_match(&reader, "min_bet");
+                    mpack_expect_cstr_match(&reader, "minBet");
                     int min_bet = mpack_expect_i32(&reader);
-                    mpack_expect_cstr_match(&reader, "current_player");
+                    mpack_expect_cstr_match(&reader, "currentPlayer");
                     int current_player = mpack_expect_i32(&reader);
 
                     printf("%d: %s, max player: %d, min bet: %d, current player: %d\n", id, name, max_player, min_bet, current_player);

@@ -246,7 +246,7 @@ TEST(test_encode_scoreboard_response)
         {7000, 4},
         {4000, 5}};
 
-    Leaderboard *leaderboard = malloc(sizeof(Leaderboard));
+    dbScoreboard *leaderboard = malloc(sizeof(dbScoreboard));
     leaderboard->players = players;
     leaderboard->size = 5;
 
@@ -254,26 +254,22 @@ TEST(test_encode_scoreboard_response)
 
     mpack_reader_t reader;
     mpack_reader_init(&reader, encoded->data, 1024, 1024);
-    mpack_expect_map_max(&reader, 2);
-    mpack_expect_cstr_match(&reader, "Number of player");
-    int size = mpack_expect_i32(&reader);
-    ASSERT(size == leaderboard->size);
 
-    mpack_expect_cstr_match(&reader, "Leaderboard");
+    int size = 20;
+
     mpack_expect_array_max(&reader, size);
     for (int i = 0; i < size; i++)
     {
         mpack_expect_map_max(&reader, 3);
-
-        mpack_expect_cstr_match(&reader, "Rank");
+        mpack_expect_cstr_match(&reader, "rank");
         int rank = mpack_expect_i32(&reader);
         ASSERT(rank == i + 1);
 
-        mpack_expect_cstr_match(&reader, "PlayerID");
+        mpack_expect_cstr_match(&reader, "id");
         int user_id = mpack_expect_i32(&reader);
         ASSERT(user_id == leaderboard->players[i].user_id);
 
-        mpack_expect_cstr_match(&reader, "Balance");
+        mpack_expect_cstr_match(&reader, "balance");
         int balance = mpack_expect_i32(&reader);
         ASSERT(balance == leaderboard->players[i].balance);
     }

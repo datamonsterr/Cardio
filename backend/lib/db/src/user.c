@@ -92,10 +92,10 @@ void dbDeleteUser(PGconn *conn, int user_id)
 
 // no need input
 // output is the list of users in ranking board
-Leaderboard *dbGetScoreBoard(PGconn *conn)
+dbScoreboard *dbGetScoreBoard(PGconn *conn)
 {
     char query[256];
-    snprintf(query, sizeof(query), "SELECT * FROM ranking ORDER BY balance DESC");
+    snprintf(query, sizeof(query), "SELECT user_id, balance FROM  \"User\" ORDER BY balance DESC LIMIT 20");
 
     PGresult *res = PQexec(conn, query);
     if (PQresultStatus(res) != PGRES_TUPLES_OK)
@@ -108,13 +108,13 @@ Leaderboard *dbGetScoreBoard(PGconn *conn)
     printf("%d\t%d", atoi(PQgetvalue(res, 0, 0)), atoi(PQgetvalue(res, 0, 1)));
 
     int numRow = PQntuples(res);
-    Leaderboard *leaderboard = malloc(sizeof(Leaderboard));
+    dbScoreboard *leaderboard = malloc(sizeof(dbScoreboard));
     leaderboard->players = malloc(numRow * sizeof(dbRanking));
     leaderboard->size = numRow;
     for (int i = 0; i < numRow; i++)
     {
-        leaderboard->players[i].balance = atoi(PQgetvalue(res, i, 0));
-        leaderboard->players[i].user_id = atoi(PQgetvalue(res, i, 1));
+        leaderboard->players[i].user_id = atoi(PQgetvalue(res, i, 0));
+        leaderboard->players[i].balance = atoi(PQgetvalue(res, i, 1));
     }
 
     PQclear(res);

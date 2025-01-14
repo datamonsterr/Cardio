@@ -109,7 +109,7 @@ RawBytes *decode_refresh_tables_request(char *payload);
 RawBytes *encode_update_tables_response(TableList *new_tables);
 
 // Encode scoreboard response
-RawBytes *encode_scoreboard_response(Leaderboard *Leaderboard);
+RawBytes *encode_scoreboard_response(dbScoreboard *dbScoreboard);
 
 // Encode login success response
 RawBytes *encode_login_success_response(dbUser *user);

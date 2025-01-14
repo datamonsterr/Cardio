@@ -61,8 +61,19 @@ TEST(test_db_signup)
     PQfinish(conn);
 }
 
+TEST(test_db_scoreboard)
+{
+    PGconn *conn = PQconnectdb(conninfo);
+    dbScoreboard *leaderboard = dbGetScoreBoard(conn);
+
+    ASSERT(leaderboard->size > 0);
+    ASSERT(leaderboard->players[0].balance == 3550);
+    PQfinish(conn);
+}
+
 int main()
 {
     RUN_TEST(test_db_get_user_info);
     RUN_TEST(test_db_signup);
+    RUN_TEST(test_db_scoreboard);
 }
