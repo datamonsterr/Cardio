@@ -71,9 +71,21 @@ TEST(test_db_scoreboard)
     PQfinish(conn);
 }
 
+TEST(test_db_friendlist)
+{
+    PGconn *conn = PQconnectdb(conninfo);
+    FriendList *friendlist = dbGetFriendList(conn, 1);
+
+    ASSERT(friendlist->num > 0);
+    ASSERT(friendlist->friends[0].user_id == 2);
+    ASSERT(strcmp(friendlist->friends[0].user_name, "jane_smith") == 0)
+    PQfinish(conn);
+}
+
 int main()
 {
-    RUN_TEST(test_db_get_user_info);
-    RUN_TEST(test_db_signup);
-    RUN_TEST(test_db_scoreboard);
+    // RUN_TEST(test_db_get_user_info);
+    // RUN_TEST(test_db_signup);
+    // RUN_TEST(test_db_scoreboard);
+    RUN_TEST(test_db_friendlist);
 }

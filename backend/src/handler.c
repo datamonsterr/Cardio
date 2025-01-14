@@ -290,37 +290,37 @@ void handle_unknown_request(conn_data_t *conn_data, char *data, size_t data_len)
     }
 }
 
-void handle_get_scoreboard(conn_data_t *conn_data, char *data, size_t data_len)
-{
-    PGconn *conn = PQconnectdb(dbconninfo);
-    Packet *packet = decode_packet(data, data_len);
+// void handle_get_scoreboard(conn_data_t *conn_data, char *data, size_t data_len)
+// {
+//     PGconn *conn = PQconnectdb(dbconninfo);
+//     Packet *packet = decode_packet(data, data_len);
 
-    if (packet->header->packet_type != PACKET_SCOREBOARD)
-    {
-        logger(MAIN_LOG, "Error", "Handle get scoreboard: invalid packet type");
-    }
+//     if (packet->header->packet_type != PACKET_SCOREBOARD)
+//     {
+//         logger(MAIN_LOG, "Error", "Handle get scoreboard: invalid packet type");
+//     }
 
-    if (packet->header->packet_len != data_len)
-    {
-        logger(MAIN_LOG, "Error", "Handle get scoreboard: invalid packet length");
-    }
+//     if (packet->header->packet_len != data_len)
+//     {
+//         logger(MAIN_LOG, "Error", "Handle get scoreboard: invalid packet length");
+//     }
 
-    if (conn_data->user_id == 0)
-    {
-        logger(MAIN_LOG, "Error", "Handle get scoreboard: User not logged in");
-    }
+//     if (conn_data->user_id == 0)
+//     {
+//         logger(MAIN_LOG, "Error", "Handle get scoreboard: User not logged in");
+//     }
 
-    dbScoreboard *leaderboard = dbGetLeaderboard(conn);
+//     dbScoreboard *leaderboard = dbGetLeaderboard(conn);
 
-    RawBytes *raw_bytes = encode_scoreboard_response(leaderboard);
-    RawBytes *response = encode_packet(PROTOCOL_V1, PACKET_SCOREBOARD, raw_bytes->data, raw_bytes->len);
-    if (sendall(conn_data->fd, response->data, (int *)&(response->len)) == -1)
-    {
-        logger(MAIN_LOG, "Error", "Handle get scoreboard: Cannot send response");
-    }
+//     RawBytes *raw_bytes = encode_scoreboard_response(leaderboard);
+//     RawBytes *response = encode_packet(PROTOCOL_V1, PACKET_SCOREBOARD, raw_bytes->data, raw_bytes->len);
+//     if (sendall(conn_data->fd, response->data, (int *)&(response->len)) == -1)
+//     {
+//         logger(MAIN_LOG, "Error", "Handle get scoreboard: Cannot send response");
+//     }
 
-    free(response);
-    free(raw_bytes);
-    free_packet(packet);
-    PQfinish(conn);
-}
+//     free(response);
+//     free(raw_bytes);
+//     free_packet(packet);
+//     PQfinish(conn);
+// }

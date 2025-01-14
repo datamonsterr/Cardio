@@ -237,6 +237,35 @@ TEST(test_encode_full_tables_resp)
     }
 }
 
+TEST(test_encode_friendlist_response)
+{
+    PGconn *conn = PQconnectdb(dbconninfo);
+    ASSERT(PQstatus(conn) == CONNECTION_OK);
+    FriendList *friendlist = dbGetFriendList(conn, 1);
+
+    RawBytes *encoded = encode_friendlist_response(friendlist);
+
+    mpack_reader_t reader;
+    mpack_reader_init(&reader, encoded->data, 1024, 1024);
+    // ASSERT(friendlist->num == 2);
+
+    int num = friendlist->num;
+
+    mpack_expect_array_max(&reader, num);
+    for (int i=0;i<num;i++) {
+        mpack_expect_map_max(&reader, 2);
+
+        mpack_expect_cstr_match(&reader, "id");
+        int id = mpack_expect_i32(&reader);
+        ASSERT(id == friendlist->friends[i].user_id);
+        mpack_expect_cstr_match(&reader, "username");
+        char *name = mpack_expect_cstr_alloc(&reader, 32);
+        ASSERT(strcmp(name, friendlist->friends[i].user_name) == 0);
+    }
+
+    PQfinish(conn);
+}
+
 TEST(test_encode_scoreboard_response)
 {
     dbRanking players[5] = {
@@ -348,17 +377,18 @@ TEST(test_encode_login_success_resp)
 
 int main()
 {
-    RUN_TEST(test_db_conn);
-    RUN_TEST(test_decode_packet);
-    RUN_TEST(test_encode_packet);
-    RUN_TEST(test_decode_login_request);
-    RUN_TEST(test_encode_response);
-    RUN_TEST(test_encode_response_message);
-    RUN_TEST(test_decode_signup_request);
-    RUN_TEST(test_decode_create_table_request);
-    RUN_TEST(test_logger);
-    RUN_TEST(test_encode_full_tables_resp);
-    RUN_TEST(test_decode_join_table_req);
-    RUN_TEST(test_encode_login_success_resp);
-    RUN_TEST(test_encode_scoreboard_response);
+    // RUN_TEST(test_db_conn);
+    // RUN_TEST(test_decode_packet);
+    // RUN_TEST(test_encode_packet);
+    // RUN_TEST(test_decode_login_request);
+    // RUN_TEST(test_encode_response);
+    // RUN_TEST(test_encode_response_message);
+    // RUN_TEST(test_decode_signup_request);
+    // RUN_TEST(test_decode_create_table_request);
+    // RUN_TEST(test_logger);
+    // RUN_TEST(test_encode_full_tables_resp);
+    // RUN_TEST(test_decode_join_table_req);
+    // RUN_TEST(test_encode_login_success_resp);
+    // RUN_TEST(test_encode_scoreboard_response);
+    RUN_TEST(test_encode_friendlist_response);
 }

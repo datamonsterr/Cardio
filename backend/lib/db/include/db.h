@@ -7,7 +7,7 @@
 #include <stdbool.h>
 // #include <msgpack.h>
 
-#define conninfo "dbname=cardio user=root password=1234 host=localhost port=5433"
+#define conninfo "dbname=cardio user=postgres password=1234 host=localhost port=5432"
 #define DB_ERROR -200
 #define DB_OK -100
 
@@ -38,11 +38,17 @@ typedef struct
     int size;
 } dbScoreboard;
 
-struct dbFriend
+typedef struct
 {
-    int user_id_1;
-    int user_id_2;
-};
+    int user_id;
+    char user_name[32];
+} dbFriend;
+
+typedef struct
+{
+    dbFriend *friends;
+    int num;
+} FriendList;
 
 // This function connect to database.
 // Output is none if connection is ok, or an error message if connection is failed.
@@ -56,6 +62,8 @@ int dbCreateUser(PGconn *conn, struct dbUser *user);
 void dbDeleteUser(PGconn *conn, int user_id);
 // This function return the leaderboard or an error message if failed.
 dbScoreboard *dbGetScoreBoard(PGconn *conn);
+// This function return the friendlist of a player
+FriendList *dbGetFriendList(PGconn *conn, int user_id);
 
 // This function take input: username, password.
 // If username and password are valid, it create a new user in database

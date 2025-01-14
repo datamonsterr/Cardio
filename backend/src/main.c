@@ -148,7 +148,7 @@ int main(void)
                     break;
 
                 default:
-                    handle_unknown_request(conn_data, buf, nbytes);
+                    // handle_unknown_request(conn_data, buf, nbytes);
                     fprintf(stderr, "Header: %d\n", header->packet_type);
                     break;
                 }
