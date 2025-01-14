@@ -32,6 +32,10 @@
 #define R_LEAVE_TABLE_OK 701
 #define R_LEAVE_TABLE_NOT_OK 702
 
+#define PACKET_SCOREBOARD 800
+#define R_SCOREBOARD_OK 801
+#define R_SCOREBOARD_NOT_OK 802
+
 typedef struct
 {
     char *data;
