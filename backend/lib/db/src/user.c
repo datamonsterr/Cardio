@@ -92,7 +92,7 @@ void dbDeleteUser(PGconn *conn, int user_id)
 
 // no need input
 // output is the list of users in ranking board
-struct dbRanking *dbGetScoreBoard(PGconn *conn)
+Leaderboard *dbGetScoreBoard(PGconn *conn)
 {
     char query[256];
     snprintf(query, sizeof(query), "SELECT * FROM ranking ORDER BY balance DESC");
@@ -102,16 +102,19 @@ struct dbRanking *dbGetScoreBoard(PGconn *conn)
     {
         fprintf(stderr, "\nFailed to get ranking board information: %s\n", PQerrorMessage(conn));
         PQclear(res);
+        return NULL;
     }
 
     printf("%d\t%d", atoi(PQgetvalue(res, 0, 0)), atoi(PQgetvalue(res, 0, 1)));
 
     int numRow = PQntuples(res);
-    struct dbRanking *leaderboard = malloc(numRow * sizeof(struct dbRanking));
+    Leaderboard *leaderboard = malloc(sizeof(Leaderboard));
+    leaderboard->players = malloc(numRow * sizeof(dbRanking));
+    leaderboard->size = numRow;
     for (int i = 0; i < numRow; i++)
     {
-        leaderboard[i].balance = atoi(PQgetvalue(res, i, 0));
-        leaderboard[i].user_id = atoi(PQgetvalue(res, i, 1));
+        leaderboard->players[i].balance = atoi(PQgetvalue(res, i, 0));
+        leaderboard->players[i].user_id = atoi(PQgetvalue(res, i, 1));
     }
 
     PQclear(res);

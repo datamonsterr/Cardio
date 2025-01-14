@@ -1,6 +1,7 @@
 #pragma once
 #include "game.h"
 #include "db.h"
+#include "../lib/db/include/db.h"
 
 #define MAXLINE 65540
 #define PROTOCOL_V1 0x01
@@ -108,7 +109,7 @@ RawBytes *decode_refresh_tables_request(char *payload);
 RawBytes *encode_update_tables_response(TableList *new_tables);
 
 // Encode scoreboard response
-RawBytes *encode_scoreboard_response();
+RawBytes *encode_scoreboard_response(Leaderboard *Leaderboard);
 
 // Encode login success response
 RawBytes *encode_login_success_response(dbUser *user);
