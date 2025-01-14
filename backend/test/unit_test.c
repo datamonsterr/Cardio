@@ -237,6 +237,48 @@ TEST(test_encode_full_tables_resp)
     }
 }
 
+TEST(test_encode_scoreboard_response)
+{
+    dbRanking players[5] = {
+        {5000, 1},
+        {3000, 2},
+        {1000, 3},
+        {7000, 4},
+        {4000, 5}
+    };
+
+    Leaderboard *leaderboard = malloc(sizeof(Leaderboard));
+    leaderboard->players = players;
+    leaderboard->size = 5;
+
+    RawBytes *encoded = encode_scoreboard_response(leaderboard);
+
+    mpack_reader_t reader;
+    mpack_reader_init(&reader, encoded->data, 1024, 1024);
+    mpack_expect_map_max(&reader, 2);
+    mpack_expect_cstr_match(&reader, "Number of player");
+    int size = mpack_expect_i32(&reader);
+    ASSERT(size == leaderboard->size);
+
+    mpack_expect_cstr_match(&reader, "Leaderboard");
+    mpack_expect_array_max(&reader, size);
+    for(int i=0;i<size;i++) {
+        mpack_expect_map_max(&reader, 3);
+
+        mpack_expect_cstr_match(&reader, "Rank");
+        int rank = mpack_expect_i32(&reader);
+        ASSERT(rank == i+1);
+
+        mpack_expect_cstr_match(&reader, "PlayerID");
+        int user_id = mpack_expect_i32(&reader);
+        ASSERT(user_id == leaderboard->players[i].user_id);
+
+        mpack_expect_cstr_match(&reader, "Balance");
+        int balance = mpack_expect_i32(&reader);
+        ASSERT(balance == leaderboard->players[i].balance);
+    }
+}
+
 TEST(test_decode_join_table_req)
 {
     mpack_writer_t writer;
@@ -270,4 +312,5 @@ int main()
     RUN_TEST(test_logger);
     RUN_TEST(test_encode_full_tables_resp);
     RUN_TEST(test_decode_join_table_req);
+    RUN_TEST(test_encode_scoreboard_response);
 }

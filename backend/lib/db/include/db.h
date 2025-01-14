@@ -26,11 +26,17 @@ struct dbUser
     char gender[8];
 };
 
-struct dbRanking
-{
+typedef struct
+{   
     int balance;
     int user_id;
-};
+} dbRanking;
+
+typedef struct 
+{
+    dbRanking *players;
+    int size;
+} Leaderboard;
 
 struct dbFriend
 {
@@ -49,7 +55,7 @@ int dbCreateUser(PGconn *conn, struct dbUser *user);
 // This function delete a user from database or return an error message if delete failed.
 void dbDeleteUser(PGconn *conn, int user_id);
 // This function return the leaderboard or an error message if failed.
-struct dbRanking *dbGetScoreBoard(PGconn *conn);
+Leaderboard *dbGetScoreBoard(PGconn *conn);
 
 // This function take input: username, password.
 // If username and password are valid, it create a new user in database

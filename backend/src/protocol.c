@@ -6,6 +6,7 @@ void free_packet(Packet *packet)
     free(packet);
 }
 
+
 RawBytes *encode_packet(__uint8_t protocol_ver, __uint16_t packet_type, char *payload, size_t payload_len)
 {
     // Total packet length: header size + payload size
@@ -300,6 +301,45 @@ CreateTableRequest *decode_create_table_request(char *payload)
     create_table_request->min_bet = min_bet;
 
     return create_table_request;
+}
+
+RawBytes *encode_scoreboard_response(Leaderboard *leaderboard)
+{
+    mpack_writer_t writer;
+    char buffer[MAXLINE];
+    mpack_writer_init(&writer, buffer, MAXLINE);
+    mpack_start_map(&writer, 2);
+    mpack_write_cstr(&writer, "Number of player");
+    mpack_write_i32(&writer, leaderboard->size);
+
+    mpack_write_cstr(&writer, "Leaderboard");
+    mpack_start_array(&writer, leaderboard->size);
+    for (int i=0;i<leaderboard->size;i++) {
+        mpack_start_map(&writer, 3);
+        mpack_write_cstr(&writer, "Rank");
+        mpack_write_i32(&writer, i+1);
+        mpack_write_cstr(&writer, "PlayerID");
+        mpack_write_i32(&writer, leaderboard->players[i].user_id);
+        mpack_write_cstr(&writer, "Balance");
+        mpack_write_i32(&writer, leaderboard->players[i].balance);
+        mpack_finish_map(&writer);
+    }
+    mpack_finish_array(&writer);
+    mpack_finish_map(&writer);
+
+    char *data = writer.buffer;
+    if (mpack_writer_destroy(&writer) != mpack_ok) {
+        fprintf(stderr, "MPack encoding error: %s\n", mpack_error_to_string(mpack_writer_destroy(&writer)));
+        return NULL;
+    }
+
+    RawBytes *raw_bytes = malloc(sizeof(RawBytes));
+    raw_bytes->len = mpack_writer_buffer_used(&writer);
+    raw_bytes->data = malloc(raw_bytes->len);
+
+    memcpy(raw_bytes->data, data, raw_bytes->len);
+
+    return raw_bytes;
 }
 
 RawBytes *encode_full_tables_response(TableList *table_list)
