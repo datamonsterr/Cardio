@@ -111,5 +111,8 @@ RawBytes *encode_update_tables_response(TableList *new_tables);
 // Encode scoreboard response
 RawBytes *encode_scoreboard_response(dbScoreboard *dbScoreboard);
 
+// Encode friendlist response
+RawBytes *encode_friendlist_response(FriendList *friendlist);
+
 // Encode login success response
 RawBytes *encode_login_success_response(dbUser *user);

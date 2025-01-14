@@ -120,3 +120,27 @@ dbScoreboard *dbGetScoreBoard(PGconn *conn)
     PQclear(res);
     return leaderboard;
 }
+
+FriendList *dbGetFriendList(PGconn *conn, int user_id) {
+    char query[256];
+    snprintf(query, sizeof(query), "select f.u2, u.username from friend f join \"User\" u on f.u2 = u.user_id where f.u1 = %d", user_id);
+
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "\nFailed to get friendlist: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        return NULL;
+    }
+
+    int numRow = PQntuples(res);
+    FriendList *friendlist = malloc(sizeof(FriendList));
+    friendlist->friends = malloc(numRow * sizeof(dbFriend));
+    friendlist->num = numRow;
+    for (int i=0;i<numRow;i++) {
+        friendlist->friends[i].user_id = atoi(PQgetvalue(res, i, 0));
+        strncpy(friendlist->friends[i].user_name, PQgetvalue(res, 0, 1), sizeof(friendlist->friends[i].user_name));
+    }
+
+    PQclear(res);
+    return friendlist;
+}
