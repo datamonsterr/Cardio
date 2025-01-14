@@ -18,11 +18,11 @@ void handle_login_request(conn_data_t *conn_data, char *data, size_t data_len)
     int user_id = dbLogin(conn, login_request->username, login_request->password);
     if (user_id > 0)
     {
-        RawBytes *raw_bytes = encode_response(R_LOGIN_OK);
+        struct dbUser user_info = dbGetUserInfo(conn, user_id);
+        RawBytes *raw_bytes = encode_login_success_response(&user_info);
         RawBytes *response = encode_packet(PROTOCOL_V1, 100, raw_bytes->data, raw_bytes->len);
         sendall(conn_data->fd, response->data, (int *)&(response->len));
 
-        struct dbUser user_info = dbGetUserInfo(conn, user_id);
         strncpy(conn_data->username, user_info.username, 32);
         conn_data->user_id = user_id;
         conn_data->is_active = true;

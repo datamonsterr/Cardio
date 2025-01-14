@@ -148,8 +148,8 @@ int main(void)
                     break;
 
                 default:
-                    fprintf(stderr, "Header: %d\n", header->packet_type);
                     handle_unknown_request(conn_data, buf, nbytes);
+                    fprintf(stderr, "Header: %d\n", header->packet_type);
                     break;
                 }
 

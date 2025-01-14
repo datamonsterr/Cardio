@@ -279,14 +279,14 @@ CreateTableRequest *decode_create_table_request(char *payload)
 
     mpack_expect_map_max(&reader, 3);
 
-    mpack_expect_cstr_match(&reader, "name");
+    mpack_expect_cstr_match(&reader, "tableName");
     const char *table_name = mpack_expect_cstr_alloc(&reader, 32);
 
-    mpack_expect_cstr_match(&reader, "max_player");
-    int max_player = mpack_expect_i32(&reader);
+    mpack_expect_cstr_match(&reader, "maxPlayer");
+    int max_player = mpack_expect_int(&reader);
 
-    mpack_expect_cstr_match(&reader, "min_bet");
-    int min_bet = mpack_expect_i32(&reader);
+    mpack_expect_cstr_match(&reader, "minBet");
+    int min_bet = mpack_expect_int(&reader);
 
     if (mpack_reader_destroy(&reader) != mpack_ok)
     {
@@ -318,13 +318,13 @@ RawBytes *encode_full_tables_response(TableList *table_list)
         mpack_start_map(&writer, 5);
         mpack_write_cstr(&writer, "id");
         mpack_write_i32(&writer, table_list->tables[i].id);
-        mpack_write_cstr(&writer, "name");
+        mpack_write_cstr(&writer, "tableName");
         mpack_write_cstr(&writer, table_list->tables[i].name);
-        mpack_write_cstr(&writer, "max_player");
+        mpack_write_cstr(&writer, "maxPlayer");
         mpack_write_i32(&writer, table_list->tables[i].max_player);
-        mpack_write_cstr(&writer, "min_bet");
+        mpack_write_cstr(&writer, "minBet");
         mpack_write_i32(&writer, table_list->tables[i].min_bet);
-        mpack_write_cstr(&writer, "current_player");
+        mpack_write_cstr(&writer, "currentPlayer");
         mpack_write_i32(&writer, table_list->tables[i].current_player);
         mpack_finish_map(&writer);
     }
@@ -355,7 +355,7 @@ int decode_join_table_request(char *payload)
 
     mpack_expect_map_max(&reader, 1);
 
-    mpack_expect_cstr_match(&reader, "table_id");
+    mpack_expect_cstr_match(&reader, "tableId");
     int table_id = mpack_expect_i32(&reader);
 
     if (mpack_reader_destroy(&reader) != mpack_ok)
@@ -365,4 +365,47 @@ int decode_join_table_request(char *payload)
     }
 
     return table_id;
+}
+
+RawBytes *encode_login_success_response(dbUser *user)
+{
+    mpack_writer_t writer;
+    char buffer[MAXLINE];
+    mpack_writer_init(&writer, buffer, MAXLINE);
+    mpack_start_map(&writer, 10);
+    mpack_write_cstr(&writer, "res");
+    mpack_write_u16(&writer, R_LOGIN_OK);
+    mpack_write_cstr(&writer, "userId");
+    mpack_write_i32(&writer, user->user_id);
+    mpack_write_cstr(&writer, "username");
+    mpack_write_cstr(&writer, user->username);
+    mpack_write_cstr(&writer, "balance");
+    mpack_write_i32(&writer, user->balance);
+    mpack_write_cstr(&writer, "fullname");
+    mpack_write_cstr(&writer, user->fullname);
+    mpack_write_cstr(&writer, "email");
+    mpack_write_cstr(&writer, user->email);
+    mpack_write_cstr(&writer, "phone");
+    mpack_write_cstr(&writer, user->phone);
+    mpack_write_cstr(&writer, "dob");
+    mpack_write_cstr(&writer, user->dob);
+    mpack_write_cstr(&writer, "country");
+    mpack_write_cstr(&writer, user->country);
+    mpack_write_cstr(&writer, "gender");
+    mpack_write_cstr(&writer, user->gender);
+    mpack_finish_map(&writer);
+
+    if (mpack_writer_destroy(&writer) != mpack_ok)
+    {
+        fprintf(stderr, "Encode login response: An error occurred encoding the message\n");
+        return NULL;
+    }
+
+    RawBytes *raw_bytes = malloc(sizeof(RawBytes));
+
+    raw_bytes->len = mpack_writer_buffer_used(&writer);
+    raw_bytes->data = malloc(raw_bytes->len);
+    memcpy(raw_bytes->data, buffer, raw_bytes->len);
+
+    return raw_bytes;
 }

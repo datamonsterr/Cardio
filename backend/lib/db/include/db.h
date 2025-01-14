@@ -24,7 +24,7 @@ struct dbUser
     char dob[16];
     char registration_date[16];
     char gender[8];
-};
+} typedef dbUser;
 
 struct dbRanking
 {

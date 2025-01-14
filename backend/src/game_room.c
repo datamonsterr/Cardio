@@ -57,9 +57,11 @@ int remove_table(TableList *table_list, int id)
     {
         table_list->tables[i] = table_list->tables[i + 1];
     }
+    free(&table_list->tables[table_list->size - 1]);
     table_list->size--;
     return 0;
 }
+
 int find_table_by_id(TableList *table_list, int id)
 {
     for (int i = 0; i < table_list->size; i++)

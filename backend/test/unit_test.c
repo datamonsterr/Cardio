@@ -169,11 +169,11 @@ TEST(test_decode_create_table_request)
 
     mpack_start_map(&writer, 3);
 
-    mpack_write_cstr(&writer, "name");
+    mpack_write_cstr(&writer, "tableName");
     mpack_write_cstr(&writer, "Table 1");
-    mpack_write_cstr(&writer, "max_player");
+    mpack_write_cstr(&writer, "maxPlayer");
     mpack_write_int(&writer, 5);
-    mpack_write_cstr(&writer, "min_bet");
+    mpack_write_cstr(&writer, "minBet");
     mpack_write_int(&writer, 100);
 
     mpack_finish_map(&writer);
@@ -224,13 +224,13 @@ TEST(test_encode_full_tables_resp)
 
         mpack_expect_cstr_match(&reader, "id");
         int id = mpack_expect_i32(&reader);
-        mpack_expect_cstr_match(&reader, "name");
+        mpack_expect_cstr_match(&reader, "tableName");
         const char *name = mpack_expect_cstr_alloc(&reader, 32);
-        mpack_expect_cstr_match(&reader, "max_player");
+        mpack_expect_cstr_match(&reader, "maxPlayer");
         int max_player = mpack_expect_i32(&reader);
-        mpack_expect_cstr_match(&reader, "min_bet");
+        mpack_expect_cstr_match(&reader, "minBet");
         int min_bet = mpack_expect_i32(&reader);
-        mpack_expect_cstr_match(&reader, "current_player");
+        mpack_expect_cstr_match(&reader, "currentPlayer");
         int current_player = mpack_expect_i32(&reader);
 
         ASSERT(strcmp(name, table_list->tables[i].name) == 0);
@@ -243,7 +243,7 @@ TEST(test_decode_join_table_req)
     char buffer[1024];
     mpack_writer_init(&writer, buffer, 1024);
     mpack_start_map(&writer, 1);
-    mpack_write_cstr(&writer, "table_id");
+    mpack_write_cstr(&writer, "tableId");
     mpack_write_i32(&writer, 1);
     mpack_finish_map(&writer);
 
@@ -255,6 +255,57 @@ TEST(test_decode_join_table_req)
     ASSERT(decoded->header->packet_len == encoded->len);
 
     mpack_reader_t reader;
+}
+
+TEST(test_encode_login_success_resp)
+{
+    dbUser *user = malloc(sizeof(dbUser));
+
+    user->user_id = 1;
+    user->balance = 1000;
+    strcpy(user->username, "Tester");
+    strcpy(user->fullname, "Pham Thanh Dat");
+    strcpy(user->email, "test@gmail.com");
+    strcpy(user->phone, "1234567890");
+    strcpy(user->dob, "2004/01/01");
+    strcpy(user->country, "Vietnam");
+    strcpy(user->gender, "Male");
+    RawBytes *rawbytes = encode_login_success_response(user);
+
+    mpack_reader_t reader;
+    mpack_reader_init(&reader, rawbytes->data, 1024, 1024);
+    mpack_expect_map_max(&reader, 10);
+    mpack_expect_cstr_match(&reader, "res");
+    int res = mpack_expect_i32(&reader);
+    mpack_expect_cstr_match(&reader, "userId");
+    int user_id = mpack_expect_i32(&reader);
+    mpack_expect_cstr_match(&reader, "username");
+    const char *username = mpack_expect_cstr_alloc(&reader, 32);
+    mpack_expect_cstr_match(&reader, "balance");
+    int balance = mpack_expect_i32(&reader);
+    mpack_expect_cstr_match(&reader, "fullname");
+    const char *fullname = mpack_expect_cstr_alloc(&reader, 64);
+    mpack_expect_cstr_match(&reader, "email");
+    const char *email = mpack_expect_cstr_alloc(&reader, 64);
+    mpack_expect_cstr_match(&reader, "phone");
+    const char *phone = mpack_expect_cstr_alloc(&reader, 16);
+    mpack_expect_cstr_match(&reader, "dob");
+    const char *dob = mpack_expect_cstr_alloc(&reader, 16);
+    mpack_expect_cstr_match(&reader, "country");
+    const char *country = mpack_expect_cstr_alloc(&reader, 32);
+    mpack_expect_cstr_match(&reader, "gender");
+    const char *gender = mpack_expect_cstr_alloc(&reader, 8);
+
+    if (mpack_reader_destroy(&reader) != mpack_ok)
+    {
+        fprintf(stderr, "Error: %s\n", mpack_error_to_string(mpack_reader_destroy(&reader)));
+    }
+
+    ASSERT(res == R_LOGIN_OK);
+    ASSERT(user_id == 1);
+    ASSERT(balance == 1000);
+    ASSERT(strcmp(username, "Tester") == 0);
+    ASSERT(strcmp(fullname, "Pham Thanh Dat") == 0);
 }
 
 int main()
@@ -270,4 +321,5 @@ int main()
     RUN_TEST(test_logger);
     RUN_TEST(test_encode_full_tables_resp);
     RUN_TEST(test_decode_join_table_req);
+    RUN_TEST(test_encode_login_success_resp);
 }
