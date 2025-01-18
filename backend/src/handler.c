@@ -300,16 +300,6 @@ void handle_get_scoreboard(conn_data_t *conn_data, char *data, size_t data_len)
         logger(MAIN_LOG, "Error", "Handle get scoreboard: invalid packet type");
     }
 
-    if (packet->header->packet_len != data_len)
-    {
-        logger(MAIN_LOG, "Error", "Handle get scoreboard: invalid packet length");
-    }
-
-    if (conn_data->user_id == 0)
-    {
-        logger(MAIN_LOG, "Error", "Handle get scoreboard: User not logged in");
-    }
-
     dbScoreboard *scoreboard = dbGetScoreBoard(conn);
 
     RawBytes *raw_bytes = encode_scoreboard_response(scoreboard);
@@ -317,6 +307,41 @@ void handle_get_scoreboard(conn_data_t *conn_data, char *data, size_t data_len)
     if (sendall(conn_data->fd, response->data, (int *)&(response->len)) == -1)
     {
         logger(MAIN_LOG, "Error", "Handle get scoreboard: Cannot send response");
+    }
+
+    free(response);
+    free(raw_bytes);
+    free_packet(packet);
+    PQfinish(conn);
+}
+
+void handle_get_friendlist(conn_data_t *conn_data, char *data, size_t data_len)
+{
+    PGconn *conn = PQconnectdb(dbconninfo);
+    Packet *packet = decode_packet(data, data_len);
+
+    if (packet->header->packet_type != PACKET_FRIENDLIST)
+    {
+        logger(MAIN_LOG, "Error", "Handle get friendlist: invalid packet type");
+    }
+
+    if (packet->header->packet_len != data_len)
+    {
+        logger(MAIN_LOG, "Error", "Handle get friendlist: invalid packet length");
+    }
+
+    if (conn_data->user_id == 0)
+    {
+        logger(MAIN_LOG, "Error", "Handle get friendlist: User not logged in");
+    }
+
+    FriendList *friendlist = dbGetFriendList(conn, conn_data->user_id);
+
+    RawBytes *raw_bytes = encode_friendlist_response(friendlist);
+    RawBytes *response = encode_packet(PROTOCOL_V1, PACKET_FRIENDLIST, raw_bytes->data, raw_bytes->len);
+    if (sendall(conn_data->fd, response->data, (int *)&(response->len)) == -1)
+    {
+        logger(MAIN_LOG, "Error", "Handle get friendlist: Cannot send response");
     }
 
     free(response);

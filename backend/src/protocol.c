@@ -340,12 +340,14 @@ RawBytes *encode_scoreboard_response(dbScoreboard *leaderboard)
     return raw_bytes;
 }
 
-RawBytes *encode_friendlist_response(FriendList *friendlist) {
+RawBytes *encode_friendlist_response(FriendList *friendlist)
+{
     mpack_writer_t writer;
     char buffer[MAXLINE];
     mpack_writer_init(&writer, buffer, MAXLINE);
     mpack_start_array(&writer, friendlist->num);
-    for (int i=0;i<friendlist->num;i++) {
+    for (int i = 0; i < friendlist->num; i++)
+    {
         mpack_start_map(&writer, 2);
         mpack_write_cstr(&writer, "id");
         mpack_write_i32(&writer, friendlist->friends[i].user_id);
@@ -357,7 +359,8 @@ RawBytes *encode_friendlist_response(FriendList *friendlist) {
     mpack_finish_array(&writer);
 
     char *data = writer.buffer;
-    if (mpack_writer_destroy(&writer) != mpack_ok) {
+    if (mpack_writer_destroy(&writer) != mpack_ok)
+    {
         fprintf(stderr, "MPack encoding error: %s\n", mpack_error_to_string(mpack_writer_destroy(&writer)));
         return NULL;
     }

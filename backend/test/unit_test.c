@@ -252,7 +252,8 @@ TEST(test_encode_friendlist_response)
     int num = friendlist->num;
 
     mpack_expect_array_max(&reader, num);
-    for (int i=0;i<num;i++) {
+    for (int i = 0; i < num; i++)
+    {
         mpack_expect_map_max(&reader, 2);
 
         mpack_expect_cstr_match(&reader, "id");
@@ -377,18 +378,18 @@ TEST(test_encode_login_success_resp)
 
 int main()
 {
-    // RUN_TEST(test_db_conn);
-    // RUN_TEST(test_decode_packet);
-    // RUN_TEST(test_encode_packet);
-    // RUN_TEST(test_decode_login_request);
-    // RUN_TEST(test_encode_response);
-    // RUN_TEST(test_encode_response_message);
-    // RUN_TEST(test_decode_signup_request);
-    // RUN_TEST(test_decode_create_table_request);
-    // RUN_TEST(test_logger);
-    // RUN_TEST(test_encode_full_tables_resp);
-    // RUN_TEST(test_decode_join_table_req);
-    // RUN_TEST(test_encode_login_success_resp);
-    // RUN_TEST(test_encode_scoreboard_response);
+    RUN_TEST(test_db_conn);
+    RUN_TEST(test_decode_packet);
+    RUN_TEST(test_encode_packet);
+    RUN_TEST(test_decode_login_request);
+    RUN_TEST(test_encode_response);
+    RUN_TEST(test_encode_response_message);
+    RUN_TEST(test_decode_signup_request);
+    RUN_TEST(test_decode_create_table_request);
+    RUN_TEST(test_logger);
+    RUN_TEST(test_encode_full_tables_resp);
+    RUN_TEST(test_decode_join_table_req);
+    RUN_TEST(test_encode_login_success_resp);
+    RUN_TEST(test_encode_scoreboard_response);
     RUN_TEST(test_encode_friendlist_response);
 }

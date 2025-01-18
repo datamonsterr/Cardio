@@ -147,8 +147,18 @@ int main(void)
                     handle_join_table_request(conn_data, buf, nbytes, table_list);
                     break;
 
+                case PACKET_SCOREBOARD:
+                    logger(MAIN_LOG, "Info", "Get scoreboard request from client");
+                    handle_get_scoreboard(conn_data, buf, nbytes);
+                    break;
+
+                case PACKET_FRIENDLIST:
+                    logger(MAIN_LOG, "Info", "Get friendlist request from client");
+                    handle_get_friendlist(conn_data, buf, nbytes);
+                    break;
+
                 default:
-                    // handle_unknown_request(conn_data, buf, nbytes);
+                    handle_unknown_request(conn_data, buf, nbytes);
                     fprintf(stderr, "Header: %d\n", header->packet_type);
                     break;
                 }

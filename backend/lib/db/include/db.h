@@ -7,7 +7,7 @@
 #include <stdbool.h>
 // #include <msgpack.h>
 
-#define conninfo "dbname=cardio user=postgres password=1234 host=localhost port=5432"
+#define conninfo "dbname=cardio user=postgres password=1234 host=localhost port=5433"
 #define DB_ERROR -200
 #define DB_OK -100
 
@@ -27,12 +27,12 @@ struct dbUser
 } typedef dbUser;
 
 typedef struct
-{   
+{
     int balance;
     int user_id;
 } dbRanking;
 
-typedef struct 
+typedef struct
 {
     dbRanking *players;
     int size;

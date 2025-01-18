@@ -36,6 +36,9 @@ void handle_signup_request(conn_data_t *conn_data, char *data, size_t data_len);
 void handle_create_table_request(conn_data_t *conn_data, char *data, size_t data_len, TableList *table_list);
 void handle_get_all_tables_request(conn_data_t *conn_data, char *data, size_t data_len, TableList *table_list);
 void handle_join_table_request(conn_data_t *conn_data, char *data, size_t data_len, TableList *table_list);
+void handle_get_scoreboard(conn_data_t *conn_data, char *data, size_t data_len);
+void handle_get_friendlist(conn_data_t *conn_data, char *data, size_t data_len);
+void handle_unknown_request(conn_data_t *conn_data, char *data, size_t data_len);
 
 int leave_table(conn_data_t *conn_data, TableList *table_list);
 int join_table(conn_data_t *conn_data, TableList *table_list, int table_id);

@@ -36,6 +36,10 @@
 #define R_SCOREBOARD_OK 801
 #define R_SCOREBOARD_NOT_OK 802
 
+#define PACKET_FRIENDLIST 900
+#define R_FRIENDLIST_OK 901
+#define R_FRIENDLIST_NOT_OK 902
+
 typedef struct
 {
     char *data;
