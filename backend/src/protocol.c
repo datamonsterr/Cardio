@@ -439,6 +439,24 @@ int decode_join_table_request(char *payload)
     return table_id;
 }
 
+int decode_leave_table_request(char *payload) 
+{
+    mpack_reader_t reader;
+    mpack_reader_init(&reader, payload, 100, 100);
+
+    mpack_expect_map_max(&reader, 1);
+
+    mpack_expect_cstr_match(&reader, "tableID");
+    int table_id = mpack_expect_i32(&reader);
+
+    if (mpack_reader_destroy(&reader) != mpack_ok) {
+        fprintf(stderr, "decode_leave_table_response: An error occurred decoding the message %s\n", mpack_error_to_string(mpack_reader_destroy(&reader)));
+        return -1;
+    }
+
+    return table_id;
+}
+
 RawBytes *encode_login_success_response(dbUser *user)
 {
     mpack_writer_t writer;

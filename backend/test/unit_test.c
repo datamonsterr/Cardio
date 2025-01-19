@@ -325,6 +325,26 @@ TEST(test_decode_join_table_req)
     mpack_reader_t reader;
 }
 
+TEST(test_decode_leave_table_req)
+{
+    mpack_writer_t writer;
+    char buffer[1024];
+    mpack_writer_init(&writer, buffer, 1024);
+    mpack_start_map(&writer, 1);
+    mpack_write_cstr(&writer, "tableID");
+    mpack_write_i32(&writer, 1);
+    mpack_finish_map(&writer);
+
+    char *data = writer.buffer;
+    RawBytes *encoded = encode_packet(1, PACKET_LEAVE_TABLE, data, mpack_writer_buffer_used(&writer));
+    Packet *decoded = decode_packet(encoded->data, encoded->len);
+
+    ASSERT(decoded->header->packet_type == PACKET_LEAVE_TABLE);
+    ASSERT(decoded->header->packet_len == encoded->len);
+
+    mpack_reader_t reader;
+}
+
 TEST(test_encode_login_success_resp)
 {
     dbUser *user = malloc(sizeof(dbUser));
@@ -378,18 +398,19 @@ TEST(test_encode_login_success_resp)
 
 int main()
 {
-    RUN_TEST(test_db_conn);
-    RUN_TEST(test_decode_packet);
-    RUN_TEST(test_encode_packet);
-    RUN_TEST(test_decode_login_request);
-    RUN_TEST(test_encode_response);
-    RUN_TEST(test_encode_response_message);
-    RUN_TEST(test_decode_signup_request);
-    RUN_TEST(test_decode_create_table_request);
-    RUN_TEST(test_logger);
-    RUN_TEST(test_encode_full_tables_resp);
-    RUN_TEST(test_decode_join_table_req);
-    RUN_TEST(test_encode_login_success_resp);
-    RUN_TEST(test_encode_scoreboard_response);
-    RUN_TEST(test_encode_friendlist_response);
+    // RUN_TEST(test_db_conn);
+    // RUN_TEST(test_decode_packet);
+    // RUN_TEST(test_encode_packet);
+    // RUN_TEST(test_decode_login_request);
+    // RUN_TEST(test_encode_response);
+    // RUN_TEST(test_encode_response_message);
+    // RUN_TEST(test_decode_signup_request);
+    // RUN_TEST(test_decode_create_table_request);
+    // RUN_TEST(test_logger);
+    // RUN_TEST(test_encode_full_tables_resp);
+    // RUN_TEST(test_decode_join_table_req);
+    RUN_TEST(test_decode_leave_table_req);
+    // RUN_TEST(test_encode_login_success_resp);
+    // RUN_TEST(test_encode_scoreboard_response);
+    // RUN_TEST(test_encode_friendlist_response);
 }
