@@ -46,22 +46,6 @@ int add_table(TableList *table_list, char *table_name, int max_player, int min_b
     table_list->size++;
     return id;
 }
-int remove_table(TableList *table_list, int id)
-{
-    int index = find_table_by_id(table_list, id);
-    if (index == -1)
-    {
-        return -1;
-    }
-    for (int i = index; i < table_list->size - 1; i++)
-    {
-        table_list->tables[i] = table_list->tables[i + 1];
-    }
-    free(&table_list->tables[table_list->size - 1]);
-    table_list->size--;
-    return 0;
-}
-
 int find_table_by_id(TableList *table_list, int id)
 {
     for (int i = 0; i < table_list->size; i++)
@@ -73,7 +57,20 @@ int find_table_by_id(TableList *table_list, int id)
     }
     return -1;
 }
-
+int remove_table(TableList *table_list, int id)
+{
+    int index = find_table_by_id(table_list, id);
+    if (index == -1)
+    {
+        return -1;
+    }
+    for (int i = index; i < table_list->size - 1; i++)
+    {
+        table_list->tables[i] = table_list->tables[i + 1];
+    }
+    table_list->size--;
+    return 0;
+}
 int join_table(conn_data_t *conn_data, TableList *table_list, int table_id)
 {
     int index = find_table_by_id(table_list, table_id);

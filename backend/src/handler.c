@@ -271,6 +271,8 @@ void handle_join_table_request(conn_data_t *conn_data, char *data, size_t data_l
     }
 
     response = encode_packet(PROTOCOL_V1, PACKET_JOIN_TABLE, raw_bytes->data, raw_bytes->len);
+
+    printf("response len = %d\n", response->len);
     if (sendall(conn_data->fd, response->data, (int *)&(response->len)) == -1)
     {
         logger(MAIN_LOG, "Error", "Handle join table: Cannot send response");
@@ -348,4 +350,8 @@ void handle_get_friendlist(conn_data_t *conn_data, char *data, size_t data_len)
     free(raw_bytes);
     free_packet(packet);
     PQfinish(conn);
+}
+
+void handle_leave_table_request(conn_data_t *conn_data, char *data, size_t data_len, TableList *table_list)
+{
 }

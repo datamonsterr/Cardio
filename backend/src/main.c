@@ -142,7 +142,7 @@ int main(void)
                     handle_get_all_tables_request(conn_data, buf, nbytes, table_list);
                     break;
 
-                case PACKET_JOIN_TABLE: // Join table
+                case PACKET_JOIN_TABLE:
                     logger(MAIN_LOG, "Info", "Join table request from client");
                     handle_join_table_request(conn_data, buf, nbytes, table_list);
                     break;
@@ -155,6 +155,10 @@ int main(void)
                 case PACKET_FRIENDLIST:
                     logger(MAIN_LOG, "Info", "Get friendlist request from client");
                     handle_get_friendlist(conn_data, buf, nbytes);
+                    break;
+                case PACKET_LEAVE_TABLE:
+                    logger(MAIN_LOG, "Info", "Leave table request from client");
+                    handle_leave_table_request(conn_data, buf, nbytes, table_list);
                     break;
 
                 default:
