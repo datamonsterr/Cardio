@@ -113,7 +113,7 @@ int leave_table(conn_data_t *conn_data, TableList *table_list)
     }
     table_list->tables[index].current_player--;
     conn_data->table_id = 0;
-    return 0;
+    return index;
 }
 
 void free_table_list(TableList *table_list)

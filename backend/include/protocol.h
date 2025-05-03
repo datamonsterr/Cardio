@@ -31,6 +31,7 @@
 #define PACKET_LEAVE_TABLE 700
 #define R_LEAVE_TABLE_OK 701
 #define R_LEAVE_TABLE_NOT_OK 702
+#define R_LEAVE_TABLE_EMPTY 703
 
 #define PACKET_SCOREBOARD 800
 #define R_SCOREBOARD_OK 801
@@ -108,6 +109,8 @@ CreateTableRequest *decode_create_table_request(char *payload);
 RawBytes *encode_full_tables_response(TableList *table_list);
 // Decode join TABLE request
 int decode_join_table_request(char *payload);
+// Decode leave Table resquest
+int decode_leave_table_request(char *payload);
 
 // Todo
 // Decode refresh tables request

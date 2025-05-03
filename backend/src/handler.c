@@ -204,6 +204,7 @@ void handle_get_all_tables_request(conn_data_t *conn_data, char *data, size_t da
     free(response);
     free_packet(packet);
 }
+
 void handle_join_table_request(conn_data_t *conn_data, char *data, size_t data_len, TableList *table_list)
 {
     Packet *packet = decode_packet(data, data_len);
@@ -276,6 +277,71 @@ void handle_join_table_request(conn_data_t *conn_data, char *data, size_t data_l
     if (sendall(conn_data->fd, response->data, (int *)&(response->len)) == -1)
     {
         logger(MAIN_LOG, "Error", "Handle join table: Cannot send response");
+    }
+    free(response);
+    free(raw_bytes);
+    free_packet(packet);
+    return;
+}
+
+void handle_leave_table_request(conn_data_t *conn_data, char *data, size_t data_len, TableList *table_list) {
+    Packet *packet = decode_packet(data, data_len);
+    int is_valid = 1;
+
+    if (packet->header->packet_type != PACKET_LEAVE_TABLE) {
+        logger(MAIN_LOG, "ERROR", "Handle leave table: invalid packet type");
+        is_valid = 0;
+    }
+
+    if (packet->header->packet_len != data_len) {
+        logger(MAIN_LOG, "Error", "Handle leave table: invalid packet length");
+        is_valid = 0;
+    }
+
+    if (conn_data->user_id == 0) {
+        logger(MAIN_LOG, "Error", "Handle leave table: User is not logged in");
+        is_valid = 0;
+    }
+
+    if (conn_data->table_id == 0) {
+        logger(MAIN_LOG, "Error", "Handle leae table: User already leave table");
+        is_valid = 0;
+    }
+
+    if (is_valid == 0) {
+        RawBytes *raw_bytes = encode_response(R_LEAVE_TABLE_NOT_OK);
+        RawBytes *response = encode_packet(PROTOCOL_V1, PACKET_LEAVE_TABLE, raw_bytes->data, raw_bytes->len);
+        if (sendall(conn_data->fd, response->data, (int*)&(response->len)) == -1) {
+            logger(MAIN_LOG, "Error", "Handle leave table: Cannot send response");
+        }
+        free(response);
+        free(raw_bytes);
+        free_packet(packet);
+        return;
+    }
+
+    int table_id = decode_leave_table_request(packet->data);
+
+    int res = leave_table(conn_data, table_list);
+    printf("res = %d\n", res);
+    RawBytes *raw_bytes = malloc(sizeof(RawBytes));
+    RawBytes *response = malloc(sizeof(RawBytes));
+    if (res >= 0) {
+        logger(MAIN_LOG, "Info", "Handle leave table: Leave table success");
+        raw_bytes = encode_response(R_LEAVE_TABLE_OK);
+    }
+    else if (res == -2) {
+        logger(MAIN_LOG, "Error", "Handle leave table: Table is already empty");
+        raw_bytes = encode_response(R_LEAVE_TABLE_EMPTY);
+    }
+    else {
+        logger(MAIN_LOG, "Error", "Handle leave table: Unknown error");
+        raw_bytes = encode_response(R_LEAVE_TABLE_NOT_OK);
+    }
+
+    response = encode_packet(PROTOCOL_V1, PACKET_LEAVE_TABLE, raw_bytes->data, raw_bytes->len);
+    if (sendall(conn_data->fd, response->data, (int*)&(response->len)) == -1) {
+        logger(MAIN_LOG, "Error", "Handle leave table: Cannot sned response");
     }
     free(response);
     free(raw_bytes);
