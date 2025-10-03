@@ -22,7 +22,8 @@ int dbLogin(PGconn *conn, char *username, char *password)
     int user_id = atoi(PQgetvalue(res, 0, 0));
     char *db_password = PQgetvalue(res, 0, 1);
 
-    if (strcmp(db_password, password) == 0)
+    // Verify the password against the stored hash
+    if (verify_password(password, db_password))
     {
         PQclear(res);
         return user_id;

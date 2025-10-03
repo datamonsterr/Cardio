@@ -18,7 +18,7 @@ struct dbUser
     char username[32];
     char fullname[64];
     char email[64];
-    char password[32];
+    char password[128];  // Increased to store hashed passwords
     char country[32];
     char phone[16];
     char dob[16];
@@ -72,3 +72,8 @@ int dbSignup(PGconn *conn, struct dbUser *user);
 // This function take input: username, password
 // If username and password are valid and exist in database, return dbLogin successful
 int dbLogin(PGconn *conn, char *username, char *password);
+
+// Password hashing utilities
+char* generate_salt();
+char* hash_password(const char *password, const char *salt);
+bool verify_password(const char *password, const char *hash);
