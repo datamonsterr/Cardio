@@ -2,7 +2,8 @@
 ## Prequesite
 - Using Linux or Unix is requirement for backend
 - Our compiler is clang, instead of gcc
-- Suggest using VSCode, or your most familiar IDE 
+- Suggest using VSCode, or your most familiar IDE
+- Required libraries: `libpq-dev`, `libcrypt-dev` (for password hashing) 
 
 ## How to run
 ```sh
@@ -72,7 +73,20 @@ backend
 - If you just make change to the source code, then running `make` in `build/` is enough
 - Notice that if you make change to multiple libraries, you must rebuild every libararies in order to run it.
 
+## Security Features
 
+### Password Hashing (New!)
+The application now uses secure password hashing with SHA-512 and salt. 
+
+**For new installations:** Passwords are automatically hashed on signup.
+
+**For existing installations:** You must run the migration script:
+```sh
+cd database
+./run_migration.sh
+```
+
+See `database/MIGRATION_GUIDE.md` for detailed migration instructions.
 
 ## VSCode settings
 If you're using VSCode in Linux (or MacOS), you should have `.vscode/c_cpp_properties.json` like this:

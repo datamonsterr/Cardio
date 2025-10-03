@@ -17,3 +17,6 @@ build
 compile_commands.json
 /tmp/
 *.tmp
+migrate_passwords
+test_password_hash
+database/backups

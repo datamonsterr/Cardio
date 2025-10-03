@@ -25,11 +25,11 @@ add_executable(${test} ${TESTS})
 find_package(PostgreSQL REQUIRED)
 
 target_include_directories(${PROJECT_NAME} PUBLIC ${ALL_INCLUDES})
-target_link_libraries(${PROJECT_NAME} PostgreSQL::PostgreSQL)
+target_link_libraries(${PROJECT_NAME} PostgreSQL::PostgreSQL crypt)
 
 target_include_directories(${test} PUBLIC ${ALL_INCLUDES})
 target_include_directories(${test} PUBLIC /usr/include/postgresql)
-target_link_libraries(${test} PostgreSQL::PostgreSQL)
+target_link_libraries(${test} PostgreSQL::PostgreSQL crypt)
 
 
 

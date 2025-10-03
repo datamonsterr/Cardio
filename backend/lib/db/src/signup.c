@@ -84,5 +84,26 @@ int dbSignup(PGconn* conn, struct dbUser* user)
     }
 
     PQclear(res);
+    
+    // Hash the password before creating the user
+    char *salt = generate_salt();
+    if (salt == NULL) {
+        fprintf(stderr, "dbSignup: Failed to generate salt\n");
+        return DB_ERROR;
+    }
+    
+    char *hashed_password = hash_password(user->password, salt);
+    free(salt);
+    
+    if (hashed_password == NULL) {
+        fprintf(stderr, "dbSignup: Failed to hash password\n");
+        return DB_ERROR;
+    }
+    
+    // Store the hashed password in the user struct
+    strncpy(user->password, hashed_password, sizeof(user->password) - 1);
+    user->password[sizeof(user->password) - 1] = '\0';
+    free(hashed_password);
+    
     return dbCreateUser(conn, user);
 }
