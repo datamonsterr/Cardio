@@ -1,6 +1,6 @@
 #include "pokergame.h"
-#include <string.h>
 #include "testing.h"
+#include <string.h>
 
 TEST(test_card_toString)
 {
@@ -20,14 +20,14 @@ TEST(test_hand_toString)
 {
     Deck mydeck;
     Hand myhand;
-    Card card1, card2;
+    Card *card1, *card2;
     hand_init(&myhand);
     deck_init(&mydeck);
     deck_fill(&mydeck);
     shuffle(&mydeck, 123);
     dequeue_card(&mydeck, &card1);
     dequeue_card(&mydeck, &card2);
-    add_card(&myhand, &card1);
+    add_card(&myhand, card1);
     int res = hand_toString(&myhand);
     ASSERT(res == 0);
 }

@@ -2,23 +2,16 @@
 
 // input is user's information
 // void function so no output, used to create user and insert user in ranking board
-int dbCreateUser(PGconn *conn, struct dbUser *u)
+int dbCreateUser(PGconn* conn, struct dbUser* u)
 {
-    const char *paramValues[] = {
-        u->username,
-        u->fullname,
-        u->email,
-        u->phone,
-        u->dob,
-        u->password,
-        u->country,
-        u->gender};
+    const char* paramValues[] = {u->username, u->fullname, u->email,   u->phone,
+                                 u->dob,      u->password, u->country, u->gender};
 
-    const char *query = "INSERT INTO \"User\" (username, full_name, email, phone, dob, password, country, gender, balance) "
-                        "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1000)";
+    const char* query =
+        "INSERT INTO \"User\" (username, full_name, email, phone, dob, password, country, gender, balance) "
+        "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1000)";
 
-    PGresult *res = PQexecParams(conn,
-                                 query,
+    PGresult* res = PQexecParams(conn, query,
                                  8,           // Number of parameters
                                  NULL,        // Parameter types (can be NULL for text)
                                  paramValues, // Parameter values
@@ -39,13 +32,16 @@ int dbCreateUser(PGconn *conn, struct dbUser *u)
 }
 // input is 'conn' - the connection pointer, and user_id;
 // output is information of user in form of struct dbUser
-struct dbUser dbGetUserInfo(PGconn *conn, int user_id)
+struct dbUser dbGetUserInfo(PGconn* conn, int user_id)
 {
     char query[256];
     struct dbUser user;
-    snprintf(query, sizeof(query), "SELECT username, email, phone, dob, country, gender, balance, registration_date, full_name FROM \"User\" WHERE user_id = %d LIMIT 1", user_id);
+    snprintf(query, sizeof(query),
+             "SELECT username, email, phone, dob, country, gender, balance, registration_date, full_name FROM \"User\" "
+             "WHERE user_id = %d LIMIT 1",
+             user_id);
 
-    PGresult *res = PQexec(conn, query);
+    PGresult* res = PQexec(conn, query);
     if (PQresultStatus(res) != PGRES_TUPLES_OK)
     {
         fprintf(stderr, "No data retrieved: %s\n", PQerrorMessage(conn));
@@ -72,12 +68,12 @@ struct dbUser dbGetUserInfo(PGconn *conn, int user_id)
 
 // input is user_id
 // void function so no output, used to delete user
-void dbDeleteUser(PGconn *conn, int user_id)
+void dbDeleteUser(PGconn* conn, int user_id)
 {
     char query[256];
     snprintf(query, sizeof(query), "DELETE FROM user WHERE user_id = %d RETURNING *", user_id);
 
-    PGresult *res = PQexec(conn, query);
+    PGresult* res = PQexec(conn, query);
     if (PQresultStatus(res) != PGRES_COMMAND_OK)
     {
         fprintf(stderr, "\nDeleting user failed: %s\n", PQerrorMessage(conn));
@@ -92,12 +88,12 @@ void dbDeleteUser(PGconn *conn, int user_id)
 
 // no need input
 // output is the list of users in ranking board
-dbScoreboard *dbGetScoreBoard(PGconn *conn)
+dbScoreboard* dbGetScoreBoard(PGconn* conn)
 {
     char query[256];
     snprintf(query, sizeof(query), "SELECT user_id, balance FROM  \"User\" ORDER BY balance DESC LIMIT 20");
 
-    PGresult *res = PQexec(conn, query);
+    PGresult* res = PQexec(conn, query);
     if (PQresultStatus(res) != PGRES_TUPLES_OK)
     {
         fprintf(stderr, "\nFailed to get ranking board information: %s\n", PQerrorMessage(conn));
@@ -108,7 +104,7 @@ dbScoreboard *dbGetScoreBoard(PGconn *conn)
     printf("%d\t%d", atoi(PQgetvalue(res, 0, 0)), atoi(PQgetvalue(res, 0, 1)));
 
     int numRow = PQntuples(res);
-    dbScoreboard *leaderboard = malloc(sizeof(dbScoreboard));
+    dbScoreboard* leaderboard = malloc(sizeof(dbScoreboard));
     leaderboard->players = malloc(numRow * sizeof(dbRanking));
     leaderboard->size = numRow;
     for (int i = 0; i < numRow; i++)
@@ -121,22 +117,26 @@ dbScoreboard *dbGetScoreBoard(PGconn *conn)
     return leaderboard;
 }
 
-FriendList *dbGetFriendList(PGconn *conn, int user_id) {
+FriendList* dbGetFriendList(PGconn* conn, int user_id)
+{
     char query[256];
-    snprintf(query, sizeof(query), "select f.u2, u.username from friend f join \"User\" u on f.u2 = u.user_id where f.u1 = %d", user_id);
+    snprintf(query, sizeof(query),
+             "select f.u2, u.username from friend f join \"User\" u on f.u2 = u.user_id where f.u1 = %d", user_id);
 
-    PGresult *res = PQexec(conn, query);
-    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+    PGresult* res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK)
+    {
         fprintf(stderr, "\nFailed to get friendlist: %s\n", PQerrorMessage(conn));
         PQclear(res);
         return NULL;
     }
 
     int numRow = PQntuples(res);
-    FriendList *friendlist = malloc(sizeof(FriendList));
+    FriendList* friendlist = malloc(sizeof(FriendList));
     friendlist->friends = malloc(numRow * sizeof(dbFriend));
     friendlist->num = numRow;
-    for (int i=0;i<numRow;i++) {
+    for (int i = 0; i < numRow; i++)
+    {
         friendlist->friends[i].user_id = atoi(PQgetvalue(res, i, 0));
         strncpy(friendlist->friends[i].user_name, PQgetvalue(res, 0, 1), sizeof(friendlist->friends[i].user_name));
     }

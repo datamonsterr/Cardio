@@ -16,7 +16,7 @@ void display_menu()
     printf("12. Logout\n");
     printf("13. Exit\n");
 }
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     if (argc != 3)
     {
@@ -77,12 +77,12 @@ int main(int argc, char *argv[])
         char dob[16];
         int nbytes;
         mpack_error_t error;
-        Header *header;
+        Header* header;
         size_t size;
-        RawBytes *encoded_message;
-        Packet *decoded_packet;
+        RawBytes* encoded_message;
+        Packet* decoded_packet;
         char buffer[MAXLINE];
-        char *data;
+        char* data;
         mpack_writer_t writer;
         char table_name[32];
         int max_player;
@@ -150,7 +150,8 @@ int main(int argc, char *argv[])
             if (header->packet_type == 100)
             {
                 mpack_reader_t reader;
-                mpack_reader_init(&reader, recv_buffer + sizeof(Header), header->packet_len - sizeof(Header), header->packet_len - sizeof(Header));
+                mpack_reader_init(&reader, recv_buffer + sizeof(Header), header->packet_len - sizeof(Header),
+                                  header->packet_len - sizeof(Header));
                 // if there is error, the payload will contains 2 fields: res and msg, if not, it will contains only res
 
                 mpack_expect_map_max(&reader, 1);
@@ -262,7 +263,8 @@ int main(int argc, char *argv[])
             if (header->packet_type == 200)
             {
                 mpack_reader_t reader;
-                mpack_reader_init(&reader, recv_buffer + sizeof(Header), header->packet_len - sizeof(Header), header->packet_len - sizeof(Header));
+                mpack_reader_init(&reader, recv_buffer + sizeof(Header), header->packet_len - sizeof(Header),
+                                  header->packet_len - sizeof(Header));
                 // if there is error, the payload will contains 2 fields: res and msg, if not, it will contains only res
 
                 mpack_expect_map_max(&reader, 1);
@@ -343,7 +345,8 @@ int main(int argc, char *argv[])
             if (header->packet_type == 300)
             {
                 mpack_reader_t reader;
-                mpack_reader_init(&reader, recv_buffer + sizeof(Header), header->packet_len - sizeof(Header), header->packet_len - sizeof(Header));
+                mpack_reader_init(&reader, recv_buffer + sizeof(Header), header->packet_len - sizeof(Header),
+                                  header->packet_len - sizeof(Header));
                 // if there is error, the payload will contains 2 fields: res and msg, if not, it will contains only res
 
                 mpack_expect_map_max(&reader, 1);
@@ -396,7 +399,8 @@ int main(int argc, char *argv[])
             if (header->packet_type == PACKET_TABLES)
             {
                 mpack_reader_t reader;
-                mpack_reader_init(&reader, decoded_packet->data, header->packet_len - sizeof(Header), header->packet_len - sizeof(Header));
+                mpack_reader_init(&reader, decoded_packet->data, header->packet_len - sizeof(Header),
+                                  header->packet_len - sizeof(Header));
 
                 mpack_expect_map_max(&reader, 2);
 
@@ -411,7 +415,7 @@ int main(int argc, char *argv[])
                     mpack_expect_cstr_match(&reader, "id");
                     int id = mpack_expect_i32(&reader);
                     mpack_expect_cstr_match(&reader, "name");
-                    const char *name = mpack_expect_cstr_alloc(&reader, 32);
+                    const char* name = mpack_expect_cstr_alloc(&reader, 32);
                     mpack_expect_cstr_match(&reader, "maxPlayer");
                     int max_player = mpack_expect_i32(&reader);
                     mpack_expect_cstr_match(&reader, "minBet");
@@ -419,7 +423,8 @@ int main(int argc, char *argv[])
                     mpack_expect_cstr_match(&reader, "currentPlayer");
                     int current_player = mpack_expect_i32(&reader);
 
-                    printf("%d: %s, max player: %d, min bet: %d, current player: %d\n", id, name, max_player, min_bet, current_player);
+                    printf("%d: %s, max player: %d, min bet: %d, current player: %d\n", id, name, max_player, min_bet,
+                           current_player);
                 }
 
                 mpack_done_array(&reader);
@@ -477,7 +482,8 @@ int main(int argc, char *argv[])
                 printf("Header ver %d\n", header->protocol_ver);
                 if (header->packet_type == PACKET_JOIN_TABLE)
                 {
-                    mpack_reader_init(&reader, decoded_packet->data, header->packet_len - sizeof(Header), header->packet_len - sizeof(Header));
+                    mpack_reader_init(&reader, decoded_packet->data, header->packet_len - sizeof(Header),
+                                      header->packet_len - sizeof(Header));
 
                     mpack_expect_map_max(&reader, 1);
                     mpack_expect_cstr_match(&reader, "res");

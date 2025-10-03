@@ -2,12 +2,12 @@
 
 TEST(test_decode_packet)
 {
-    char *data = "hello";
-    RawBytes *encoded = encode_packet(1, 100, data, strlen(data));
-    RawBytes *encoded_null = encode_packet(1, 100, NULL, 0);
+    char* data = "hello";
+    RawBytes* encoded = encode_packet(1, 100, data, strlen(data));
+    RawBytes* encoded_null = encode_packet(1, 100, NULL, 0);
 
-    Packet *packet = decode_packet(encoded->data, encoded->len);
-    Packet *packet_null = decode_packet(encoded_null->data, encoded_null->len);
+    Packet* packet = decode_packet(encoded->data, encoded->len);
+    Packet* packet_null = decode_packet(encoded_null->data, encoded_null->len);
 
     ASSERT(packet->header->packet_len == 10);
     ASSERT(packet->header->protocol_ver == 1);
@@ -21,9 +21,9 @@ TEST(test_decode_packet)
 
 TEST(test_encode_packet)
 {
-    char *data = "hello";
-    RawBytes *encoded = encode_packet(1, 0, data, strlen(data));
-    Header *header = decode_header(encoded->data);
+    char* data = "hello";
+    RawBytes* encoded = encode_packet(1, 0, data, strlen(data));
+    Header* header = decode_header(encoded->data);
     ASSERT(encoded->len == 10);
     ASSERT(header->packet_len == 10);
     ASSERT(compare_raw_bytes(encoded->data + 5, "hello", encoded->len - 5) == 1);
@@ -32,8 +32,8 @@ TEST(test_encode_packet)
 
 TEST(test_decode_login_request)
 {
-    char *username = "username";
-    char *password = "viet1234";
+    char* username = "username";
+    char* password = "viet1234";
     mpack_writer_t writer;
     char buffer[4096];
     mpack_writer_init(&writer, buffer, 4096);
@@ -49,10 +49,10 @@ TEST(test_decode_login_request)
     // Check for MPack errors
 
     // Retrieve MPack buffer
-    char *data = writer.buffer;
+    char* data = writer.buffer;
     size_t size = mpack_writer_buffer_used(&writer);
 
-    LoginRequest *login_request = decode_login_request(data);
+    LoginRequest* login_request = decode_login_request(data);
 
     ASSERT(strcmp(login_request->username, "username") == 0);
     ASSERT(strcmp(login_request->password, "viet1234") == 0);
@@ -65,7 +65,7 @@ TEST(test_decode_login_request)
 TEST(test_encode_response)
 {
 
-    RawBytes *success = encode_response(R_LOGIN_OK);
+    RawBytes* success = encode_response(R_LOGIN_OK);
 
     mpack_reader_t reader;
     mpack_reader_init(&reader, success->data, 1024, 1024);
@@ -85,8 +85,8 @@ TEST(test_encode_response)
 
 TEST(test_encode_response_message)
 {
-    char *msg = "Login success";
-    RawBytes *success = encode_response_msg(R_LOGIN_OK, msg);
+    char* msg = "Login success";
+    RawBytes* success = encode_response_msg(R_LOGIN_OK, msg);
 
     mpack_reader_t reader;
     mpack_reader_init(&reader, success->data, 1024, 1024);
@@ -94,7 +94,7 @@ TEST(test_encode_response_message)
     mpack_expect_cstr_match(&reader, "res");
     int res = mpack_expect_u16(&reader);
     mpack_expect_cstr_match(&reader, "msg");
-    const char *message = mpack_expect_cstr_alloc(&reader, 30);
+    const char* message = mpack_expect_cstr_alloc(&reader, 30);
 
     ASSERT(res == R_LOGIN_OK);
     ASSERT(strcmp(message, msg) == 0);
@@ -131,18 +131,18 @@ TEST(test_decode_signup_request)
     mpack_write_cstr(&writer, "Male");
     mpack_finish_map(&writer);
 
-    char *data = writer.buffer;
+    char* data = writer.buffer;
     if (mpack_writer_destroy(&writer) != mpack_ok)
     {
         fprintf(stderr, "MPack encoding error: %s\n", mpack_error_to_string(mpack_writer_destroy(&writer)));
     }
-    RawBytes *encoded = encode_packet(1, 200, data, mpack_writer_buffer_used(&writer));
-    Packet *decoded = decode_packet(encoded->data, encoded->len);
+    RawBytes* encoded = encode_packet(1, 200, data, mpack_writer_buffer_used(&writer));
+    Packet* decoded = decode_packet(encoded->data, encoded->len);
 
     ASSERT(decoded->header->packet_type == 200);
     ASSERT(decoded->header->packet_len == encoded->len);
 
-    SignupRequest *signup_request = decode_signup_request(data);
+    SignupRequest* signup_request = decode_signup_request(data);
 
     ASSERT(strcmp(signup_request->username, "Tester2") == 0);
     ASSERT(strcmp(signup_request->password, "abc1234") == 0);
@@ -156,7 +156,7 @@ TEST(test_decode_signup_request)
 
 TEST(test_db_conn)
 {
-    PGconn *conn = PQconnectdb(dbconninfo);
+    PGconn* conn = PQconnectdb(dbconninfo);
     ASSERT(PQstatus(conn) == CONNECTION_OK);
     PQfinish(conn);
 }
@@ -178,8 +178,8 @@ TEST(test_decode_create_table_request)
 
     mpack_finish_map(&writer);
 
-    char *data = writer.buffer;
-    CreateTableRequest *table_request = decode_create_table_request(data);
+    char* data = writer.buffer;
+    CreateTableRequest* table_request = decode_create_table_request(data);
 
     ASSERT(strcmp(table_request->table_name, "Table 1") == 0);
     ASSERT(table_request->max_player == 5);
@@ -189,7 +189,7 @@ TEST(test_decode_create_table_request)
 TEST(test_logger)
 {
     logger("test.log", "Info", "Test logger");
-    FILE *f = fopen("test.log", "r");
+    FILE* f = fopen("test.log", "r");
     if (f == NULL)
     {
         fprintf(stderr, "Cannot open file\n");
@@ -203,11 +203,11 @@ TEST(test_logger)
 
 TEST(test_encode_full_tables_resp)
 {
-    TableList *table_list = init_table_list(3);
+    TableList* table_list = init_table_list(3);
     add_table(table_list, "Table 1", 5, 100);
     add_table(table_list, "Table 2", 3, 130);
 
-    RawBytes *encoded = encode_full_tables_response(table_list);
+    RawBytes* encoded = encode_full_tables_response(table_list);
 
     mpack_reader_t reader;
     mpack_reader_init(&reader, encoded->data, 1024, 1024);
@@ -225,7 +225,7 @@ TEST(test_encode_full_tables_resp)
         mpack_expect_cstr_match(&reader, "id");
         int id = mpack_expect_i32(&reader);
         mpack_expect_cstr_match(&reader, "tableName");
-        const char *name = mpack_expect_cstr_alloc(&reader, 32);
+        const char* name = mpack_expect_cstr_alloc(&reader, 32);
         mpack_expect_cstr_match(&reader, "maxPlayer");
         int max_player = mpack_expect_i32(&reader);
         mpack_expect_cstr_match(&reader, "minBet");
@@ -239,11 +239,11 @@ TEST(test_encode_full_tables_resp)
 
 TEST(test_encode_friendlist_response)
 {
-    PGconn *conn = PQconnectdb(dbconninfo);
+    PGconn* conn = PQconnectdb(dbconninfo);
     ASSERT(PQstatus(conn) == CONNECTION_OK);
-    FriendList *friendlist = dbGetFriendList(conn, 1);
+    FriendList* friendlist = dbGetFriendList(conn, 1);
 
-    RawBytes *encoded = encode_friendlist_response(friendlist);
+    RawBytes* encoded = encode_friendlist_response(friendlist);
 
     mpack_reader_t reader;
     mpack_reader_init(&reader, encoded->data, 1024, 1024);
@@ -260,7 +260,7 @@ TEST(test_encode_friendlist_response)
         int id = mpack_expect_i32(&reader);
         ASSERT(id == friendlist->friends[i].user_id);
         mpack_expect_cstr_match(&reader, "username");
-        char *name = mpack_expect_cstr_alloc(&reader, 32);
+        char* name = mpack_expect_cstr_alloc(&reader, 32);
         ASSERT(strcmp(name, friendlist->friends[i].user_name) == 0);
     }
 
@@ -269,18 +269,13 @@ TEST(test_encode_friendlist_response)
 
 TEST(test_encode_scoreboard_response)
 {
-    dbRanking players[5] = {
-        {5000, 1},
-        {3000, 2},
-        {1000, 3},
-        {7000, 4},
-        {4000, 5}};
+    dbRanking players[5] = {{5000, 1}, {3000, 2}, {1000, 3}, {7000, 4}, {4000, 5}};
 
-    dbScoreboard *leaderboard = malloc(sizeof(dbScoreboard));
+    dbScoreboard* leaderboard = malloc(sizeof(dbScoreboard));
     leaderboard->players = players;
     leaderboard->size = 5;
 
-    RawBytes *encoded = encode_scoreboard_response(leaderboard);
+    RawBytes* encoded = encode_scoreboard_response(leaderboard);
 
     mpack_reader_t reader;
     mpack_reader_init(&reader, encoded->data, 1024, 1024);
@@ -315,9 +310,9 @@ TEST(test_decode_join_table_req)
     mpack_write_i32(&writer, 1);
     mpack_finish_map(&writer);
 
-    char *data = writer.buffer;
-    RawBytes *encoded = encode_packet(1, PACKET_JOIN_TABLE, data, mpack_writer_buffer_used(&writer));
-    Packet *decoded = decode_packet(encoded->data, encoded->len);
+    char* data = writer.buffer;
+    RawBytes* encoded = encode_packet(1, PACKET_JOIN_TABLE, data, mpack_writer_buffer_used(&writer));
+    Packet* decoded = decode_packet(encoded->data, encoded->len);
 
     ASSERT(decoded->header->packet_type == PACKET_JOIN_TABLE);
     ASSERT(decoded->header->packet_len == encoded->len);
@@ -327,7 +322,7 @@ TEST(test_decode_join_table_req)
 
 TEST(test_encode_login_success_resp)
 {
-    dbUser *user = malloc(sizeof(dbUser));
+    dbUser* user = malloc(sizeof(dbUser));
 
     user->user_id = 1;
     user->balance = 1000;
@@ -338,7 +333,7 @@ TEST(test_encode_login_success_resp)
     strcpy(user->dob, "2004/01/01");
     strcpy(user->country, "Vietnam");
     strcpy(user->gender, "Male");
-    RawBytes *rawbytes = encode_login_success_response(user);
+    RawBytes* rawbytes = encode_login_success_response(user);
 
     mpack_reader_t reader;
     mpack_reader_init(&reader, rawbytes->data, 1024, 1024);
@@ -348,21 +343,21 @@ TEST(test_encode_login_success_resp)
     mpack_expect_cstr_match(&reader, "userId");
     int user_id = mpack_expect_i32(&reader);
     mpack_expect_cstr_match(&reader, "username");
-    const char *username = mpack_expect_cstr_alloc(&reader, 32);
+    const char* username = mpack_expect_cstr_alloc(&reader, 32);
     mpack_expect_cstr_match(&reader, "balance");
     int balance = mpack_expect_i32(&reader);
     mpack_expect_cstr_match(&reader, "fullname");
-    const char *fullname = mpack_expect_cstr_alloc(&reader, 64);
+    const char* fullname = mpack_expect_cstr_alloc(&reader, 64);
     mpack_expect_cstr_match(&reader, "email");
-    const char *email = mpack_expect_cstr_alloc(&reader, 64);
+    const char* email = mpack_expect_cstr_alloc(&reader, 64);
     mpack_expect_cstr_match(&reader, "phone");
-    const char *phone = mpack_expect_cstr_alloc(&reader, 16);
+    const char* phone = mpack_expect_cstr_alloc(&reader, 16);
     mpack_expect_cstr_match(&reader, "dob");
-    const char *dob = mpack_expect_cstr_alloc(&reader, 16);
+    const char* dob = mpack_expect_cstr_alloc(&reader, 16);
     mpack_expect_cstr_match(&reader, "country");
-    const char *country = mpack_expect_cstr_alloc(&reader, 32);
+    const char* country = mpack_expect_cstr_alloc(&reader, 32);
     mpack_expect_cstr_match(&reader, "gender");
-    const char *gender = mpack_expect_cstr_alloc(&reader, 8);
+    const char* gender = mpack_expect_cstr_alloc(&reader, 8);
 
     if (mpack_reader_destroy(&reader) != mpack_ok)
     {

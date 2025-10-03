@@ -1,5 +1,5 @@
 #include <stdio.h>
-int compare_raw_bytes(char *b1, char *b2, int len)
+int compare_raw_bytes(char* b1, char* b2, int len)
 {
     for (int i = 0; i < len; i++)
     {

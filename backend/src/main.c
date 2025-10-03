@@ -33,7 +33,7 @@ int main(void)
         return 1;
     }
 
-    struct epoll_event *events = calloc(MAXEVENTS, sizeof(event));
+    struct epoll_event* events = calloc(MAXEVENTS, sizeof(event));
 
     if (events == NULL)
     {
@@ -41,7 +41,7 @@ int main(void)
         return 1;
     }
 
-    TableList *table_list = init_table_list(1000);
+    TableList* table_list = init_table_list(1000);
 
     for (;;)
     {
@@ -72,7 +72,7 @@ int main(void)
             }
             else
             {
-                conn_data_t *conn_data = events[i].data.ptr;
+                conn_data_t* conn_data = events[i].data.ptr;
                 if (!conn_data || conn_data->fd <= 0)
                 {
                     logger(MAIN_LOG, "Error", "Invalid connection data");
@@ -111,7 +111,7 @@ int main(void)
                     close_connection(epoll_fd, conn_data);
                     continue;
                 }
-                Header *header = decode_header(buf);
+                Header* header = decode_header(buf);
 
                 if (header == NULL)
                 {

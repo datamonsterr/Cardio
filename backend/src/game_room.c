@@ -1,9 +1,9 @@
-#include "main.h"
 #include "game.h"
+#include "main.h"
 
-TableList *init_table_list(size_t capacity)
+TableList* init_table_list(size_t capacity)
 {
-    TableList *table_list = malloc(sizeof(TableList));
+    TableList* table_list = malloc(sizeof(TableList));
     if (table_list == NULL)
     {
         return NULL;
@@ -18,18 +18,18 @@ TableList *init_table_list(size_t capacity)
     table_list->capacity = capacity;
     return table_list;
 }
-int add_table(TableList *table_list, char *table_name, int max_player, int min_bet)
+int add_table(TableList* table_list, char* table_name, int max_player, int min_bet)
 {
 
     if (table_list->size == table_list->capacity)
     {
-        TableList *new_table_list = realloc(table_list->tables, 2 * table_list->capacity * sizeof(Table));
+        TableList* new_table_list = realloc(table_list->tables, 2 * table_list->capacity * sizeof(Table));
         if (new_table_list == NULL)
         {
             logger(MAIN_LOG, "Error", "add_table: Cannot allocate memory for table list");
             return -1;
         }
-        table_list->tables = (Table *)new_table_list;
+        table_list->tables = (Table*) new_table_list;
         table_list->capacity *= 2;
     }
 
@@ -46,7 +46,7 @@ int add_table(TableList *table_list, char *table_name, int max_player, int min_b
     table_list->size++;
     return id;
 }
-int find_table_by_id(TableList *table_list, int id)
+int find_table_by_id(TableList* table_list, int id)
 {
     for (int i = 0; i < table_list->size; i++)
     {
@@ -57,7 +57,7 @@ int find_table_by_id(TableList *table_list, int id)
     }
     return -1;
 }
-int remove_table(TableList *table_list, int id)
+int remove_table(TableList* table_list, int id)
 {
     int index = find_table_by_id(table_list, id);
     if (index == -1)
@@ -71,7 +71,7 @@ int remove_table(TableList *table_list, int id)
     table_list->size--;
     return 0;
 }
-int join_table(conn_data_t *conn_data, TableList *table_list, int table_id)
+int join_table(conn_data_t* conn_data, TableList* table_list, int table_id)
 {
     int index = find_table_by_id(table_list, table_id);
     if (index == -1)
@@ -98,7 +98,7 @@ int join_table(conn_data_t *conn_data, TableList *table_list, int table_id)
     return index;
 }
 
-int leave_table(conn_data_t *conn_data, TableList *table_list)
+int leave_table(conn_data_t* conn_data, TableList* table_list)
 {
     int index = find_table_by_id(table_list, conn_data->table_id);
     if (index == -1)
@@ -116,7 +116,7 @@ int leave_table(conn_data_t *conn_data, TableList *table_list)
     return 0;
 }
 
-void free_table_list(TableList *table_list)
+void free_table_list(TableList* table_list)
 {
     free(table_list->tables);
     free(table_list);

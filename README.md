@@ -7,10 +7,37 @@
 
 ## How to run
 ```sh
+# Build all libraries and main project
+make build
+
+# Or manually:
 mkdir build
 cd build
 cmake ../
 make
+```
+
+## Testing
+
+The project includes comprehensive unit tests for all libraries. See [TESTING.md](TESTING.md) for detailed documentation.
+
+### Quick Start
+
+```sh
+# Run all library tests (no database required)
+make test-libs
+
+# Run all tests including database tests (requires PostgreSQL)
+make test
+
+# Clean all build artifacts
+make clean
+
+# Format all C code
+make format
+
+# Lint all C code
+make lint
 ```
 
 ## Workflow
