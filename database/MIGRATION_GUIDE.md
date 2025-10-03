@@ -50,7 +50,7 @@ Compile the password migration program:
 
 ```bash
 cd database
-gcc -o migrate_passwords migrate_passwords.c -lpq -lcrypt
+gcc -o migrate_passwords migrate_passwords.c -I/usr/include/postgresql -lpq -lcrypt
 ```
 
 ### Step 4: Migrate Existing Passwords

@@ -46,7 +46,7 @@ echo ""
 # Step 3: Compile migration tool
 echo "Step 3: Compiling migration tool..."
 if [ -f migrate_passwords.c ]; then
-    gcc -o migrate_passwords migrate_passwords.c -lpq -lcrypt || {
+    gcc -o migrate_passwords migrate_passwords.c -I/usr/include/postgresql -lpq -lcrypt || {
         echo "❌ Error: Failed to compile migration tool"
         echo "   Make sure you have libpq-dev and build-essential installed"
         exit 1

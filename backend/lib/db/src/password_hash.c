@@ -18,10 +18,18 @@ char* generate_salt()
     
     strcpy(salt, "$6$");
     
-    // Generate random salt characters
-    srand(time(NULL) ^ getpid());
+    // Generate random salt characters using better seed
+    static int initialized = 0;
+    if (!initialized) {
+        srand(time(NULL) ^ getpid());
+        initialized = 1;
+    }
+    
+    // Use rand() but add additional randomness from time for each character
+    unsigned int seed = time(NULL) ^ getpid() ^ rand();
     for (int i = 0; i < 16; i++) {
-        salt[3 + i] = saltchars[rand() % 64];
+        seed = seed * 1103515245 + 12345;  // Linear congruential generator
+        salt[3 + i] = saltchars[(seed >> 16) % 64];
     }
     salt[19] = '$';
     salt[20] = '\0';

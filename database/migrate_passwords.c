@@ -4,7 +4,7 @@
  * This program migrates existing plaintext passwords in the database
  * to hashed passwords using SHA-512 with salt.
  * 
- * Compile: gcc -o migrate_passwords migrate_passwords.c -lpq -lcrypt
+ * Compile: gcc -o migrate_passwords migrate_passwords.c -I/usr/include/postgresql -lpq -lcrypt
  * Run: ./migrate_passwords
  */
 
