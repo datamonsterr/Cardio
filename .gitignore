@@ -3,3 +3,6 @@
 *.o
 build
 *.log
+migrate_passwords
+test_password_hash
+database/backups
