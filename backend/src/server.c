@@ -201,7 +201,8 @@ int close_connection(int epoll_fd, conn_data_t *conn_data)
 
     fprintf(stdout, "Closed connection from client %d\n", conn_data->fd);
 
-    free(conn_data);
+    // Close file descriptor before freeing conn_data to avoid use-after-free
     close(conn_data->fd);
+    free(conn_data);
     return 0;
 }

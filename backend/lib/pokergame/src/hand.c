@@ -23,13 +23,31 @@ int hand_init(Hand *aHandPtr)
   for (i = 0; i < HAND_SIZE; i++)
   {
     if ((aHandPtr->cards[i] = (Card *)malloc(sizeof(Card))) == NULL)
+    {
+      // Free already allocated cards
+      for (int j = 0; j < i; j++)
+      {
+        free(aHandPtr->cards[j]);
+      }
+      free(aHandPtr->cards);
       return -1;
+    }
   }
   aHandPtr->cardsHeld = 0;
 
   // hand_value must be run in order for these to have anything meaningful
   aHandPtr->value = 0;
   aHandPtr->class = (char *)malloc(sizeof(char) * 20);
+  if (aHandPtr->class == NULL)
+  {
+    // Free all allocated cards
+    for (i = 0; i < HAND_SIZE; i++)
+    {
+      free(aHandPtr->cards[i]);
+    }
+    free(aHandPtr->cards);
+    return -1;
+  }
   strcpy(aHandPtr->class, "123456789012345678");
   return 0;
 }
@@ -62,6 +80,7 @@ int hand_toString(Hand *aHandPtr)
     char *str = card_toString(aHandPtr->cards[i]);
     if (str)
     {
+      free(str);
     }
   }
   return 0;
@@ -76,7 +95,11 @@ int hand_toString_ordered(Hand *aHandPtr)
   for (i = 0; i < aHandPtr->cardsHeld; i++)
   {
     printf("[%d] ", i + 1);
-    card_toString(aHandPtr->cards[i]);
+    char *str = card_toString(aHandPtr->cards[i]);
+    if (str)
+    {
+      free(str);
+    }
   }
   return 0;
 }
@@ -98,7 +121,21 @@ int hand_copy(Hand *t, Hand *s)
 
 void hand_destroy(Hand *aHandPtr)
 {
-  free(aHandPtr->cards);
+  if (aHandPtr == NULL)
+    return;
+  // Free individual cards
+  if (aHandPtr->cards != NULL)
+  {
+    for (int i = 0; i < HAND_SIZE; i++)
+    {
+      if (aHandPtr->cards[i] != NULL)
+        free(aHandPtr->cards[i]);
+    }
+    free(aHandPtr->cards);
+  }
+  // Free class string
+  if (aHandPtr->class != NULL)
+    free(aHandPtr->class);
   free(aHandPtr);
 }
 

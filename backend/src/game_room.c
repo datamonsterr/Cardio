@@ -92,7 +92,7 @@ int join_table(conn_data_t *conn_data, TableList *table_list, int table_id)
     }
     conn_data->table_id = table_id;
 
-    char *msg;
+    char msg[256];
     sprintf(msg, "join_table: Player %s joined table %d", conn_data->username, table_id);
     logger(MAIN_LOG, "Info", msg);
     return index;
