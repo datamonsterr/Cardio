@@ -38,7 +38,7 @@ list(APPEND ALL_INCLUDES "${LIB_DIR}/utils")
 # add postgresql
 find_package(PostgreSQL REQUIRED)
 list(APPEND ALL_INCLUDES /usr/include/postgresql)
-list(APPEND ALL_LIBRARIES PostgreSQL::PostgreSQL)
+list(APPEND ALL_LIBRARIES PostgreSQL::PostgreSQL crypt)
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 add_executable(${TEST_NAME} ${TEST_SOURCES})
