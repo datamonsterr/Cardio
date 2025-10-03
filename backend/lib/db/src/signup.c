@@ -27,8 +27,8 @@ bool validate_password(char *password)
         return false;
     }
 
-    bool digit;
-    bool alpha;
+    bool digit = false;
+    bool alpha = false;
     for (int i = 0; i < strlen(password); i++)
     {
         if (isalpha(password[i]))

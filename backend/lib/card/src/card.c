@@ -67,6 +67,7 @@ char *card_toString(Card *aCardPtr)
     }
 
     free(tmp);
+
     return str;
 }
 

@@ -28,6 +28,8 @@ void handle_login_request(conn_data_t *conn_data, char *data, size_t data_len)
         conn_data->is_active = true;
         conn_data->balance = user_info.balance;
 
+        PQfinish(conn);
+
         free(response);
         free(raw_bytes);
         free(login_request);
@@ -84,6 +86,8 @@ void handle_signup_request(conn_data_t *conn_data, char *data, size_t data_len)
         RawBytes *raw_bytes = encode_response(R_SIGNUP_OK);
         RawBytes *response = encode_packet(PROTOCOL_V1, 200, raw_bytes->data, raw_bytes->len);
         sendall(conn_data->fd, response->data, (int *)&(response->len));
+
+        PQfinish(conn);
 
         free(response);
         free(raw_bytes);
