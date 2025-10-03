@@ -19,13 +19,48 @@ int player_toString(Player * aPlayer){
 }
 
 int player_reset_hand(Player * aPlayer){
-  free(aPlayer->hand);
+  // Properly destroy the existing hand first
+  if (aPlayer->hand != NULL)
+  {
+    if (aPlayer->hand->cards != NULL)
+    {
+      for (int i = 0; i < HAND_SIZE; i++)
+      {
+        if (aPlayer->hand->cards[i] != NULL)
+          free(aPlayer->hand->cards[i]);
+      }
+      free(aPlayer->hand->cards);
+    }
+    if (aPlayer->hand->class != NULL)
+      free(aPlayer->hand->class);
+    free(aPlayer->hand);
+  }
   if((aPlayer->hand = (Hand *)malloc(sizeof(Hand)))==NULL)
      return -1;
   hand_init(aPlayer->hand);
   return 0;
 }
 void player_destroy(Player * aPlayer){
-  free(aPlayer->hand);
+  if (aPlayer == NULL)
+    return;
+  // Free the name field
+  if (aPlayer->name != NULL)
+    free(aPlayer->name);
+  // Properly destroy the hand
+  if (aPlayer->hand != NULL)
+  {
+    if (aPlayer->hand->cards != NULL)
+    {
+      for (int i = 0; i < HAND_SIZE; i++)
+      {
+        if (aPlayer->hand->cards[i] != NULL)
+          free(aPlayer->hand->cards[i]);
+      }
+      free(aPlayer->hand->cards);
+    }
+    if (aPlayer->hand->class != NULL)
+      free(aPlayer->hand->class);
+    free(aPlayer->hand);
+  }
   free(aPlayer);
 }
