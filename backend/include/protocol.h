@@ -40,6 +40,13 @@
 #define R_FRIENDLIST_OK 901
 #define R_FRIENDLIST_NOT_OK 902
 
+// Game action packets (following protocol spec)
+#define PACKET_ACTION_REQUEST 450
+#define PACKET_ACTION_RESULT 451
+#define PACKET_UPDATE_BUNDLE 460
+#define PACKET_RESYNC_REQUEST 470
+#define PACKET_RESYNC_RESPONSE 471
+
 typedef struct
 {
     char *data;
