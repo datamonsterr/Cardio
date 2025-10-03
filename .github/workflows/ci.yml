@@ -39,20 +39,9 @@ jobs:
         cmake ..
         make
 
-    - name: Run Card library tests
+    - name: Run all library tests
       run: |
-        cd backend/lib/card/build
-        ./Kasino_card_test
-
-    - name: Run Logger library tests
-      run: |
-        cd backend/lib/logger/build
-        ./Kasino_logger_test
-
-    - name: Run Pokergame library tests
-      run: |
-        cd backend/lib/pokergame/build
-        ./Kasino_pokergame_test
+        make test-libs
 
     - name: Check code formatting
       run: |
