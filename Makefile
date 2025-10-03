@@ -1,4 +1,4 @@
-.PHONY: all build clean test test-libs format lint help
+.PHONY: all build clean test test-libs test-integration format lint help
 
 # Default target
 all: build
@@ -52,6 +52,11 @@ test:
 	@echo ""
 	@echo "All tests completed!"
 
+# Run integration tests (requires build and database setup)
+test-integration:
+	@echo "Running integration tests..."
+	cd backend && ./run_integration_tests.sh
+
 # Format all C source files using clang-format
 format:
 	@echo "Formatting all C files with clang-format..."
@@ -70,11 +75,12 @@ lint:
 # Help target to display available commands
 help:
 	@echo "Available targets:"
-	@echo "  make all       - Build all libraries and main project (default)"
-	@echo "  make build     - Build all libraries and main project"
-	@echo "  make clean     - Clean all build artifacts"
-	@echo "  make test-libs - Run library unit tests (no database required)"
-	@echo "  make test      - Run all unit tests (requires database setup)"
-	@echo "  make format    - Format all C files with clang-format"
-	@echo "  make lint      - Lint all C files with clang-tidy"
-	@echo "  make help      - Show this help message"
+	@echo "  make all              - Build all libraries and main project (default)"
+	@echo "  make build            - Build all libraries and main project"
+	@echo "  make clean            - Clean all build artifacts"
+	@echo "  make test-libs        - Run library unit tests (no database required)"
+	@echo "  make test             - Run all unit tests (requires database setup)"
+	@echo "  make test-integration - Run integration tests (requires build and database)"
+	@echo "  make format           - Format all C files with clang-format"
+	@echo "  make lint             - Lint all C files with clang-tidy"
+	@echo "  make help             - Show this help message"

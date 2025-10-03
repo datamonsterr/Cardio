@@ -7,29 +7,100 @@ on:
     branches: [ main, develop ]
 
 jobs:
-  build-and-test:
+  format:
+    name: Code Formatting Check
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Install dependencies
+    - name: Cache clang-format
+      uses: actions/cache@v3
+      with:
+        path: /usr/bin/clang-format
+        key: clang-format-${{ runner.os }}
+
+    - name: Install clang-format
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang-format
+
+    - name: Check code formatting
+      run: |
+        find backend -type f \( -name "*.c" -o -name "*.h" \) ! -path "*/build/*" ! -path "*/mpack/*" -exec clang-format --dry-run --Werror {} +
+
+  lint:
+    name: Static Analysis with clang-tidy
+    runs-on: ubuntu-latest
+    needs: format
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Cache clang-tidy
+      uses: actions/cache@v3
+      with:
+        path: /usr/bin/clang-tidy
+        key: clang-tidy-${{ runner.os }}
+
+    - name: Install clang and clang-tidy
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang clang-tidy
+
+    - name: Run linting with clang-tidy
+      continue-on-error: true
+      run: |
+        make lint
+
+  build:
+    name: Build Libraries and Main Project
+    runs-on: ubuntu-latest
+    needs: lint
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          /usr/include/postgresql
+          /usr/lib/x86_64-linux-gnu/libpq*
+          /usr/lib/x86_64-linux-gnu/libcrypt*
+        key: deps-${{ runner.os }}-${{ hashFiles('**/CMakeLists.txt') }}
+        restore-keys: |
+          deps-${{ runner.os }}-
+
+    - name: Install build dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y clang cmake postgresql postgresql-contrib libpq-dev
-        sudo apt-get install -y clang-format clang-tidy
 
-    - name: Start PostgreSQL service
-      run: |
-        sudo systemctl start postgresql.service
-        sudo -u postgres psql -c "CREATE USER testuser WITH PASSWORD 'testpass';"
-        sudo -u postgres psql -c "CREATE DATABASE testdb OWNER testuser;"
+    - name: Cache library builds
+      uses: actions/cache@v3
+      with:
+        path: |
+          backend/lib/*/build
+        key: libs-${{ runner.os }}-${{ hashFiles('backend/lib/**/*.c', 'backend/lib/**/CMakeLists.txt') }}
+        restore-keys: |
+          libs-${{ runner.os }}-
 
     - name: Build all libraries
       run: |
         cd backend
         ./build_all.sh
+
+    - name: Cache main project build
+      uses: actions/cache@v3
+      with:
+        path: backend/build
+        key: main-build-${{ runner.os }}-${{ hashFiles('backend/src/**/*.c', 'backend/CMakeLists.txt') }}
+        restore-keys: |
+          main-build-${{ runner.os }}-
 
     - name: Build main project
       run: |
@@ -39,15 +110,75 @@ jobs:
         cmake ..
         make
 
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-artifacts
+        path: |
+          backend/build/Kasino_server
+          backend/build/test
+          backend/build/client
+          backend/lib/*/build/*.a
+          backend/lib/*/build/*_test
+        retention-days: 1
+
+  unit-tests:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: build-artifacts
+        path: backend/
+
+    - name: Make executables executable
+      run: |
+        chmod +x backend/lib/*/build/*_test || true
+        chmod +x backend/build/test || true
+
     - name: Run all library tests
       run: |
         make test-libs
 
-    - name: Check code formatting
-      run: |
-        find backend -type f \( -name "*.c" -o -name "*.h" \) ! -path "*/build/*" ! -path "*/mpack/*" -exec clang-format --dry-run --Werror {} +
+  integration-tests:
+    name: Run Integration Tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-    - name: Run linting with clang-tidy
-      continue-on-error: true
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: build-artifacts
+        path: backend/
+
+    - name: Install PostgreSQL
       run: |
-        make lint
+        sudo apt-get update
+        sudo apt-get install -y postgresql postgresql-contrib libpq-dev
+
+    - name: Start PostgreSQL service
+      run: |
+        sudo systemctl start postgresql.service
+        sudo -u postgres psql -c "CREATE USER testuser WITH PASSWORD 'testpass';"
+        sudo -u postgres psql -c "CREATE DATABASE testdb OWNER testuser;"
+
+    - name: Make executables executable
+      run: |
+        chmod +x backend/build/Kasino_server || true
+        chmod +x backend/build/client || true
+        chmod +x backend/build/test || true
+
+    - name: Run integration tests
+      run: |
+        cd backend
+        ./run_integration_tests.sh
