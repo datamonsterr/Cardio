@@ -12,9 +12,17 @@ char *card_toString(Card *aCardPtr)
     char *str = (char *)malloc(sizeof(char) * 20);
     char *tmp = (char *)malloc(sizeof(char) * 5);
     if (aCardPtr == NULL)
-        str = NULL;
+    {
+        free(str);
+        free(tmp);
+        return NULL;
+    }
     if (aCardPtr->rank >= 14 || aCardPtr->rank <= 0)
-        str = NULL;
+    {
+        free(str);
+        free(tmp);
+        return NULL;
+    }
     switch (aCardPtr->rank)
     {
     case 1:
@@ -52,16 +60,13 @@ char *card_toString(Card *aCardPtr)
         strcat(str, "Clubs");
         break;
     default:
-        str = NULL;
-        break;
+        free(str);
+        free(tmp);
+        fprintf(stderr, "Invalid card with suit %d, rank %d. Suit is in range(1,4), ranks is in range(1,13)", aCardPtr->suit, aCardPtr->rank);
+        return NULL;
     }
 
     free(tmp);
-
-    if (str == NULL)
-    {
-        fprintf(stderr, "Invalid card with suit %d, rank %d. Suit is in range(1,4), ranks is in range(1,13)", aCardPtr->suit, aCardPtr->rank);
-    }
 
     return str;
 }

@@ -98,7 +98,12 @@ int hand_copy(Hand *t, Hand *s)
 
 void hand_destroy(Hand *aHandPtr)
 {
+  for (int i = 0; i < HAND_SIZE; i++)
+  {
+    free(aHandPtr->cards[i]);
+  }
   free(aHandPtr->cards);
+  free(aHandPtr->class);
   free(aHandPtr);
 }
 
