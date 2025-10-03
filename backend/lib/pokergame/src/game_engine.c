@@ -195,18 +195,18 @@ int game_start_hand(GameState *state) {
     state->seq = 0;
     state->hand_in_progress = true;
     
-    // Set dealer button
-    game_set_dealer_button(state);
-    
-    // Set blind positions
-    game_set_blinds_positions(state);
-    
-    // Set all waiting players to active
+    // Set all waiting players to active first
     for (int i = 0; i < MAX_PLAYERS; i++) {
         if (state->players[i].state == PLAYER_STATE_WAITING && state->players[i].money > 0) {
             state->players[i].state = PLAYER_STATE_ACTIVE;
         }
     }
+    
+    // Set dealer button
+    game_set_dealer_button(state);
+    
+    // Set blind positions (after players are active)
+    game_set_blinds_positions(state);
     
     // Deal hole cards
     game_deal_hole_cards(state);
@@ -401,7 +401,6 @@ bool game_is_betting_round_complete(GameState *state) {
     if (!state) return false;
     
     int active_count = 0;
-    int acted_count = 0;
     int all_matched = true;
     
     for (int i = 0; i < MAX_PLAYERS; i++) {
