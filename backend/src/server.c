@@ -1,18 +1,18 @@
 #include "main.h"
 
 // Get sockaddr, IPv4 or IPv6:
-void *get_in_addr(struct sockaddr *sa)
+void* get_in_addr(struct sockaddr* sa)
 {
     if (sa->sa_family == AF_INET)
     {
-        return &(((struct sockaddr_in *)sa)->sin_addr);
+        return &(((struct sockaddr_in*) sa)->sin_addr);
     }
 
-    return &(((struct sockaddr_in6 *)sa)->sin6_addr);
+    return &(((struct sockaddr_in6*) sa)->sin6_addr);
 }
 
 // Return a listening socket
-int get_listener_socket(const char *host, const char *port, int backlog)
+int get_listener_socket(const char* host, const char* port, int backlog)
 {
     int listener; // Listening socket descriptor
     int yes = 1;  // For setsockopt() SO_REUSEADDR, below
@@ -90,11 +90,11 @@ int accept_connection(int listenfd)
 {
     struct sockaddr_storage client_addr;
     socklen_t addr_size = sizeof(client_addr);
-    int client_fd = accept(listenfd, (struct sockaddr *)&client_addr, &addr_size);
+    int client_fd = accept(listenfd, (struct sockaddr*) &client_addr, &addr_size);
 
     // log the new connection address using get_in_addr
     char client_ip[INET6_ADDRSTRLEN];
-    inet_ntop(client_addr.ss_family, get_in_addr((struct sockaddr *)&client_addr), client_ip, sizeof client_ip);
+    inet_ntop(client_addr.ss_family, get_in_addr((struct sockaddr*) &client_addr), client_ip, sizeof client_ip);
     fprintf(stdout, "New connection from %s\n", client_ip);
 
     if (client_fd < 0)
@@ -105,7 +105,7 @@ int accept_connection(int listenfd)
     return client_fd;
 }
 
-int sendall(int socketfd, char *buf, int *len)
+int sendall(int socketfd, char* buf, int* len)
 {
     int total = 0;        // how many bytes we've sent
     int bytesleft = *len; // how many we have left to send
@@ -127,9 +127,9 @@ int sendall(int socketfd, char *buf, int *len)
     return n == -1 ? -1 : 0; // return -1 on failure, 0 on success
 }
 
-conn_data_t *init_connection_data(int client_fd)
+conn_data_t* init_connection_data(int client_fd)
 {
-    conn_data_t *conn_data = malloc(sizeof(conn_data_t));
+    conn_data_t* conn_data = malloc(sizeof(conn_data_t));
     if (!conn_data)
     {
         fprintf(stderr, "init_connection_data: Cannot allocate memory for connection data\n");
@@ -150,7 +150,7 @@ conn_data_t *init_connection_data(int client_fd)
 
 int add_connection_to_epoll(int epoll_fd, int client_fd)
 {
-    conn_data_t *conn_data = init_connection_data(client_fd);
+    conn_data_t* conn_data = init_connection_data(client_fd);
 
     if (!conn_data)
     {
@@ -176,7 +176,7 @@ int add_connection_to_epoll(int epoll_fd, int client_fd)
     return 0;
 }
 
-int update_conn_data(int epoll_fd, int client_fd, conn_data_t *conn_data)
+int update_conn_data(int epoll_fd, int client_fd, conn_data_t* conn_data)
 {
     struct epoll_event event;
     event.events = EPOLLIN | EPOLLET;
@@ -191,7 +191,7 @@ int update_conn_data(int epoll_fd, int client_fd, conn_data_t *conn_data)
     return 0;
 }
 
-int close_connection(int epoll_fd, conn_data_t *conn_data)
+int close_connection(int epoll_fd, conn_data_t* conn_data)
 {
     if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, conn_data->fd, NULL) == -1)
     {

@@ -3,3 +3,17 @@
 *.o
 build
 *.log
+*.a
+*.so
+*.dylib
+*.exe
+*.out
+*.test
+.DS_Store
+*.swp
+*.swo
+*~
+.cache/
+compile_commands.json
+/tmp/
+*.tmp

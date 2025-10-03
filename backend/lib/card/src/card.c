@@ -1,16 +1,16 @@
-#include <string.h>
 #include "card.h"
+#include <string.h>
 
-void card_init(Card *aCardPtr, int suit, int rank)
+void card_init(Card* aCardPtr, int suit, int rank)
 {
     aCardPtr->suit = suit;
     aCardPtr->rank = rank;
 }
 
-char *card_toString(Card *aCardPtr)
+char* card_toString(Card* aCardPtr)
 {
-    char *str = (char *)malloc(sizeof(char) * 20);
-    char *tmp = (char *)malloc(sizeof(char) * 5);
+    char* str = (char*) malloc(sizeof(char) * 20);
+    char* tmp = (char*) malloc(sizeof(char) * 5);
     if (aCardPtr == NULL)
     {
         free(str);
@@ -62,7 +62,8 @@ char *card_toString(Card *aCardPtr)
     default:
         free(str);
         free(tmp);
-        fprintf(stderr, "Invalid card with suit %d, rank %d. Suit is in range(1,4), ranks is in range(1,13)", aCardPtr->suit, aCardPtr->rank);
+        fprintf(stderr, "Invalid card with suit %d, rank %d. Suit is in range(1,4), ranks is in range(1,13)",
+                aCardPtr->suit, aCardPtr->rank);
         return NULL;
     }
 
@@ -71,11 +72,11 @@ char *card_toString(Card *aCardPtr)
     return str;
 }
 
-int card_compare(const void *a, const void *b)
+int card_compare(const void* a, const void* b)
 {
-    return ((*(Card **)(a))->rank) - ((*(Card **)(b))->rank);
+    return ((*(Card**) (a))->rank) - ((*(Card**) (b))->rank);
 }
-void card_destroy(Card *aCardPtr)
+void card_destroy(Card* aCardPtr)
 {
     free(aCardPtr);
 }

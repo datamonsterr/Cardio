@@ -1,18 +1,18 @@
 #include "main.h"
 
-void free_packet(Packet *packet)
+void free_packet(Packet* packet)
 {
     free(packet->header);
     free(packet);
 }
 
-RawBytes *encode_packet(__uint8_t protocol_ver, __uint16_t packet_type, char *payload, size_t payload_len)
+RawBytes* encode_packet(__uint8_t protocol_ver, __uint16_t packet_type, char* payload, size_t payload_len)
 {
     // Total packet length: header size + payload size
     size_t len = sizeof(Header) + payload_len;
 
     // Allocate memory for the entire packet
-    char *buffer = malloc(len);
+    char* buffer = malloc(len);
     if (buffer == NULL)
     {
         fprintf(stderr, "Failed to allocate memory for packet\n");
@@ -21,7 +21,7 @@ RawBytes *encode_packet(__uint8_t protocol_ver, __uint16_t packet_type, char *pa
 
     // Encode the header
     // Packet length (2 bytes)
-    __uint16_t packet_len = htons((__uint16_t)len);
+    __uint16_t packet_len = htons((__uint16_t) len);
     memcpy(buffer, &packet_len, sizeof(packet_len));
 
     // Protocol version (1 byte)
@@ -40,7 +40,7 @@ RawBytes *encode_packet(__uint8_t protocol_ver, __uint16_t packet_type, char *pa
             free(buffer);
             return NULL;
         }
-        RawBytes *raw_bytes = malloc(sizeof(RawBytes));
+        RawBytes* raw_bytes = malloc(sizeof(RawBytes));
         raw_bytes->data = buffer;
         raw_bytes->len = 5;
         return raw_bytes;
@@ -48,7 +48,7 @@ RawBytes *encode_packet(__uint8_t protocol_ver, __uint16_t packet_type, char *pa
     memcpy(buffer + sizeof(Header), payload, payload_len);
 
     // Wrap the raw bytes in a structure
-    RawBytes *raw_bytes = malloc(sizeof(RawBytes));
+    RawBytes* raw_bytes = malloc(sizeof(RawBytes));
     if (raw_bytes == NULL)
     {
         fprintf(stderr, "Failed to allocate memory for RawBytes\n");
@@ -62,7 +62,7 @@ RawBytes *encode_packet(__uint8_t protocol_ver, __uint16_t packet_type, char *pa
     return raw_bytes;
 }
 
-Header *decode_header(char *data)
+Header* decode_header(char* data)
 {
     if (data == NULL)
     {
@@ -70,21 +70,21 @@ Header *decode_header(char *data)
         return NULL;
     }
 
-    Header *header = malloc(sizeof(Header));
+    Header* header = malloc(sizeof(Header));
     if (header == NULL)
     {
         fprintf(stderr, "decode_header: Memory allocation failed\n");
         return NULL;
     }
 
-    header->packet_len = ntohs(*(uint16_t *)&data[0]);  // Convert first 2 bytes
-    header->protocol_ver = (uint8_t)data[2];            // Single byte (no conversion needed)
-    header->packet_type = ntohs(*(uint16_t *)&data[3]); // Convert next 2 bytes
+    header->packet_len = ntohs(*(uint16_t*) &data[0]);  // Convert first 2 bytes
+    header->protocol_ver = (uint8_t) data[2];           // Single byte (no conversion needed)
+    header->packet_type = ntohs(*(uint16_t*) &data[3]); // Convert next 2 bytes
 
     return header;
 }
 
-Packet *decode_packet(char *data, size_t data_len)
+Packet* decode_packet(char* data, size_t data_len)
 {
     if (data == NULL || data_len < sizeof(Header))
     {
@@ -93,7 +93,7 @@ Packet *decode_packet(char *data, size_t data_len)
     }
 
     // Allocate memory for the Packet structure
-    Packet *packet = malloc(sizeof(Packet));
+    Packet* packet = malloc(sizeof(Packet));
     if (packet == NULL)
     {
         fprintf(stderr, "decode_packet: Memory allocation failed for Packet\n");
@@ -113,8 +113,7 @@ Packet *decode_packet(char *data, size_t data_len)
     uint16_t packet_len = packet->header->packet_len;
     if (packet_len > data_len)
     {
-        fprintf(stderr, "decode_packet: Packet length mismatch (expected: %u, received: %zu)\n",
-                packet_len, data_len);
+        fprintf(stderr, "decode_packet: Packet length mismatch (expected: %u, received: %zu)\n", packet_len, data_len);
         free(packet->header);
         free(packet);
         return NULL;
@@ -146,7 +145,8 @@ Packet *decode_packet(char *data, size_t data_len)
     return packet;
 }
 
-LoginRequest *decode_login_request(char *data) // login payload: {username: "vietanh", password: "viet1234"} is already extracted from the packet
+LoginRequest* decode_login_request(
+    char* data) // login payload: {username: "vietanh", password: "viet1234"} is already extracted from the packet
 {
     mpack_reader_t reader;
     mpack_reader_init_data(&reader, data, 1024);
@@ -154,9 +154,9 @@ LoginRequest *decode_login_request(char *data) // login payload: {username: "vie
     mpack_expect_map_max(&reader, 2);
 
     mpack_expect_cstr_match(&reader, "user");
-    const char *username = mpack_expect_cstr_alloc(&reader, 32);
+    const char* username = mpack_expect_cstr_alloc(&reader, 32);
     mpack_expect_cstr_match(&reader, "pass");
-    const char *password = mpack_expect_cstr_alloc(&reader, 32);
+    const char* password = mpack_expect_cstr_alloc(&reader, 32);
 
     if (mpack_reader_destroy(&reader) != mpack_ok)
     {
@@ -164,14 +164,14 @@ LoginRequest *decode_login_request(char *data) // login payload: {username: "vie
         return NULL;
     }
 
-    LoginRequest *login_request = malloc(sizeof(LoginRequest));
+    LoginRequest* login_request = malloc(sizeof(LoginRequest));
     strcpy(login_request->username, username);
     strcpy(login_request->password, password);
 
     return login_request;
 }
 
-RawBytes *encode_response(int res)
+RawBytes* encode_response(int res)
 {
     mpack_writer_t writer;
     char buffer[100];
@@ -187,7 +187,7 @@ RawBytes *encode_response(int res)
         return NULL;
     }
 
-    RawBytes *raw_bytes = malloc(sizeof(RawBytes));
+    RawBytes* raw_bytes = malloc(sizeof(RawBytes));
 
     raw_bytes->len = mpack_writer_buffer_used(&writer);
     raw_bytes->data = malloc(raw_bytes->len);
@@ -196,7 +196,7 @@ RawBytes *encode_response(int res)
     return raw_bytes;
 }
 
-RawBytes *encode_response_msg(int res, char *msg)
+RawBytes* encode_response_msg(int res, char* msg)
 {
     mpack_writer_t writer;
     char buffer[1024];
@@ -208,7 +208,7 @@ RawBytes *encode_response_msg(int res, char *msg)
     mpack_write_cstr(&writer, msg);
     mpack_finish_map(&writer);
 
-    RawBytes *raw_bytes = malloc(sizeof(RawBytes));
+    RawBytes* raw_bytes = malloc(sizeof(RawBytes));
 
     raw_bytes->len = mpack_writer_buffer_used(&writer);
     raw_bytes->data = malloc(raw_bytes->len);
@@ -223,7 +223,7 @@ RawBytes *encode_response_msg(int res, char *msg)
     return raw_bytes;
 }
 
-SignupRequest *decode_signup_request(char *payload)
+SignupRequest* decode_signup_request(char* payload)
 {
     mpack_reader_t reader;
     mpack_reader_init_data(&reader, payload, 4096);
@@ -231,35 +231,36 @@ SignupRequest *decode_signup_request(char *payload)
     mpack_expect_map_max(&reader, 9);
 
     mpack_expect_cstr_match(&reader, "user");
-    const char *username = mpack_expect_cstr_alloc(&reader, 32);
+    const char* username = mpack_expect_cstr_alloc(&reader, 32);
     mpack_expect_cstr_match(&reader, "pass");
-    const char *password = mpack_expect_cstr_alloc(&reader, 32);
+    const char* password = mpack_expect_cstr_alloc(&reader, 32);
 
     mpack_expect_cstr_match(&reader, "fullname");
-    const char *fullname = mpack_expect_cstr_alloc(&reader, 64);
+    const char* fullname = mpack_expect_cstr_alloc(&reader, 64);
 
     mpack_expect_cstr_match(&reader, "phone");
-    const char *phone = mpack_expect_cstr_alloc(&reader, 16);
+    const char* phone = mpack_expect_cstr_alloc(&reader, 16);
 
     mpack_expect_cstr_match(&reader, "dob");
-    const char *dob = mpack_expect_cstr_alloc(&reader, 16);
+    const char* dob = mpack_expect_cstr_alloc(&reader, 16);
 
     mpack_expect_cstr_match(&reader, "email");
-    const char *email = mpack_expect_cstr_alloc(&reader, 64);
+    const char* email = mpack_expect_cstr_alloc(&reader, 64);
 
     mpack_expect_cstr_match(&reader, "country");
-    const char *country = mpack_expect_cstr_alloc(&reader, 32);
+    const char* country = mpack_expect_cstr_alloc(&reader, 32);
 
     mpack_expect_cstr_match(&reader, "gender");
-    const char *gender = mpack_expect_cstr_alloc(&reader, 8);
+    const char* gender = mpack_expect_cstr_alloc(&reader, 8);
 
     if (mpack_reader_destroy(&reader) != mpack_ok)
     {
-        fprintf(stderr, "decode_signup_request: An error occurred decoding the message %s\n", mpack_error_to_string(mpack_reader_destroy(&reader)));
+        fprintf(stderr, "decode_signup_request: An error occurred decoding the message %s\n",
+                mpack_error_to_string(mpack_reader_destroy(&reader)));
         return NULL;
     }
 
-    SignupRequest *signup_request = malloc(sizeof(SignupRequest));
+    SignupRequest* signup_request = malloc(sizeof(SignupRequest));
     strncpy(signup_request->username, username, 32);
     strncpy(signup_request->password, password, 32);
     strncpy(signup_request->fullname, fullname, 64);
@@ -272,7 +273,7 @@ SignupRequest *decode_signup_request(char *payload)
     return signup_request;
 }
 
-CreateTableRequest *decode_create_table_request(char *payload)
+CreateTableRequest* decode_create_table_request(char* payload)
 {
     mpack_reader_t reader;
     mpack_reader_init_data(&reader, payload, 4096);
@@ -280,7 +281,7 @@ CreateTableRequest *decode_create_table_request(char *payload)
     mpack_expect_map_max(&reader, 3);
 
     mpack_expect_cstr_match(&reader, "tableName");
-    const char *table_name = mpack_expect_cstr_alloc(&reader, 32);
+    const char* table_name = mpack_expect_cstr_alloc(&reader, 32);
 
     mpack_expect_cstr_match(&reader, "maxPlayer");
     int max_player = mpack_expect_int(&reader);
@@ -290,11 +291,12 @@ CreateTableRequest *decode_create_table_request(char *payload)
 
     if (mpack_reader_destroy(&reader) != mpack_ok)
     {
-        fprintf(stderr, "decode_create_table_request: An error occurred decoding the message %s\n", mpack_error_to_string(mpack_reader_destroy(&reader)));
+        fprintf(stderr, "decode_create_table_request: An error occurred decoding the message %s\n",
+                mpack_error_to_string(mpack_reader_destroy(&reader)));
         return NULL;
     }
 
-    CreateTableRequest *create_table_request = malloc(sizeof(CreateTableRequest));
+    CreateTableRequest* create_table_request = malloc(sizeof(CreateTableRequest));
     strncpy(create_table_request->table_name, table_name, 32);
     create_table_request->max_player = max_player;
     create_table_request->min_bet = min_bet;
@@ -302,7 +304,7 @@ CreateTableRequest *decode_create_table_request(char *payload)
     return create_table_request;
 }
 
-RawBytes *encode_scoreboard_response(dbScoreboard *leaderboard)
+RawBytes* encode_scoreboard_response(dbScoreboard* leaderboard)
 {
     mpack_writer_t writer;
     char buffer[MAXLINE];
@@ -324,14 +326,14 @@ RawBytes *encode_scoreboard_response(dbScoreboard *leaderboard)
 
     mpack_finish_array(&writer);
 
-    char *data = writer.buffer;
+    char* data = writer.buffer;
     if (mpack_writer_destroy(&writer) != mpack_ok)
     {
         fprintf(stderr, "MPack encoding error: %s\n", mpack_error_to_string(mpack_writer_destroy(&writer)));
         return NULL;
     }
 
-    RawBytes *raw_bytes = malloc(sizeof(RawBytes));
+    RawBytes* raw_bytes = malloc(sizeof(RawBytes));
     raw_bytes->len = mpack_writer_buffer_used(&writer);
     raw_bytes->data = malloc(raw_bytes->len);
 
@@ -340,7 +342,7 @@ RawBytes *encode_scoreboard_response(dbScoreboard *leaderboard)
     return raw_bytes;
 }
 
-RawBytes *encode_friendlist_response(FriendList *friendlist)
+RawBytes* encode_friendlist_response(FriendList* friendlist)
 {
     mpack_writer_t writer;
     char buffer[MAXLINE];
@@ -358,14 +360,14 @@ RawBytes *encode_friendlist_response(FriendList *friendlist)
 
     mpack_finish_array(&writer);
 
-    char *data = writer.buffer;
+    char* data = writer.buffer;
     if (mpack_writer_destroy(&writer) != mpack_ok)
     {
         fprintf(stderr, "MPack encoding error: %s\n", mpack_error_to_string(mpack_writer_destroy(&writer)));
         return NULL;
     }
 
-    RawBytes *raw_bytes = malloc(sizeof(RawBytes));
+    RawBytes* raw_bytes = malloc(sizeof(RawBytes));
     raw_bytes->len = mpack_writer_buffer_used(&writer);
     raw_bytes->data = malloc(raw_bytes->len);
 
@@ -374,7 +376,7 @@ RawBytes *encode_friendlist_response(FriendList *friendlist)
     return raw_bytes;
 }
 
-RawBytes *encode_full_tables_response(TableList *table_list)
+RawBytes* encode_full_tables_response(TableList* table_list)
 {
     mpack_writer_t writer;
     char buffer[MAXLINE];
@@ -404,14 +406,14 @@ RawBytes *encode_full_tables_response(TableList *table_list)
     mpack_finish_array(&writer);
     mpack_finish_map(&writer);
 
-    char *data = writer.buffer;
+    char* data = writer.buffer;
     if (mpack_writer_destroy(&writer) != mpack_ok)
     {
         fprintf(stderr, "MPack encoding error: %s\n", mpack_error_to_string(mpack_writer_destroy(&writer)));
         return NULL;
     }
 
-    RawBytes *raw_bytes = malloc(sizeof(RawBytes));
+    RawBytes* raw_bytes = malloc(sizeof(RawBytes));
     raw_bytes->len = mpack_writer_buffer_used(&writer);
     raw_bytes->data = malloc(raw_bytes->len);
 
@@ -420,7 +422,7 @@ RawBytes *encode_full_tables_response(TableList *table_list)
     return raw_bytes;
 }
 
-int decode_join_table_request(char *payload)
+int decode_join_table_request(char* payload)
 {
     mpack_reader_t reader;
     mpack_reader_init(&reader, payload, 100, 100);
@@ -432,14 +434,15 @@ int decode_join_table_request(char *payload)
 
     if (mpack_reader_destroy(&reader) != mpack_ok)
     {
-        fprintf(stderr, "decode_join_table_request: An error occurred decoding the message %s\n", mpack_error_to_string(mpack_reader_destroy(&reader)));
+        fprintf(stderr, "decode_join_table_request: An error occurred decoding the message %s\n",
+                mpack_error_to_string(mpack_reader_destroy(&reader)));
         return -1;
     }
 
     return table_id;
 }
 
-RawBytes *encode_login_success_response(dbUser *user)
+RawBytes* encode_login_success_response(dbUser* user)
 {
     mpack_writer_t writer;
     char buffer[MAXLINE];
@@ -473,7 +476,7 @@ RawBytes *encode_login_success_response(dbUser *user)
         return NULL;
     }
 
-    RawBytes *raw_bytes = malloc(sizeof(RawBytes));
+    RawBytes* raw_bytes = malloc(sizeof(RawBytes));
 
     raw_bytes->len = mpack_writer_buffer_used(&writer);
     raw_bytes->data = malloc(raw_bytes->len);

@@ -1,7 +1,7 @@
 #pragma once
-#include "game.h"
-#include "db.h"
 #include "../lib/db/include/db.h"
+#include "db.h"
+#include "game.h"
 
 #define MAXLINE 65540
 #define PROTOCOL_V1 0x01
@@ -42,7 +42,7 @@
 
 typedef struct
 {
-    char *data;
+    char* data;
     size_t len;
 } RawBytes;
 
@@ -55,18 +55,20 @@ typedef struct __attribute__((packed))
 
 struct
 {
-    Header *header;
-    char *data;
+    Header* header;
+    char* data;
 } typedef Packet;
 
-// Decode first 5 bytes of the packet and turn it into a Header struct. Also, apply network to host byte order conversion
-Header *decode_header(char *data);
+// Decode first 5 bytes of the packet and turn it into a Header struct. Also, apply network to host byte order
+// conversion
+Header* decode_header(char* data);
 // Split the packet into header and payload
-Packet *decode_packet(char *data, size_t data_len);
-void free_packet(Packet *packet);
+Packet* decode_packet(char* data, size_t data_len);
+void free_packet(Packet* packet);
 
-// Encode a packet with the given protocol version, packet type, payload and payload length. Apply host to network byte order conversion in the header
-RawBytes *encode_packet(__uint8_t protocol_ver, __uint16_t packet_type, char *payload, size_t payload_len);
+// Encode a packet with the given protocol version, packet type, payload and payload length. Apply host to network byte
+// order conversion in the header
+RawBytes* encode_packet(__uint8_t protocol_ver, __uint16_t packet_type, char* payload, size_t payload_len);
 
 struct LoginRequest
 {
@@ -74,9 +76,9 @@ struct LoginRequest
     char password[32];
 } typedef LoginRequest;
 
-LoginRequest *decode_login_request(char *data);
-RawBytes *encode_response_msg(int res, char *msg);
-RawBytes *encode_response(int res);
+LoginRequest* decode_login_request(char* data);
+RawBytes* encode_response_msg(int res, char* msg);
+RawBytes* encode_response(int res);
 
 struct SignupRequest
 {
@@ -91,7 +93,7 @@ struct SignupRequest
 } typedef SignupRequest;
 
 // Decode signup request
-SignupRequest *decode_signup_request(char *payload);
+SignupRequest* decode_signup_request(char* payload);
 
 struct CreateTableRequest
 {
@@ -102,25 +104,25 @@ struct CreateTableRequest
 
 // Decode create TABLE request
 // Table request will be in the form of: {"name": "table_name", "max_player": 5, "min_bet": 100}
-CreateTableRequest *decode_create_table_request(char *payload);
+CreateTableRequest* decode_create_table_request(char* payload);
 // Find all tables in table list and encode them into a response which is an array of tables
 // For example: [{"id": 1, "name": "Table 1", "max_player": 5, "min_bet": 100, "current_player": 1}, ...]
-RawBytes *encode_full_tables_response(TableList *table_list);
+RawBytes* encode_full_tables_response(TableList* table_list);
 // Decode join TABLE request
-int decode_join_table_request(char *payload);
+int decode_join_table_request(char* payload);
 
 // Todo
 // Decode refresh tables request
-RawBytes *decode_refresh_tables_request(char *payload);
+RawBytes* decode_refresh_tables_request(char* payload);
 
 // Encode update tables response
-RawBytes *encode_update_tables_response(TableList *new_tables);
+RawBytes* encode_update_tables_response(TableList* new_tables);
 
 // Encode scoreboard response
-RawBytes *encode_scoreboard_response(dbScoreboard *dbScoreboard);
+RawBytes* encode_scoreboard_response(dbScoreboard* dbScoreboard);
 
 // Encode friendlist response
-RawBytes *encode_friendlist_response(FriendList *friendlist);
+RawBytes* encode_friendlist_response(FriendList* friendlist);
 
 // Encode login success response
-RawBytes *encode_login_success_response(dbUser *user);
+RawBytes* encode_login_success_response(dbUser* user);

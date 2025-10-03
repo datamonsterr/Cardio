@@ -1,6 +1,6 @@
 #include "../include/db.h"
 
-bool validate_username(char *username)
+bool validate_username(char* username)
 {
     if (strlen(username) < 5)
     {
@@ -19,7 +19,7 @@ bool validate_username(char *username)
     return true;
 }
 
-bool validate_password(char *password)
+bool validate_password(char* password)
 {
     // if contains at least 10 characters, both numeric and alphabetic
     if (strlen(password) < 10)
@@ -44,7 +44,7 @@ bool validate_password(char *password)
     return alpha && digit;
 }
 
-int dbSignup(PGconn *conn, struct dbUser *user)
+int dbSignup(PGconn* conn, struct dbUser* user)
 {
     if (!validate_username(user->username))
     {
@@ -65,9 +65,11 @@ int dbSignup(PGconn *conn, struct dbUser *user)
     }
 
     char query[256];
-    snprintf(query, sizeof(query), "select user_id from \"User\" where email = '%s' OR phone = '%s' OR username = '%s';", user->email, user->phone, user->username);
+    snprintf(query, sizeof(query),
+             "select user_id from \"User\" where email = '%s' OR phone = '%s' OR username = '%s';", user->email,
+             user->phone, user->username);
 
-    PGresult *res = PQexec(conn, query);
+    PGresult* res = PQexec(conn, query);
     if (PQresultStatus(res) != PGRES_TUPLES_OK)
     {
         fprintf(stderr, "PstgreSQL error: %s\n", PQerrorMessage(conn));

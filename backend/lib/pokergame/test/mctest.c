@@ -62,7 +62,8 @@
 //             card_toString(testHand->cards[maxdiscards[i]]);
 //     }
 
-//     // printf("\n%d,maxdiscards:%d,%d,%d,%d,%d\n",*maxthrown,maxdiscards[0],maxdiscards[1],maxdiscards[2],maxdiscards[3],maxdiscards[4]);
+//     //
+//     printf("\n%d,maxdiscards:%d,%d,%d,%d,%d\n",*maxthrown,maxdiscards[0],maxdiscards[1],maxdiscards[2],maxdiscards[3],maxdiscards[4]);
 //     // hand_toString(testHand);
 
 //     // destroy Monte Carlo testing stuff

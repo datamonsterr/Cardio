@@ -1,0 +1,64 @@
+name: C Unit Tests CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang cmake postgresql postgresql-contrib libpq-dev
+        sudo apt-get install -y clang-format clang-tidy
+
+    - name: Start PostgreSQL service
+      run: |
+        sudo systemctl start postgresql.service
+        sudo -u postgres psql -c "CREATE USER testuser WITH PASSWORD 'testpass';"
+        sudo -u postgres psql -c "CREATE DATABASE testdb OWNER testuser;"
+
+    - name: Build all libraries
+      run: |
+        cd backend
+        ./build_all.sh
+
+    - name: Build main project
+      run: |
+        cd backend
+        mkdir -p build
+        cd build
+        cmake ..
+        make
+
+    - name: Run Card library tests
+      run: |
+        cd backend/lib/card/build
+        ./Kasino_card_test
+
+    - name: Run Logger library tests
+      run: |
+        cd backend/lib/logger/build
+        ./Kasino_logger_test
+
+    - name: Run Pokergame library tests
+      run: |
+        cd backend/lib/pokergame/build
+        ./Kasino_pokergame_test
+
+    - name: Check code formatting
+      run: |
+        find backend -type f \( -name "*.c" -o -name "*.h" \) ! -path "*/build/*" ! -path "*/mpack/*" -exec clang-format --dry-run --Werror {} +
+
+    - name: Run linting with clang-tidy
+      continue-on-error: true
+      run: |
+        make lint

@@ -1,9 +1,9 @@
-#include "testing.h"
 #include "db.h"
+#include "testing.h"
 
 TEST(test_db_get_user_info)
 {
-    PGconn *conn = PQconnectdb(conninfo);
+    PGconn* conn = PQconnectdb(conninfo);
 
     int user_id = dbLogin(conn, "user2", "password12345");
     if (user_id == DB_ERROR)
@@ -24,7 +24,7 @@ TEST(test_db_get_user_info)
 
 TEST(test_db_signup)
 {
-    PGconn *conn = PQconnectdb(conninfo);
+    PGconn* conn = PQconnectdb(conninfo);
 
     struct dbUser user;
     strcpy(user.username, "tester01abc");
@@ -63,8 +63,8 @@ TEST(test_db_signup)
 
 TEST(test_db_scoreboard)
 {
-    PGconn *conn = PQconnectdb(conninfo);
-    dbScoreboard *leaderboard = dbGetScoreBoard(conn);
+    PGconn* conn = PQconnectdb(conninfo);
+    dbScoreboard* leaderboard = dbGetScoreBoard(conn);
 
     ASSERT(leaderboard->size > 0);
     ASSERT(leaderboard->players[0].balance == 3550);
@@ -73,8 +73,8 @@ TEST(test_db_scoreboard)
 
 TEST(test_db_friendlist)
 {
-    PGconn *conn = PQconnectdb(conninfo);
-    FriendList *friendlist = dbGetFriendList(conn, 1);
+    PGconn* conn = PQconnectdb(conninfo);
+    FriendList* friendlist = dbGetFriendList(conn, 1);
 
     ASSERT(friendlist->num > 0);
     ASSERT(friendlist->friends[0].user_id == 2);
