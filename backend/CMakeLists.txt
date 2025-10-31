@@ -55,8 +55,3 @@ target_link_libraries(${TEST_NAME} PRIVATE ${ALL_LIBRARIES})
 target_include_directories(${CLIENT_NAME} PUBLIC "include")
 target_include_directories(${CLIENT_NAME} PUBLIC ${ALL_INCLUDES})
 target_link_libraries(${CLIENT_NAME} PRIVATE ${ALL_LIBRARIES})
-
-
-
-
-
