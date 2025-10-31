@@ -30,7 +30,3 @@ target_link_libraries(${PROJECT_NAME} PostgreSQL::PostgreSQL crypt)
 target_include_directories(${test} PUBLIC ${ALL_INCLUDES})
 target_include_directories(${test} PUBLIC /usr/include/postgresql)
 target_link_libraries(${test} PostgreSQL::PostgreSQL crypt)
-
-
-
-

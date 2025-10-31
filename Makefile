@@ -1,4 +1,4 @@
-.PHONY: all build clean test test-libs test-integration format lint help
+.PHONY: all build clean test test-libs test-integration format format-check lint lint-fix tidy clean-format help
 
 # Default target
 all: build
@@ -57,30 +57,55 @@ test-integration:
 	@echo "Running integration tests..."
 	cd backend && ./run_integration_tests.sh
 
-# Format all C source files using clang-format
+# ===============================
+# FORMATTING AND TIDYING TARGETS
+# ===============================
+
+# Format all C source files using clang-format (in-place)
 format:
-	@echo "Formatting all C files with clang-format..."
-	@find backend -type f \( -name "*.c" -o -name "*.h" \) ! -path "*/build/*" ! -path "*/mpack/*" -exec clang-format -i {} +
-	@echo "Formatting complete!"
+	@./scripts/format-and-tidy.sh format
+
+# Check formatting without modifying files
+format-check:
+	@./scripts/format-and-tidy.sh format-check
 
 # Lint all C source files using clang-tidy
 lint:
-	@echo "Linting all C files with clang-tidy..."
-	@find backend/lib/card/src -type f -name "*.c" -exec clang-tidy {} -- -I backend/lib/card/include \; || true
-	@find backend/lib/logger/src -type f -name "*.c" -exec clang-tidy {} -- -I backend/lib/logger/include \; || true
-	@find backend/lib/pokergame/src -type f -name "*.c" -exec clang-tidy {} -- -I backend/lib/pokergame/include -I backend/lib/card/include -I backend/lib/utils \; || true
-	@find backend/lib/db/src -type f -name "*.c" -exec clang-tidy {} -- -I backend/lib/db/include -I /usr/include/postgresql \; || true
-	@echo "Linting complete!"
+	@./scripts/format-and-tidy.sh lint
+
+# Lint and auto-fix issues where possible
+lint-fix:
+	@./scripts/format-and-tidy.sh lint-fix
+
+# Combined formatting and linting (full tidy)
+tidy:
+	@./scripts/format-and-tidy.sh tidy
+
+# Clean formatting backup files (if any clang tools create them)
+clean-format:
+	@./scripts/format-and-tidy.sh clean
 
 # Help target to display available commands
 help:
 	@echo "Available targets:"
+	@echo ""
+	@echo "📦 BUILD TARGETS:"
 	@echo "  make all              - Build all libraries and main project (default)"
 	@echo "  make build            - Build all libraries and main project"
 	@echo "  make clean            - Clean all build artifacts"
+	@echo ""
+	@echo "🧪 TEST TARGETS:"
 	@echo "  make test-libs        - Run library unit tests (no database required)"
 	@echo "  make test             - Run all unit tests (requires database setup)"
 	@echo "  make test-integration - Run integration tests (requires build and database)"
-	@echo "  make format           - Format all C files with clang-format"
+	@echo ""
+	@echo "🎨 FORMATTING & TIDYING TARGETS:"
+	@echo "  make format           - Format all C files with clang-format (in-place)"
+	@echo "  make format-check     - Check if files need formatting (no changes)"
 	@echo "  make lint             - Lint all C files with clang-tidy"
+	@echo "  make lint-fix         - Lint and auto-fix issues where possible"
+	@echo "  make tidy             - Run both format and lint (full code tidying)"
+	@echo "  make clean-format     - Clean formatting backup files"
+	@echo ""
+	@echo "ℹ️  OTHER:"
 	@echo "  make help             - Show this help message"

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Set the base directory to the 'lib' folder
 BASE_DIR="lib"

@@ -5,6 +5,12 @@
 void logger(const char* log_file, const char* tag, const char* message)
 {
     FILE* stream = fopen(log_file, "a");
+    if (stream == NULL)
+    {
+        // If we can't open the log file, write to stderr instead
+        fprintf(stderr, "Warning: Could not open log file %s\n", log_file);
+        return;
+    }
     time_t now;
     time(&now);
     struct tm* local = localtime(&now);
