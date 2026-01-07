@@ -2,19 +2,26 @@
 
 void handle_login_request(conn_data_t* conn_data, char* data, size_t data_len)
 {
+    char log_msg[256];
+    snprintf(log_msg, sizeof(log_msg), "Login request from fd=%d, data_len=%zu", conn_data->fd, data_len);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    
     PGconn* conn = PQconnectdb(dbconninfo);
     Packet* packet = decode_packet(data, data_len);
     if (packet->header->packet_type != 100)
     {
-        logger(MAIN_LOG, "Error", "Handle login: invalid packet type");
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Invalid packet type", 1);
     }
 
     if (packet->header->packet_len != data_len)
     {
-        logger(MAIN_LOG, "Error", "Handle login: invalid packet length");
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Invalid packet length", 1);
     }
 
     LoginRequest* login_request = decode_login_request(packet->data);
+    snprintf(log_msg, sizeof(log_msg), "Attempting login for user='%s'", login_request->username);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    
     int user_id = dbLogin(conn, login_request->username, login_request->password);
     if (user_id > 0)
     {
@@ -33,19 +40,20 @@ void handle_login_request(conn_data_t* conn_data, char* data, size_t data_len)
         free(response);
         free(raw_bytes);
         free(login_request);
-        logger(MAIN_LOG, "Info", "Handle login: Login success");
-        char* log_msg = malloc(100);
-        sprintf(log_msg, "Handle login: Login success from socket %d\n", conn_data->fd);
-        logger(MAIN_LOG, "Info", log_msg);
+        
+        snprintf(log_msg, sizeof(log_msg), "Login SUCCESS: user='%s' (id=%d) fd=%d balance=%d", 
+                 user_info.username, user_id, conn_data->fd, user_info.balance);
+        logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
         return;
     }
 
     RawBytes* raw_bytes = encode_response(R_LOGIN_NOT_OK);
     RawBytes* response = encode_packet(PROTOCOL_V1, 100, raw_bytes->data, raw_bytes->len);
     sendall(conn_data->fd, response->data, (int*) &(response->len));
-    char* log_msg = malloc(100);
-    sprintf(log_msg, "Handle login: Login failed from socket %d\n", conn_data->fd);
-    logger(MAIN_LOG, "Error", log_msg);
+    
+    snprintf(log_msg, sizeof(log_msg), "Login FAILED: user='%s' fd=%d (user_id=%d)", 
+             login_request->username, conn_data->fd, user_id);
+    logger_ex(MAIN_LOG, "WARN", __func__, log_msg, 1);
 
     PQfinish(conn);
 
@@ -57,16 +65,20 @@ void handle_login_request(conn_data_t* conn_data, char* data, size_t data_len)
 
 void handle_signup_request(conn_data_t* conn_data, char* data, size_t data_len)
 {
+    char log_msg[256];
+    snprintf(log_msg, sizeof(log_msg), "Signup request from fd=%d", conn_data->fd);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    
     PGconn* conn = PQconnectdb(dbconninfo);
     Packet* packet = decode_packet(data, data_len);
     if (packet->header->packet_type != 200)
     {
-        logger(MAIN_LOG, "Error", "Handle signup: invalid packet type");
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Invalid packet type", 1);
     }
 
     if (packet->header->packet_len != data_len)
     {
-        logger(MAIN_LOG, "Error", "Handle signup: invalid packet length");
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Invalid packet length", 1);
     }
 
     SignupRequest* signup_request = decode_signup_request(packet->data);
@@ -79,6 +91,11 @@ void handle_signup_request(conn_data_t* conn_data, char* data, size_t data_len)
     strncpy(user->fullname, signup_request->fullname, 64);
     strncpy(user->country, signup_request->country, 32);
     strncpy(user->gender, signup_request->gender, 8);
+    
+    snprintf(log_msg, sizeof(log_msg), "Attempting signup for user='%s' email='%s'", 
+             signup_request->username, signup_request->email);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    
     int res = dbSignup(conn, user);
 
     if (res == DB_OK)
@@ -92,14 +109,18 @@ void handle_signup_request(conn_data_t* conn_data, char* data, size_t data_len)
         free(response);
         free(raw_bytes);
         free(signup_request);
-        logger(MAIN_LOG, "Info", "Handle signup: Signup success");
+        
+        snprintf(log_msg, sizeof(log_msg), "Signup SUCCESS: user='%s' fd=%d", user->username, conn_data->fd);
+        logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
         return;
     }
 
     RawBytes* raw_bytes = encode_response(R_SIGNUP_NOT_OK);
     RawBytes* response = encode_packet(PROTOCOL_V1, 200, raw_bytes->data, raw_bytes->len);
     sendall(conn_data->fd, response->data, (int*) &(response->len));
-    logger(MAIN_LOG, "Error", "Handle signup: Signup failed");
+    
+    snprintf(log_msg, sizeof(log_msg), "Signup FAILED: user='%s' fd=%d", signup_request->username, conn_data->fd);
+    logger_ex(MAIN_LOG, "WARN", __func__, log_msg, 1);
 
     PQfinish(conn);
 
@@ -111,30 +132,36 @@ void handle_signup_request(conn_data_t* conn_data, char* data, size_t data_len)
 
 void handle_create_table_request(conn_data_t* conn_data, char* data, size_t data_len, TableList* table_list)
 {
+    char log_msg[256];
+    snprintf(log_msg, sizeof(log_msg), "Create table request from fd=%d user='%s'", 
+             conn_data->fd, conn_data->username);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    
     Packet* packet = decode_packet(data, data_len);
     int is_valid = 1;
 
     if (packet->header->packet_type != 300)
     {
-        logger(MAIN_LOG, "Error", "Handle create table: invalid packet type");
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Invalid packet type", 1);
         is_valid = 0;
     }
 
     if (packet->header->packet_len != data_len)
     {
-        logger(MAIN_LOG, "Error", "Handle create table: invalid packet length");
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Invalid packet length", 1);
         is_valid = 0;
     }
 
     if (conn_data->user_id == 0)
     {
-        logger(MAIN_LOG, "Error", "Handle create table: User not logged in");
+        logger_ex(MAIN_LOG, "ERROR", __func__, "User not logged in", 1);
         is_valid = 0;
     }
 
     if (conn_data->table_id != 0)
     {
-        logger(MAIN_LOG, "Error", "Handle create table: User already at a table");
+        snprintf(log_msg, sizeof(log_msg), "User already at table (table_id=%d)", conn_data->table_id);
+        logger_ex(MAIN_LOG, "ERROR", __func__, log_msg, 1);
         is_valid = 0;
     }
 
@@ -144,7 +171,7 @@ void handle_create_table_request(conn_data_t* conn_data, char* data, size_t data
         RawBytes* response = encode_packet(PROTOCOL_V1, 300, raw_bytes->data, raw_bytes->len);
         if (sendall(conn_data->fd, response->data, (int*) &(response->len)) == -1)
         {
-            logger(MAIN_LOG, "Error", "Handle create table: Cannot send response");
+            logger_ex(MAIN_LOG, "ERROR", __func__, "Cannot send response", 1);
         }
         free(response);
         free(raw_bytes);
@@ -153,6 +180,10 @@ void handle_create_table_request(conn_data_t* conn_data, char* data, size_t data
     }
 
     CreateTableRequest* create_table_request = decode_create_table_request(packet->data);
+    snprintf(log_msg, sizeof(log_msg), "Creating table '%s' max_player=%d min_bet=%d", 
+             create_table_request->table_name, create_table_request->max_player, create_table_request->min_bet);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    
     Table* table;
     int res = add_table(table_list, create_table_request->table_name, create_table_request->max_player,
                         create_table_request->min_bet);
@@ -163,20 +194,21 @@ void handle_create_table_request(conn_data_t* conn_data, char* data, size_t data
     {
         raw_bytes = encode_response(R_CREATE_TABLE_OK);
         response = encode_packet(PROTOCOL_V1, 300, raw_bytes->data, raw_bytes->len);
-        logger(MAIN_LOG, "Info", "Handle create table: Create table success");
+        snprintf(log_msg, sizeof(log_msg), "Table created SUCCESS: id=%d name='%s' creator='%s'", 
+                 res, create_table_request->table_name, conn_data->username);
+        logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
     }
     else
     {
         raw_bytes = encode_response(R_CREATE_TABLE_NOT_OK);
         response = encode_packet(PROTOCOL_V1, 300, raw_bytes->data, raw_bytes->len);
-        char* msg;
-        sprintf(msg, "Handle create table: Create table failed res = %d, is_join = %d", res, is_join_ok);
-        logger(MAIN_LOG, "Error", msg);
+        snprintf(log_msg, sizeof(log_msg), "Table creation FAILED: res=%d is_join=%d", res, is_join_ok);
+        logger_ex(MAIN_LOG, "ERROR", __func__, log_msg, 1);
     }
 
     if (sendall(conn_data->fd, response->data, (int*) &(response->len)) == -1)
     {
-        logger(MAIN_LOG, "Error", "Handle create table: Cannot send response");
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Cannot send response", 1);
     }
 
     free(response);
@@ -211,31 +243,37 @@ void handle_get_all_tables_request(conn_data_t* conn_data, char* data, size_t da
 }
 void handle_join_table_request(conn_data_t* conn_data, char* data, size_t data_len, TableList* table_list)
 {
+    char log_msg[256];
+    snprintf(log_msg, sizeof(log_msg), "Join table request from fd=%d user='%s'", 
+             conn_data->fd, conn_data->username);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    
     Packet* packet = decode_packet(data, data_len);
 
     int is_valid = 1;
 
     if (packet->header->packet_type != PACKET_JOIN_TABLE)
     {
-        logger(MAIN_LOG, "Error", "Handle join table: invalid packet type");
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Invalid packet type", 1);
         is_valid = 0;
     }
 
     if (packet->header->packet_len != data_len)
     {
-        logger(MAIN_LOG, "Error", "Handle join table: invalid packet length");
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Invalid packet length", 1);
         is_valid = 0;
     }
 
     if (conn_data->user_id == 0)
     {
-        logger(MAIN_LOG, "Error", "Handle join table: User not logged in");
+        logger_ex(MAIN_LOG, "ERROR", __func__, "User not logged in", 1);
         is_valid = 0;
     }
 
     if (conn_data->table_id != 0)
     {
-        logger(MAIN_LOG, "Error", "Handle join table: User already at a table");
+        snprintf(log_msg, sizeof(log_msg), "User already at table (table_id=%d)", conn_data->table_id);
+        logger_ex(MAIN_LOG, "ERROR", __func__, log_msg, 1);
         is_valid = 0;
     }
 
@@ -245,7 +283,7 @@ void handle_join_table_request(conn_data_t* conn_data, char* data, size_t data_l
         RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_JOIN_TABLE, raw_bytes->data, raw_bytes->len);
         if (sendall(conn_data->fd, response->data, (int*) &(response->len)) == -1)
         {
-            logger(MAIN_LOG, "Error", "Handle join table: Cannot send response");
+            logger_ex(MAIN_LOG, "ERROR", __func__, "Cannot send response", 1);
         }
         free(response);
         free(raw_bytes);
@@ -254,6 +292,9 @@ void handle_join_table_request(conn_data_t* conn_data, char* data, size_t data_l
     }
 
     int table_id = decode_join_table_request(packet->data);
+    snprintf(log_msg, sizeof(log_msg), "User '%s' attempting to join table_id=%d", 
+             conn_data->username, table_id);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
 
     int res = join_table(conn_data, table_list, table_id);
     printf("res = %d\n", res);
@@ -261,17 +302,23 @@ void handle_join_table_request(conn_data_t* conn_data, char* data, size_t data_l
     RawBytes* response = malloc(sizeof(RawBytes));
     if (res >= 0)
     {
-        logger(MAIN_LOG, "Info", "Handle join table: Join table success");
+        snprintf(log_msg, sizeof(log_msg), "Join table SUCCESS: user='%s' table_id=%d", 
+                 conn_data->username, table_id);
+        logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
         raw_bytes = encode_response(R_JOIN_TABLE_OK);
     }
     else if (res == -2)
     {
-        logger(MAIN_LOG, "Error", "Handle join table: Table is full");
+        snprintf(log_msg, sizeof(log_msg), "Join table FAILED (FULL): user='%s' table_id=%d", 
+                 conn_data->username, table_id);
+        logger_ex(MAIN_LOG, "WARN", __func__, log_msg, 1);
         raw_bytes = encode_response(R_JOIN_TABLE_FULL);
     }
     else
     {
-        logger(MAIN_LOG, "Error", "Handle join table: Unknown error");
+        snprintf(log_msg, sizeof(log_msg), "Join table FAILED (ERROR): user='%s' table_id=%d res=%d", 
+                 conn_data->username, table_id, res);
+        logger_ex(MAIN_LOG, "ERROR", __func__, log_msg, 1);
         raw_bytes = encode_response(R_JOIN_TABLE_NOT_OK);
     }
 
@@ -280,7 +327,7 @@ void handle_join_table_request(conn_data_t* conn_data, char* data, size_t data_l
     printf("response len = %d\n", response->len);
     if (sendall(conn_data->fd, response->data, (int*) &(response->len)) == -1)
     {
-        logger(MAIN_LOG, "Error", "Handle join table: Cannot send response");
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Cannot send response", 1);
     }
     free(response);
     free(raw_bytes);

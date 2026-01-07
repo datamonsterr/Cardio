@@ -19,7 +19,7 @@
 #include "protocol.h"
 #include "server.h"
 
-#define dbconninfo "dbname=cardio user=root password=1234 host=localhost port=5433"
+#define dbconninfo "dbname=cardio user=postgres password=postgres host=localhost port=5433"
 #define MAIN_LOG "server.log"
 
 int compare_raw_bytes(char* b1, char* b2, int len);

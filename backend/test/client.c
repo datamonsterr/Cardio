@@ -152,19 +152,75 @@ int main(int argc, char* argv[])
                 mpack_reader_t reader;
                 mpack_reader_init(&reader, recv_buffer + sizeof(Header), header->packet_len - sizeof(Header),
                                   header->packet_len - sizeof(Header));
-                // if there is error, the payload will contains 2 fields: res and msg, if not, it will contains only res
 
-                mpack_expect_map_max(&reader, 1);
-                mpack_expect_cstr_match(&reader, "res");
-                int res = mpack_expect_u16(&reader);
+                int result = -1;
+                int user_id = 0;
+                char username_resp[64] = {0};
+                int balance = 0;
+                char fullname_resp[128] = {0};
+                char email_resp[128] = {0};
 
-                if (res == R_LOGIN_OK)
+                uint32_t map_size = mpack_expect_map(&reader);
+                for (uint32_t i = 0; i < map_size; i++)
                 {
-                    printf("Login success with code %d\n", res);
+                    char key[32] = {0};
+                    size_t key_len = mpack_expect_str_buf(&reader, key, sizeof(key) - 1);
+                    key[key_len] = '\0';
+
+                    if (strcmp(key, "result") == 0)
+                    {
+                        result = mpack_expect_u16(&reader);
+                    }
+                    else if (strcmp(key, "user_id") == 0)
+                    {
+                        user_id = mpack_expect_i32(&reader);
+                    }
+                    else if (strcmp(key, "username") == 0)
+                    {
+                        size_t len = mpack_expect_str_buf(&reader, username_resp, sizeof(username_resp) - 1);
+                        username_resp[len] = '\0';
+                    }
+                    else if (strcmp(key, "balance") == 0)
+                    {
+                        balance = mpack_expect_i32(&reader);
+                    }
+                    else if (strcmp(key, "fullname") == 0)
+                    {
+                        size_t len = mpack_expect_str_buf(&reader, fullname_resp, sizeof(fullname_resp) - 1);
+                        fullname_resp[len] = '\0';
+                    }
+                    else if (strcmp(key, "email") == 0)
+                    {
+                        size_t len = mpack_expect_str_buf(&reader, email_resp, sizeof(email_resp) - 1);
+                        email_resp[len] = '\0';
+                    }
+                    else
+                    {
+                        // Skip unknown field
+                        mpack_discard(&reader);
+                    }
+                }
+                mpack_done_map(&reader);
+
+                if (mpack_reader_destroy(&reader) == mpack_ok)
+                {
+                    if (result == 0)
+                    {
+                        printf("✅ Login success!\n");
+                        printf("   User ID: %d\n", user_id);
+                        printf("   Username: %s\n", username_resp);
+                        printf("   Balance: $%d\n", balance);
+                        printf("   Fullname: %s\n", fullname_resp);
+                        printf("   Email: %s\n", email_resp);
+                    }
+                    else
+                    {
+                        printf("❌ Login failed with code %d\n", result);
+                    }
                 }
                 else
                 {
-                    printf("Login failed with code %d\n", res);
+                    printf("❌ Failed to parse login response\n");
                 }
             }
             else

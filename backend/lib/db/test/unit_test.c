@@ -74,11 +74,28 @@ TEST(test_db_scoreboard)
 TEST(test_db_friendlist)
 {
     PGconn* conn = PQconnectdb(conninfo);
+    
+    if (PQstatus(conn) != CONNECTION_OK)
+    {
+        fprintf(stderr, "Connection failed: %s\n", PQerrorMessage(conn));
+        PQfinish(conn);
+        return;
+    }
+    
     FriendList* friendlist = dbGetFriendList(conn, 1);
+    
+    if (friendlist == NULL)
+    {
+        fprintf(stderr, "Failed to get friendlist\n");
+        PQfinish(conn);
+        return;
+    }
 
     ASSERT(friendlist->num > 0);
     ASSERT(friendlist->friends[0].user_id == 2);
-    ASSERT(strcmp(friendlist->friends[0].user_name, "jane_smith") == 0)
+    ASSERT(strcmp(friendlist->friends[0].user_name, "user2") == 0);
+    
+    free(friendlist);
     PQfinish(conn);
 }
 

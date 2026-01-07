@@ -280,19 +280,20 @@ CreateTableRequest* decode_create_table_request(char* payload)
 
     mpack_expect_map_max(&reader, 3);
 
-    mpack_expect_cstr_match(&reader, "tableName");
+    mpack_expect_cstr_match(&reader, "name");
     const char* table_name = mpack_expect_cstr_alloc(&reader, 32);
 
-    mpack_expect_cstr_match(&reader, "maxPlayer");
+    mpack_expect_cstr_match(&reader, "max_player");
     int max_player = mpack_expect_int(&reader);
 
-    mpack_expect_cstr_match(&reader, "minBet");
+    mpack_expect_cstr_match(&reader, "min_bet");
     int min_bet = mpack_expect_int(&reader);
 
-    if (mpack_reader_destroy(&reader) != mpack_ok)
+    mpack_error_t error = mpack_reader_destroy(&reader);
+    if (error != mpack_ok)
     {
         fprintf(stderr, "decode_create_table_request: An error occurred decoding the message %s\n",
-                mpack_error_to_string(mpack_reader_destroy(&reader)));
+                mpack_error_to_string(error));
         return NULL;
     }
 
@@ -447,10 +448,10 @@ RawBytes* encode_login_success_response(dbUser* user)
     mpack_writer_t writer;
     char buffer[MAXLINE];
     mpack_writer_init(&writer, buffer, MAXLINE);
-    mpack_start_map(&writer, 10);
-    mpack_write_cstr(&writer, "res");
-    mpack_write_u16(&writer, R_LOGIN_OK);
-    mpack_write_cstr(&writer, "userId");
+    mpack_start_map(&writer, 6);
+    mpack_write_cstr(&writer, "result");
+    mpack_write_u16(&writer, 0);
+    mpack_write_cstr(&writer, "user_id");
     mpack_write_i32(&writer, user->user_id);
     mpack_write_cstr(&writer, "username");
     mpack_write_cstr(&writer, user->username);
@@ -460,14 +461,6 @@ RawBytes* encode_login_success_response(dbUser* user)
     mpack_write_cstr(&writer, user->fullname);
     mpack_write_cstr(&writer, "email");
     mpack_write_cstr(&writer, user->email);
-    mpack_write_cstr(&writer, "phone");
-    mpack_write_cstr(&writer, user->phone);
-    mpack_write_cstr(&writer, "dob");
-    mpack_write_cstr(&writer, user->dob);
-    mpack_write_cstr(&writer, "country");
-    mpack_write_cstr(&writer, user->country);
-    mpack_write_cstr(&writer, "gender");
-    mpack_write_cstr(&writer, user->gender);
     mpack_finish_map(&writer);
 
     if (mpack_writer_destroy(&writer) != mpack_ok)

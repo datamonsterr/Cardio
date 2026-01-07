@@ -107,12 +107,12 @@ int hand_toString_ordered(Hand* aHandPtr)
 int hand_copy(Hand* t, Hand* s)
 {
     int i = 0;
-    int x = 0;
+    // int x = 0;
     if (t == NULL || s == NULL)
         return -1;
     for (i = 0; i < HAND_SIZE; i++)
     {
-        if ((x = replace_card(t, i, s->cards[i])) == -1)
+        if ((replace_card(t, i, s->cards[i])) == -1)
             return -1;
     }
     t->cardsHeld = s->cardsHeld;

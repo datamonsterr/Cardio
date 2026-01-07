@@ -7,7 +7,7 @@
 #include <string.h>
 // #include <msgpack.h>
 
-#define conninfo "dbname=cardio user=postgres password=1234 host=localhost port=5433"
+#define conninfo "dbname=cardio user=postgres password=postgres host=localhost port=5433"
 #define DB_ERROR -200
 #define DB_OK -100
 

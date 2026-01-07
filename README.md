@@ -1,13 +1,58 @@
 # For devloper
 ## Prequesite
+
+### Development Tools
 - Using Linux or Unix is requirement for backend
-- Our compiler is clang, instead of gcc
-- Suggest using VSCode, or your most familiar IDE
-- Required libraries: `libpq-dev`, `libcrypt-dev` (for password hashing) 
-- cmake minimum version 3.22 (see [CMake 3.22 Installation](#cmake-322-installation) below)
-- Docker (for postgres)
+- **Compiler**: clang (not gcc)
+- **Build System**: cmake >= 3.22 (see [CMake 3.22 Installation](#cmake-322-installation) below)
+- **IDE**: VSCode recommended
+
+### Development Dependencies
+- `libpq-dev` (PostgreSQL client development library)
+- `libcrypt-dev` (for password hashing)
+- `clang-tidy` (for code linting with `make lint`)
+
+### Runtime
+- **Database**: Docker + PostgreSQL 15 (see [How to run](#how-to-run) section)
+  - Default credentials: `postgres:postgres` on port `5433`
+  - Configured in [docker-compose.yaml](docker-compose.yaml)
+
+## Installation
+
+### Linux (Ubuntu/Debian)
+
+```bash
+# Install build tools and dependencies
+sudo apt-get update
+sudo apt-get install -y clang cmake libpq-dev libcrypt-dev clang-tools
+
+# Docker (optional, for PostgreSQL)
+# Follow: https://docs.docker.com/engine/install/
+```
+
+### macOS
+
+```bash
+# Install with Homebrew
+brew install llvm cmake libpq clang-tools
+```
 
 ## How to run
+
+### Start Database
+```sh
+# Start PostgreSQL with Docker
+docker compose up -d
+
+# The database will be accessible at:
+# Host: localhost
+# Port: 5433
+# Database: cardio
+# User: postgres
+# Password: postgres
+```
+
+### Build and Run Server
 ```sh
 # Build all libraries and main project
 make build
@@ -17,7 +62,21 @@ mkdir build
 cd build
 cmake ../
 make
+
+# Run the server
+./backend/build/Kasino_server
 ```
+
+### Test the Server
+```sh
+# Interactive test client
+./backend/build/client localhost 8080
+
+# Automated E2E test suite
+./backend/build/e2e_test_client localhost 8080
+```
+
+**Important:** All user passwords in the initial dataset ([data.sql](database/data.sql#L1)) are `password12345`
 
 ## Testing
 
@@ -105,17 +164,32 @@ backend
 ## Security Features
 
 ### Password Hashing (New!)
-The application now uses secure password hashing with SHA-512 and salt. 
+The application uses secure password hashing with SHA-512 and salt. 
 
 **For new installations:** Passwords are automatically hashed on signup.
 
 **For existing installations:** You must run the migration script:
 ```sh
 cd database
-./run_migration.sh
+DB_PASSWORD=postgres ./run_migration.sh
 ```
 
-See `database/MIGRATION_GUIDE.md` for detailed migration instructions.
+See [MIGRATION_GUIDE.md](database/MIGRATION_GUIDE.md) for detailed migration instructions.
+
+### Enhanced Logging (New!)
+The server now includes comprehensive logging with:
+- **Color-coded output**: ERROR (Red), WARN (Yellow), INFO (Green), DEBUG (Cyan)
+- **Function name tracking**: Every log shows which function generated it
+- **Format**: `[TAG] YYYY-MM-DD HH:MM:SS [function_name] message`
+- **Both file and terminal**: Logs written to `server.log` and displayed in terminal
+
+Example log output:
+```
+[INFO] 2026-01-07 22:28:36 [get_listener_socket] Listener socket created successfully on 0.0.0.0:8080
+[INFO] 2026-01-07 22:28:54 [accept_connection] New connection from 127.0.0.1 [fd=5]
+[INFO] 2026-01-07 22:28:54 [handle_login_request] Login request from fd=5, data_len=43
+[INFO] 2026-01-07 22:28:54 [handle_login_request] Login SUCCESS: user='user1' (id=1) fd=5 balance=500
+```
 
 ## CMake 3.22 Installation
 
