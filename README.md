@@ -4,6 +4,8 @@
 - Our compiler is clang, instead of gcc
 - Suggest using VSCode, or your most familiar IDE
 - Required libraries: `libpq-dev`, `libcrypt-dev` (for password hashing) 
+- cmake minimum version 3.22 (see [CMake 3.22 Installation](#cmake-322-installation) below)
+- Docker (for postgres)
 
 ## How to run
 ```sh
@@ -114,6 +116,34 @@ cd database
 ```
 
 See `database/MIGRATION_GUIDE.md` for detailed migration instructions.
+
+## CMake 3.22 Installation
+
+Ubuntu's default `apt install cmake` provides version 3.16, which is too old. Use one of these methods:
+
+### Option 1: Pre-built Binary (Recommended - Fastest)
+```bash
+# Download CMake 3.22.6
+wget https://github.com/Kitware/CMake/releases/download/v3.22.6/cmake-3.22.6-linux-x86_64.tar.gz
+
+# Extract to /opt
+sudo tar -xzf cmake-3.22.6-linux-x86_64.tar.gz -C /opt
+
+# Create symlink (note the -linux-x86_64 suffix in the directory name)
+sudo ln -s /opt/cmake-3.22.6-linux-x86_64/bin/cmake /usr/local/bin/cmake
+
+# Verify
+cmake --version
+
+# Remove tar file
+rm cmake-3.22.6-linux-x86_64.tar.gz
+```
+
+### Option 2: Snap
+```bash
+sudo snap install cmake --classic
+cmake --version
+```
 
 ## VSCode settings
 If you're using VSCode in Linux (or MacOS), you should have `.vscode/c_cpp_properties.json` like this:
