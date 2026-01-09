@@ -23,9 +23,16 @@ void handle_login_request(conn_data_t* conn_data, char* data, size_t data_len)
     logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
     
     int user_id = dbLogin(conn, login_request->username, login_request->password);
+    snprintf(log_msg, sizeof(log_msg), "dbLogin returned user_id=%d for user='%s'", user_id, login_request->username);
+    logger_ex(MAIN_LOG, "DEBUG", __func__, log_msg, 1);
+    
     if (user_id > 0)
     {
         struct dbUser user_info = dbGetUserInfo(conn, user_id);
+        snprintf(log_msg, sizeof(log_msg), "dbGetUserInfo returned: user_id=%d username='%s' balance=%d", 
+                 user_info.user_id, user_info.username, user_info.balance);
+        logger_ex(MAIN_LOG, "DEBUG", __func__, log_msg, 1);
+        
         RawBytes* raw_bytes = encode_login_success_response(&user_info);
         RawBytes* response = encode_packet(PROTOCOL_V1, 100, raw_bytes->data, raw_bytes->len);
         sendall(conn_data->fd, response->data, (int*) &(response->len));
@@ -83,17 +90,25 @@ void handle_signup_request(conn_data_t* conn_data, char* data, size_t data_len)
 
     SignupRequest* signup_request = decode_signup_request(packet->data);
     struct dbUser* user = malloc(sizeof(struct dbUser));
-    strncpy(user->username, signup_request->username, 32);
-    strncpy(user->password, signup_request->password, 32);
-    strncpy(user->phone, signup_request->phone, 16);
-    strncpy(user->email, signup_request->email, 64);
-    strncpy(user->phone, signup_request->phone, 16);
-    strncpy(user->fullname, signup_request->fullname, 64);
-    strncpy(user->country, signup_request->country, 32);
-    strncpy(user->gender, signup_request->gender, 8);
+    strncpy(user->username, signup_request->username, sizeof(user->username) - 1);
+    user->username[sizeof(user->username) - 1] = '\0';
+    strncpy(user->password, signup_request->password, sizeof(user->password) - 1);
+    user->password[sizeof(user->password) - 1] = '\0';
+    strncpy(user->phone, signup_request->phone, sizeof(user->phone) - 1);
+    user->phone[sizeof(user->phone) - 1] = '\0';
+    strncpy(user->email, signup_request->email, sizeof(user->email) - 1);
+    user->email[sizeof(user->email) - 1] = '\0';
+    strncpy(user->fullname, signup_request->fullname, sizeof(user->fullname) - 1);
+    user->fullname[sizeof(user->fullname) - 1] = '\0';
+    strncpy(user->country, signup_request->country, sizeof(user->country) - 1);
+    user->country[sizeof(user->country) - 1] = '\0';
+    strncpy(user->gender, signup_request->gender, sizeof(user->gender) - 1);
+    user->gender[sizeof(user->gender) - 1] = '\0';
+    strncpy(user->dob, signup_request->dob, sizeof(user->dob) - 1);
+    user->dob[sizeof(user->dob) - 1] = '\0';
     
-    snprintf(log_msg, sizeof(log_msg), "Attempting signup for user='%s' email='%s'", 
-             signup_request->username, signup_request->email);
+    snprintf(log_msg, sizeof(log_msg), "Attempting signup for user='%s' email='%s' pass_len=%zu", 
+             signup_request->username, signup_request->email, strlen(user->password));
     logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
     
     int res = dbSignup(conn, user);
@@ -119,7 +134,8 @@ void handle_signup_request(conn_data_t* conn_data, char* data, size_t data_len)
     RawBytes* response = encode_packet(PROTOCOL_V1, 200, raw_bytes->data, raw_bytes->len);
     sendall(conn_data->fd, response->data, (int*) &(response->len));
     
-    snprintf(log_msg, sizeof(log_msg), "Signup FAILED: user='%s' fd=%d", signup_request->username, conn_data->fd);
+    snprintf(log_msg, sizeof(log_msg), "Signup FAILED: user='%s' fd=%d error_code=%d", 
+             signup_request->username, conn_data->fd, res);
     logger_ex(MAIN_LOG, "WARN", __func__, log_msg, 1);
 
     PQfinish(conn);
@@ -302,10 +318,34 @@ void handle_join_table_request(conn_data_t* conn_data, char* data, size_t data_l
     RawBytes* response = malloc(sizeof(RawBytes));
     if (res >= 0)
     {
-        snprintf(log_msg, sizeof(log_msg), "Join table SUCCESS: user='%s' table_id=%d", 
-                 conn_data->username, table_id);
+        snprintf(log_msg, sizeof(log_msg), "Join table SUCCESS: user='%s' table_id=%d seat=%d", 
+                 conn_data->username, table_id, conn_data->seat);
         logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
-        raw_bytes = encode_response(R_JOIN_TABLE_OK);
+        
+        // Send game state to the joining player
+        Table* table = &table_list->tables[res];
+        RawBytes* game_state_data = encode_game_state(table->game_state, conn_data->user_id);
+        
+        snprintf(log_msg, sizeof(log_msg), "encode_game_state returned: %p (size=%zu)", 
+                 (void*)game_state_data, game_state_data ? game_state_data->len : 0);
+        logger_ex(MAIN_LOG, "DEBUG", __func__, log_msg, 1);
+        
+        if (game_state_data) {
+            snprintf(log_msg, sizeof(log_msg), "Game state data: len=%zu first_bytes=%02x %02x %02x %02x", 
+                     game_state_data->len,
+                     (unsigned char)game_state_data->data[0],
+                     (unsigned char)game_state_data->data[1],
+                     (unsigned char)game_state_data->data[2],
+                     (unsigned char)game_state_data->data[3]);
+            logger_ex(MAIN_LOG, "DEBUG", __func__, log_msg, 1);
+            raw_bytes = game_state_data;
+        } else {
+            logger_ex(MAIN_LOG, "WARN", __func__, "encode_game_state returned NULL, sending simple OK", 1);
+            raw_bytes = encode_response(R_JOIN_TABLE_OK);
+        }
+        
+        // Try to start game if we have enough players
+        start_game_if_ready(table);
     }
     else if (res == -2)
     {
@@ -406,4 +446,220 @@ void handle_get_friendlist(conn_data_t* conn_data, char* data, size_t data_len)
 
 void handle_leave_table_request(conn_data_t* conn_data, char* data, size_t data_len, TableList* table_list)
 {
+}
+
+void handle_action_request(conn_data_t* conn_data, char* data, size_t data_len, TableList* table_list)
+{
+    char log_msg[256];
+    snprintf(log_msg, sizeof(log_msg), "Action request from fd=%d user='%s'", 
+             conn_data->fd, conn_data->username);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    
+    // Validate user is logged in and at a table
+    if (conn_data->user_id == 0 || conn_data->table_id == 0) {
+        ActionResult result = {
+            .result = 403,
+            .client_seq = 0,
+        };
+        strncpy(result.reason, "Not logged in or not at a table", sizeof(result.reason) - 1);
+        
+        RawBytes* result_bytes = encode_action_result(&result);
+        if (result_bytes) {
+            RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_ACTION_RESULT, 
+                                              result_bytes->data, result_bytes->len);
+            if (response) {
+                sendall(conn_data->fd, response->data, (int*)&response->len);
+                free(response);
+            }
+            free(result_bytes);
+        }
+        return;
+    }
+    
+    // Find the table
+    int table_idx = find_table_by_id(table_list, conn_data->table_id);
+    if (table_idx < 0) {
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Table not found", 1);
+        return;
+    }
+    
+    Table* table = &table_list->tables[table_idx];
+    GameState* gs = table->game_state;
+    
+    if (!gs) {
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Game state not found", 1);
+        return;
+    }
+    
+    // Decode action request
+    Packet* packet = decode_packet(data, data_len);
+    if (!packet || packet->header->packet_type != PACKET_ACTION_REQUEST) {
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Invalid packet", 1);
+        if (packet) free_packet(packet);
+        return;
+    }
+    
+    ActionRequest* action_req = decode_action_request(packet->data);
+    if (!action_req) {
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Failed to decode action request", 1);
+        free_packet(packet);
+        return;
+    }
+    
+    snprintf(log_msg, sizeof(log_msg), "Action from user='%s': type='%s' amount=%d", 
+             conn_data->username, action_req->action_type, action_req->amount);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    
+    // Validate it's the player's turn
+    if (gs->active_seat < 0 || gs->players[gs->active_seat].player_id != conn_data->user_id) {
+        ActionResult result = {
+            .result = 403,
+            .client_seq = action_req->client_seq,
+        };
+        strncpy(result.reason, "Not your turn", sizeof(result.reason) - 1);
+        
+        RawBytes* result_bytes = encode_action_result(&result);
+        if (result_bytes) {
+            RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_ACTION_RESULT, 
+                                              result_bytes->data, result_bytes->len);
+            if (response) {
+                sendall(conn_data->fd, response->data, (int*)&response->len);
+                free(response);
+            }
+            free(result_bytes);
+        }
+        
+        free(action_req);
+        free_packet(packet);
+        return;
+    }
+    
+    // Convert action type string to ActionType enum
+    Action action = {0};
+    if (strcmp(action_req->action_type, "fold") == 0) {
+        action.type = ACTION_FOLD;
+    } else if (strcmp(action_req->action_type, "check") == 0) {
+        action.type = ACTION_CHECK;
+    } else if (strcmp(action_req->action_type, "call") == 0) {
+        action.type = ACTION_CALL;
+    } else if (strcmp(action_req->action_type, "bet") == 0) {
+        action.type = ACTION_BET;
+        action.amount = action_req->amount;
+    } else if (strcmp(action_req->action_type, "raise") == 0) {
+        action.type = ACTION_RAISE;
+        action.amount = action_req->amount;
+    } else if (strcmp(action_req->action_type, "all_in") == 0) {
+        action.type = ACTION_ALL_IN;
+    } else {
+        ActionResult result = {
+            .result = 400,
+            .client_seq = action_req->client_seq,
+        };
+        strncpy(result.reason, "Invalid action type", sizeof(result.reason) - 1);
+        
+        RawBytes* result_bytes = encode_action_result(&result);
+        if (result_bytes) {
+            RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_ACTION_RESULT, 
+                                              result_bytes->data, result_bytes->len);
+            if (response) {
+                sendall(conn_data->fd, response->data, (int*)&response->len);
+                free(response);
+            }
+            free(result_bytes);
+        }
+        
+        free(action_req);
+        free_packet(packet);
+        return;
+    }
+    
+    // Validate action
+    ActionValidation validation = game_validate_action(gs, conn_data->user_id, &action);
+    if (!validation.is_valid) {
+        ActionResult result = {
+            .result = 409,
+            .client_seq = action_req->client_seq,
+        };
+        strncpy(result.reason, validation.error_message ? validation.error_message : "Invalid action", 
+                sizeof(result.reason) - 1);
+        
+        RawBytes* result_bytes = encode_action_result(&result);
+        if (result_bytes) {
+            RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_ACTION_RESULT, 
+                                              result_bytes->data, result_bytes->len);
+            if (response) {
+                sendall(conn_data->fd, response->data, (int*)&response->len);
+                free(response);
+            }
+            free(result_bytes);
+        }
+        
+        free(action_req);
+        free_packet(packet);
+        return;
+    }
+    
+    // Process the action
+    int process_result = game_process_action(gs, conn_data->user_id, &action);
+    if (process_result != 0) {
+        ActionResult result = {
+            .result = 500,
+            .client_seq = action_req->client_seq,
+        };
+        strncpy(result.reason, "Failed to process action", sizeof(result.reason) - 1);
+        
+        RawBytes* result_bytes = encode_action_result(&result);
+        if (result_bytes) {
+            RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_ACTION_RESULT, 
+                                              result_bytes->data, result_bytes->len);
+            if (response) {
+                sendall(conn_data->fd, response->data, (int*)&response->len);
+                free(response);
+            }
+            free(result_bytes);
+        }
+        
+        free(action_req);
+        free_packet(packet);
+        return;
+    }
+    
+    // Action processed successfully
+    ActionResult result = {
+        .result = 0,
+        .client_seq = action_req->client_seq,
+    };
+    
+    RawBytes* result_bytes = encode_action_result(&result);
+    if (result_bytes) {
+        RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_ACTION_RESULT, 
+                                          result_bytes->data, result_bytes->len);
+        if (response) {
+            sendall(conn_data->fd, response->data, (int*)&response->len);
+            free(response);
+        }
+        free(result_bytes);
+    }
+    
+    // Broadcast updated game state to all players at the table
+    for (int i = 0; i < table->current_player; i++) {
+        if (table->connections[i] != NULL && table->connections[i]->fd > 0) {
+            RawBytes* game_state_data = encode_game_state(gs, table->connections[i]->user_id);
+            if (game_state_data) {
+                RawBytes* broadcast_packet = encode_packet(PROTOCOL_V1, PACKET_UPDATE_GAMESTATE, 
+                                                          game_state_data->data, game_state_data->len);
+                if (broadcast_packet) {
+                    sendall(table->connections[i]->fd, broadcast_packet->data, (int*)&broadcast_packet->len);
+                    free(broadcast_packet);
+                }
+                free(game_state_data);
+            }
+        }
+    }
+    
+    snprintf(log_msg, sizeof(log_msg), "Action processed successfully for user='%s'", conn_data->username);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    
+    free(action_req);
+    free_packet(packet);
 }

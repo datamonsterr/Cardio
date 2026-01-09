@@ -172,6 +172,7 @@ conn_data_t* init_connection_data(int client_fd)
     conn_data->user_id = 0;
     conn_data->balance = 0;
     conn_data->table_id = 0;
+    conn_data->seat = -1;  // Not seated
     conn_data->buffer_len = 0;
     conn_data->is_active = false;
 

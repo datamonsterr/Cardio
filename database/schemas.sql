@@ -4,7 +4,7 @@ CREATE TABLE "User"
     email    VARCHAR(100) NOT NULL UNIQUE,
     phone    VARCHAR(15)  NOT NULL,
     dob      DATE         NOT NULL,
-    password VARCHAR(32)  NOT NULL CHECK ( LENGTH(password) > 8 ),
+    password VARCHAR(128) NOT NULL,
     country  VARCHAR(32),
     gender VARCHAR(10) NOT NULL CHECK ( gender IN ('Male', 'Female', 'Other') ),
     balance  INTEGER DEFAULT 0,

@@ -1,5 +1,9 @@
 #pragma once
 #include <stddef.h>
+#include "game_engine.h"
+
+// Forward declaration to avoid circular dependency
+typedef struct conn_data_t conn_data_t;
 
 struct
 {
@@ -9,6 +13,9 @@ struct
     int max_player;
     int min_bet;
     int max_bet;
+    GameState* game_state;       // Pointer to the game engine state
+    conn_data_t* connections[MAX_PLAYERS];  // Array of connected players
+    int seat_to_conn_idx[MAX_PLAYERS];      // Map seat number to connections index
 } typedef Table;
 
 typedef struct

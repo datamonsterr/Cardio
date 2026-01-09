@@ -166,7 +166,7 @@ Packet IDs are organized by functionality:
 - `471`: RESYNC_RESPONSE (S2C)
 
 **Game State:**
-- `600`: PACKET_UPDATE_GAMESTATE (S2C) - Full state sync
+- `600`: PACKET_UPDATE_GAMESTATE (S2C) - Full state sync (currently sent after each action)
 
 **Leave Table:**
 - `700`: LEAVE_TABLE_REQUEST (C2S)
@@ -262,9 +262,10 @@ typedef struct {
 
 **Direction**: S2C
 
-**Response Types:**
-- ID `101` (R_LOGIN_OK): Login successful
-- ID `102` (R_LOGIN_NOT_OK): Login failed
+**Response Types**: All responses use packet type 100. The R_* constants are result codes in the payload.
+
+- Result `101` (R_LOGIN_OK): Login successful  
+- Result `102` (R_LOGIN_NOT_OK): Login failed
 
 **Payload on Success** (MessagePack):
 ```json
@@ -314,9 +315,10 @@ typedef struct {
 
 **Direction**: S2C
 
-**Response Types:**
-- ID `201` (R_SIGNUP_OK): Registration successful
-- ID `202` (R_SIGNUP_NOT_OK): Registration failed
+**Response Types**: All responses use packet type 200. The R_* constants are result codes in the payload.
+
+- Result `201` (R_SIGNUP_OK): Registration successful
+- Result `202` (R_SIGNUP_NOT_OK): Registration failed
 
 **Result Codes:**
 - `0`: REGISTER_OK
@@ -346,9 +348,10 @@ typedef struct {
 
 **Direction**: S2C
 
-**Response Types:**
-- ID `301` (R_CREATE_TABLE_OK): Table created
-- ID `302` (R_CREATE_TABLE_NOT_OK): Failed to create
+**Response Types**: All responses use packet type 300. The R_* constants are result codes in the payload.
+
+- Result `301` (R_CREATE_TABLE_OK): Table created
+- Result `302` (R_CREATE_TABLE_NOT_OK): Failed to create
 
 ### GET_TABLES (ID: 500)
 
@@ -392,18 +395,31 @@ typedef struct {
 
 **Direction**: S2C
 
-**Response Types:**
-- ID `401` (R_JOIN_TABLE_OK): Successfully joined
-- ID `402` (R_JOIN_TABLE_NOT_OK): Join failed
-- ID `403` (R_JOIN_TABLE_FULL): Table is full
+**Note**: All responses use packet type 400 (PACKET_JOIN_TABLE). The constants 401-403 are result codes in the MessagePack payload, not packet types.
 
-**Payload on Success** (ID: 401):
+**Response Payload**:
+
+On success, server sends either:
+1. Simple success response:
 ```json
 {
-  "result": 0,
-  "game_state": {
-    // Full game state (see GAME_STATE structure below)
-  }
+  "res": 401  // R_JOIN_TABLE_OK
+}
+```
+
+2. Full game state (when game is active):
+```json
+{
+  "game_id": <int>,
+  "hand_id": <int>,
+  // ... (see GAME_STATE structure below)
+}
+```
+
+On failure:
+```json
+{
+  "res": 402  // R_JOIN_TABLE_NOT_OK or 403 for R_JOIN_TABLE_FULL
 }
 ```
 
@@ -422,9 +438,10 @@ typedef struct {
 
 **Direction**: S2C
 
-**Response Types:**
-- ID `701` (R_LEAVE_TABLE_OK): Successfully left
-- ID `702` (R_LEAVE_TABLE_NOT_OK): Leave failed
+**Response Types**: All responses use packet type 700. The R_* constants are result codes in the payload.
+
+- Result `701` (R_LEAVE_TABLE_OK): Successfully left
+- Result `702` (R_LEAVE_TABLE_NOT_OK): Leave failed
 
 ---
 
@@ -450,7 +467,8 @@ This is sent when a player joins a table or requests a resync.
   "dealer_seat": <int>,
   "active_seat": <int>,
   
-  "players": [
+  "players": [           // Array of MAX_PLAYERS (9) elements
+    null,                  // Empty seats are represented as null
     {
       "player_id": <int>,
       "name": "<string>",
@@ -459,7 +477,7 @@ This is sent when a player joins a table or requests a resync.
       "money": <int>,           // Stack size
       "bet": <int>,             // Current bet this round
       "total_bet": <int>,       // Total bet this hand
-      "cards": [<int>, <int>],  // -1 for hidden cards
+      "cards": [<int>, <int>],  // -1 for hidden cards, player only sees own cards
       "is_dealer": <bool>,
       "is_small_blind": <bool>,
       "is_big_blind": <bool>,
@@ -513,6 +531,8 @@ Cards are represented as integers:
 ### UPDATE_BUNDLE (ID: 460)
 
 **Direction**: S2C
+
+**Implementation Note**: Current implementation sends full game state via PACKET_UPDATE_GAMESTATE (600) after each action instead of incremental updates. UPDATE_BUNDLE with delta updates is planned for future optimization.
 
 Game state changes are sent as atomic bundles containing notifications (for UI/animations) and updates (for state synchronization).
 

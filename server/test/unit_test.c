@@ -400,6 +400,74 @@ TEST(test_encode_login_success_resp)
     ASSERT(strcmp(fullname, "Pham Thanh Dat") == 0);
 }
 
+TEST(test_decode_action_request)
+{
+    // Create a mock action request
+    char buffer[4096];
+    mpack_writer_t writer;
+    mpack_writer_init(&writer, buffer, 4096);
+    
+    mpack_start_map(&writer, 3);
+    
+    mpack_write_cstr(&writer, "game_id");
+    mpack_write_int(&writer, 123);
+    
+    mpack_write_cstr(&writer, "action");
+    mpack_start_map(&writer, 2);
+    mpack_write_cstr(&writer, "type");
+    mpack_write_cstr(&writer, "raise");
+    mpack_write_cstr(&writer, "amount");
+    mpack_write_int(&writer, 100);
+    mpack_finish_map(&writer);
+    
+    mpack_write_cstr(&writer, "client_seq");
+    mpack_write_u32(&writer, 42);
+    
+    mpack_finish_map(&writer);
+    
+    size_t size = mpack_writer_buffer_used(&writer);
+    mpack_error_t error = mpack_writer_destroy(&writer);
+    ASSERT(error == mpack_ok);
+    
+    // Decode the action request
+    ActionRequest* req = decode_action_request(buffer);
+    ASSERT(req != NULL);
+    ASSERT(req->game_id == 123);
+    ASSERT(strcmp(req->action_type, "raise") == 0);
+    ASSERT(req->amount == 100);
+    ASSERT(req->client_seq == 42);
+    
+    free(req);
+}
+
+TEST(test_encode_action_result)
+{
+    ActionResult result = {
+        .result = 0,
+        .client_seq = 42,
+    };
+    strncpy(result.reason, "Success", sizeof(result.reason) - 1);
+    
+    RawBytes* encoded = encode_action_result(&result);
+    ASSERT(encoded != NULL);
+    ASSERT(encoded->len > 0);
+    
+    // Verify the encoded data
+    mpack_tree_t tree;
+    mpack_tree_init_data(&tree, encoded->data, encoded->len);
+    mpack_tree_parse(&tree);
+    mpack_node_t root = mpack_tree_root(&tree);
+    
+    mpack_node_t result_node = mpack_node_map_cstr(root, "result");
+    ASSERT(mpack_node_int(result_node) == 0);
+    
+    mpack_node_t seq_node = mpack_node_map_cstr(root, "client_seq");
+    ASSERT(mpack_node_u32(seq_node) == 42);
+    
+    mpack_tree_destroy(&tree);
+    free(encoded);
+}
+
 int main()
 {
     RUN_TEST(test_db_conn);
@@ -416,4 +484,6 @@ int main()
     RUN_TEST(test_encode_login_success_resp);
     RUN_TEST(test_encode_scoreboard_response);
     RUN_TEST(test_encode_friendlist_response);
+    RUN_TEST(test_decode_action_request);
+    RUN_TEST(test_encode_action_result);
 }

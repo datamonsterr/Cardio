@@ -160,6 +160,11 @@ int main(void)
                     logger(MAIN_LOG, "Info", "Leave table request from client");
                     handle_leave_table_request(conn_data, buf, nbytes, table_list);
                     break;
+                
+                case PACKET_ACTION_REQUEST:
+                    logger(MAIN_LOG, "Info", "Action request from client");
+                    handle_action_request(conn_data, buf, nbytes, table_list);
+                    break;
 
                 default:
                     handle_unknown_request(conn_data, buf, nbytes);

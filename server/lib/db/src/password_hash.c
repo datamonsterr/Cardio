@@ -1,7 +1,10 @@
 #include "../include/db.h"
+#include "../../../lib/logger/include/logger.h"
 #include <crypt.h>
 #include <time.h>
 #include <unistd.h>
+
+#define DB_LOG "server.log"
 
 // Generate a salt for password hashing using SHA-512
 // Returns a pointer to the salt string (must be freed by caller)
@@ -68,15 +71,28 @@ char* hash_password(const char* password, const char* salt)
 // Returns true if the password matches, false otherwise
 bool verify_password(const char* password, const char* hash)
 {
+    char log_msg[256];
     struct crypt_data data;
     data.initialized = 0;
+
+    snprintf(log_msg, sizeof(log_msg), "verify_password: password_len=%zu hash_len=%zu hash_prefix='%.20s'", 
+             strlen(password), strlen(hash), hash);
+    logger_ex(DB_LOG, "DEBUG", __func__, log_msg, 1);
 
     char* result = crypt_r(password, hash, &data);
     if (result == NULL)
     {
-        fprintf(stderr, "Password verification failed\n");
+        logger_ex(DB_LOG, "ERROR", __func__, "crypt_r returned NULL", 1);
         return false;
     }
 
-    return strcmp(result, hash) == 0;
+    snprintf(log_msg, sizeof(log_msg), "verify_password: result_len=%zu result_prefix='%.20s'", 
+             strlen(result), result);
+    logger_ex(DB_LOG, "DEBUG", __func__, log_msg, 1);
+    
+    bool match = strcmp(result, hash) == 0;
+    snprintf(log_msg, sizeof(log_msg), "verify_password: match=%s", match ? "TRUE" : "FALSE");
+    logger_ex(DB_LOG, "DEBUG", __func__, log_msg, 1);
+
+    return match;
 }

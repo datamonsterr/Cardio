@@ -10,7 +10,7 @@ int sendall(int socketfd, char* buf, int* len); // Send all data in buffer
                                                 //
 // Connection management
 // Custom data structure to associate with each connection
-typedef struct
+typedef struct conn_data_t
 {
     char buffer[1024];       // Buffer for partial reads/writes
     int fd;                  // File descriptor for the connection
@@ -18,6 +18,7 @@ typedef struct
     unsigned int user_id;    // Player's ID
     unsigned int balance;    // Chips the player has
     unsigned short table_id; // Game table ID (0 if not at a table)
+    int seat;                // Seat number at table (-1 if not seated)
     size_t buffer_len;       // Length of valid data in the buffer
     bool is_active;          // Player's activity status
 } conn_data_t;
@@ -40,6 +41,12 @@ void handle_get_scoreboard(conn_data_t* conn_data, char* data, size_t data_len);
 void handle_get_friendlist(conn_data_t* conn_data, char* data, size_t data_len);
 void handle_unknown_request(conn_data_t* conn_data, char* data, size_t data_len);
 void handle_leave_table_request(conn_data_t* conn_data, char* data, size_t data_len, TableList* table_list);
+void handle_action_request(conn_data_t* conn_data, char* data, size_t data_len, TableList* table_list);
 
 int leave_table(conn_data_t* conn_data, TableList* table_list);
 int join_table(conn_data_t* conn_data, TableList* table_list, int table_id);
+
+// Game state management
+void broadcast_to_table(int table_id, TableList* table_list, char* data, int len);
+void start_game_if_ready(Table* table);
+void process_player_action(conn_data_t* conn_data, Table* table, ActionRequest* action_req);

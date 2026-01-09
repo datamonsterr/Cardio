@@ -15,7 +15,7 @@ list(APPEND TESTS ${SOURCES})
 
 set(LIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..) # SET LIB DIR HERE, this is relative directory of "lib" folder from this Cmake dir 
 
-set(ALL_INCLUDES ${LIB_DIR}/utils ${LIB_DIR}/db/include /usr/include/postgresql) # SET ALL INCLUDES HERE
+set(ALL_INCLUDES ${LIB_DIR}/utils ${LIB_DIR}/db/include ${LIB_DIR}/logger/include /usr/include/postgresql) # SET ALL INCLUDES HERE
 
 add_library(${PROJECT_NAME} ${SOURCES})
 
@@ -25,11 +25,11 @@ add_executable(${test} ${TESTS})
 find_package(PostgreSQL REQUIRED)
 
 target_include_directories(${PROJECT_NAME} PUBLIC ${ALL_INCLUDES})
-target_link_libraries(${PROJECT_NAME} PostgreSQL::PostgreSQL crypt)
+target_link_libraries(${PROJECT_NAME} PostgreSQL::PostgreSQL crypt ${LIB_DIR}/logger/build/libCardio_logger.a)
 
 target_include_directories(${test} PUBLIC ${ALL_INCLUDES})
 target_include_directories(${test} PUBLIC /usr/include/postgresql)
-target_link_libraries(${test} PostgreSQL::PostgreSQL crypt)
+target_link_libraries(${test} PostgreSQL::PostgreSQL crypt ${LIB_DIR}/logger/build/libCardio_logger.a)
 
 
 

@@ -133,3 +133,32 @@ RawBytes* encode_friendlist_response(FriendList* friendlist);
 
 // Encode login success response
 RawBytes* encode_login_success_response(dbUser* user);
+
+// ===== Game Action Packets =====
+
+// Action request from client
+typedef struct {
+    int game_id;
+    char action_type[16];  // "fold", "check", "call", "bet", "raise", "all_in"
+    int amount;            // For bet/raise actions
+    uint32_t client_seq;   // Optional correlation ID
+} ActionRequest;
+
+// Action result response
+typedef struct {
+    int result;            // 0=OK, 400=BAD_ACTION, 403=NOT_YOUR_TURN, etc.
+    uint32_t client_seq;   // Echoed from request
+    char reason[128];      // Present on failure
+} ActionResult;
+
+// Decode action request
+ActionRequest* decode_action_request(char* payload);
+// Encode action result
+RawBytes* encode_action_result(ActionResult* result);
+
+// Encode full game state (for JOIN_TABLE_OK and RESYNC_RESPONSE)
+RawBytes* encode_game_state(GameState* state, int viewer_player_id);
+
+// Encode update bundle (for broadcasting game state changes)
+RawBytes* encode_update_bundle(uint32_t seq, const char** notifications, int num_notifications,
+                                const char** updates, int num_updates);
