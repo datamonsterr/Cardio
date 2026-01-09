@@ -99,6 +99,14 @@ export interface AuthContextType {
   loading: boolean;
   signup?: (request: SignupRequestType) => Promise<void>;
   getTables?: () => Promise<any>;
+  createTable?: (request: CreateTableRequestType) => Promise<void>;
+}
+
+// Create table request type
+export interface CreateTableRequestType {
+  name: string;
+  max_player: number;
+  min_bet: number;
 }
 
 // Signup request type
