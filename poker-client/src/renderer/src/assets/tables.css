@@ -1,80 +1,119 @@
+.tables-page {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 2rem;
+  background:
+    linear-gradient(135deg, rgba(10, 14, 23, 0.92) 0%, rgba(15, 20, 25, 0.92) 100%),
+    url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800"><defs><pattern id="cards" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse"><rect x="10" y="10" width="30" height="40" fill="none" stroke="%23ffd700" stroke-width="2" rx="3"/><text x="25" y="40" text-anchor="middle" fill="%23ffd700" font-size="12">♠</text></pattern></defs><rect width="1200" height="800" fill="%230a0e17"/><rect width="1200" height="800" fill="url(%23cards)" opacity="0.05"/></svg>');
+  background-attachment: fixed;
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-y: auto;
+}
+
 .tables-container {
+  width: 100%;
   max-width: 1400px;
   margin: 0 auto;
-  padding: 2rem;
-  background: #0a0e17;
-  min-height: 100vh;
 }
 
 .tables-header {
-  text-align: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 2rem;
+  padding: 1.5rem 0;
 }
 
-.tables-header h1 {
+.tables-title {
   color: #ffd700;
   font-size: 2.5rem;
-  margin-bottom: 0.5rem;
+  font-weight: 700;
+  text-shadow: 0 2px 20px rgba(255, 215, 0, 0.3);
+  letter-spacing: -0.5px;
+  margin: 0;
 }
 
-.tables-header p {
-  color: #b8c5d6;
-  font-size: 1.1rem;
+.header-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
 }
 
-.return-button {
-  background: linear-gradient(135deg, #2a3447 0%, #1a1f2e 100%);
-  color: #b8c5d6;
-  border: 2px solid #2a3447;
+.refresh-button {
+  background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: white;
+  box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+}
+
+.home-button {
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+  color: white;
+  font-size: 1.25rem;
+  font-weight: 700;
+  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+}
+.create-table-button {
   padding: 0.75rem 1.5rem;
-  border-radius: 12px;
-  font-weight: 600;
-  font-size: 1rem;
+  color: white;
+  border: none;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  white-space: nowrap;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(10px);
+  font-size: 1.25rem;
+  font-weight: 700;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.return-button:hover {
-  background: linear-gradient(135deg, #1a1f2e 0%, #0f1419 100%);
-  color: #ffd700;
-  border-color: #ffd700;
-  transform: translateY(-3px);
-  box-shadow: 0 6px 20px rgba(255, 215, 0, 0.3);
+.refresh-button {
+  background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+  box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
 }
 
-.return-button:active {
-  transform: translateY(-1px);
-  box-shadow: 0 3px 10px rgba(255, 215, 0, 0.2);
+.refresh-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(108, 117, 125, 0.4);
+}
+
+.refresh-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .create-table-button {
   background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
-  color: white;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  padding: 0.75rem 1.5rem;
-  border-radius: 12px;
-  font-weight: 600;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  white-space: nowrap;
   box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
-  backdrop-filter: blur(10px);
 }
 
 .create-table-button:hover {
-  background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
-  transform: translateY(-3px);
+  transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(76, 175, 80, 0.5);
-  border-color: rgba(255, 255, 255, 0.3);
 }
 
-.create-table-button:active {
-  transform: translateY(-1px);
-  box-shadow: 0 3px 10px rgba(76, 175, 80, 0.4);
+.home-button {
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+  color: #0a0e17;
+  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+}
+
+.home-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 215, 0, 0.5);
+}
+
+.refresh-button svg,
+.home-button svg,
+.create-table-button svg {
+  width: 16px;
+  height: 16px;
 }
 
 .tables-controls {

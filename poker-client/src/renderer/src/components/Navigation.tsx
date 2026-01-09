@@ -77,7 +77,7 @@ const Navigation: React.FC = () => {
           </div>
           <div className="nav-user">
             <span className="user-info">
-              💰 ${user.chips} | {user.username}
+              ${user.chips} | {user.username}
             </span>
             <button
               onClick={handleButtonClick}
