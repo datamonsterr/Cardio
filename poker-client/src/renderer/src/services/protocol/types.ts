@@ -67,11 +67,13 @@ export interface GenericResponse {
   msg?: string;
 }
 
-// Action request
+// Action request (matches server decode_action_request format)
 export interface ActionRequest {
   game_id: number;
-  action_type: string;  // "fold", "check", "call", "bet", "raise"
-  amount?: number;      // for bet/raise
+  action: {
+    type: string;       // "fold", "check", "call", "bet", "raise", "all_in"
+    amount?: number;    // for bet/raise
+  };
   client_seq: number;
 }
 
@@ -82,24 +84,43 @@ export interface ActionResult {
   reason?: string;
 }
 
-// Player state in game
+// Player state in game (matches server protocol_game.c)
 export interface PlayerState {
-  user_id: number;
-  username: string;
+  player_id: number;
+  name: string;
   seat: number;
-  chips: number;
-  bet: number;
-  state: string;        // "active", "folded", "all_in", "empty"
-  cards: number[];      // [-1, -1] for hidden, or actual card values
+  state: string;        // "empty", "waiting", "active", "folded", "all_in", "sitting_out"
+  money: number;        // Stack size
+  bet: number;          // Current bet this round
+  total_bet: number;    // Total bet this hand
+  cards: number[];      // [-1, -1] for hidden, or actual card values (encoded integers)
+  is_dealer: boolean;
+  is_small_blind: boolean;
+  is_big_blind: boolean;
+  timer_deadline?: number;  // Epoch_ms when action expires
 }
 
-// Pot information
+// Pot information (matches server protocol)
 export interface Pot {
   amount: number;
-  eligible_seats: number[];
+  eligible_players: number[];  // Array of player_ids
 }
 
-// Game state
+// Side pot information
+export interface SidePot {
+  amount: number;
+  eligible_players: number[];
+}
+
+// Available action (for active player)
+export interface AvailableAction {
+  type: string;         // "fold", "check", "call", "bet", "raise", "all_in"
+  min_amount: number;
+  max_amount: number;
+  increment: number;
+}
+
+// Game state (matches server encode_game_state format)
 export interface GameState {
   game_id: number;
   hand_id: number;
@@ -112,12 +133,13 @@ export interface GameState {
   betting_round: string;  // "preflop", "flop", "turn", "river", "showdown", "complete"
   dealer_seat: number;
   active_seat: number;
-  players: PlayerState[];
-  community_cards: number[];
-  main_pot: Pot;
-  side_pots: Pot[];
+  players: (PlayerState | null)[];  // Array of MAX_PLAYERS (9), null for empty seats
+  community_cards: number[];        // Array of encoded card integers (0-5 cards)
+  main_pot: number;                 // Main pot amount
+  side_pots: SidePot[];             // Array of side pots
   current_bet: number;
   min_raise: number;
+  available_actions?: AvailableAction[];  // Only present for active player
 }
 
 // Table info (matches server response format)

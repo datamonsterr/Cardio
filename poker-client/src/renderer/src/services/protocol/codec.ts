@@ -14,7 +14,11 @@ import {
   SignupResponse,
   GenericResponse,
   TableListResponse,
-  CreateTableRequest
+  CreateTableRequest,
+  GameState,
+  ActionRequest,
+  ActionResult,
+  JoinTableRequest
 } from './types';
 import { HEADER_SIZE } from './constants';
 
@@ -211,4 +215,47 @@ export function encodeGetTablesRequest(): Uint8Array {
  */
 export function encodeCreateTableRequest(req: CreateTableRequest): Uint8Array {
   return new Uint8Array(msgpackEncode(req));
+}
+
+/**
+ * Encode join table request payload
+ * Matches decode_join_table_request() format in server/src/protocol.c
+ * Server expects: { "tableId": int }
+ */
+export function encodeJoinTableRequest(req: JoinTableRequest): Uint8Array {
+  const payload = { tableId: req.table_id };
+  return new Uint8Array(msgpackEncode(payload));
+}
+
+/**
+ * Decode game state from server
+ * Matches encode_game_state() format in server/src/protocol_game.c
+ */
+export function decodeGameState(data: Uint8Array): GameState {
+  return msgpackDecode(data) as GameState;
+}
+
+/**
+ * Encode action request payload
+ * Matches decode_action_request() format in server/src/protocol_game.c
+ * Server expects: { "game_id": int, "action": { "type": string, "amount": int }, "client_seq": uint32 }
+ */
+export function encodeActionRequest(req: ActionRequest): Uint8Array {
+  const payload = {
+    game_id: req.game_id,
+    action: {
+      type: req.action.type,
+      ...(req.action.amount !== undefined && { amount: req.action.amount })
+    },
+    client_seq: req.client_seq
+  };
+  return new Uint8Array(msgpackEncode(payload));
+}
+
+/**
+ * Decode action result response
+ * Matches encode_action_result() format in server/src/protocol_game.c
+ */
+export function decodeActionResult(data: Uint8Array): ActionResult {
+  return msgpackDecode(data) as ActionResult;
 }

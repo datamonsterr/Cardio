@@ -212,6 +212,59 @@
   padding: 1.5rem;
 }
 
+.table-info {
+  padding: 1.5rem;
+  background: rgba(42, 52, 71, 0.3);
+  border-top: 1px solid #2a3447;
+  border-bottom: 1px solid #2a3447;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid rgba(42, 52, 71, 0.5);
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-row .label {
+  color: #b8c5d6;
+  font-size: 0.9rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.info-row .value {
+  color: #ffd700;
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: right;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.player-count {
+  color: #4caf50;
+  font-weight: 700;
+}
+
+.player-separator {
+  color: #6b7589;
+  margin: 0 0.25rem;
+}
+
+.player-max {
+  color: #b8c5d6;
+  font-weight: 500;
+}
+
 .table-info-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

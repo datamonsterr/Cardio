@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import type { Table, CreateTableRequestType } from '../types';
 import type { TableListResponse } from '../services/protocol';
 
@@ -127,10 +127,36 @@ const TablesPage: React.FC = () => {
     try {
       setCreating(true);
       setError(null);
+      const tableName = createForm.name;
       await createTable(createForm);
       setShowCreateModal(false);
+      const savedForm = { ...createForm };
       setCreateForm({ name: '', max_player: 6, min_bet: 10 });
+      
+      // Refresh tables to get the new table ID
       await fetchTables();
+      
+      // Wait a bit for server to update table list
+      await new Promise(resolve => setTimeout(resolve, 300));
+      await fetchTables();
+      
+      // Find the newly created table (by name) and navigate to game page
+      const newTable = tables.find(t => t.name === tableName);
+      
+      if (newTable) {
+        navigate(`/game?tableId=${newTable.id}`);
+      } else {
+        // If we can't find the table immediately, try fetching one more time
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await fetchTables();
+        const retryTable = tables.find(t => t.name === tableName);
+        if (retryTable) {
+          navigate(`/game?tableId=${retryTable.id}`);
+        } else {
+          // Table created but couldn't find it - user can manually join
+          console.warn('Table created but not found in list, user should manually join');
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create table');
     } finally {
@@ -251,26 +277,37 @@ const TablesPage: React.FC = () => {
 
               <div className="table-info">
                 <div className="info-row">
-                  <span className="label">Min Bet:</span>
-                  <span className="value">${table.minBet}</span>
+                  <span className="label">Min Bet (Big Blind):</span>
+                  <span className="value">${table.minBet.toLocaleString()}</span>
+                </div>
+                <div className="info-row">
+                  <span className="label">Small Blind:</span>
+                  <span className="value">${Math.floor(table.minBet / 2).toLocaleString()}</span>
                 </div>
                 <div className="info-row">
                   <span className="label">Players:</span>
                   <span className="value">
-                    {table.currentPlayers}/{table.maxPlayers}
+                    <span className="player-count">{table.currentPlayers}</span>
+                    <span className="player-separator">/</span>
+                    <span className="player-max">{table.maxPlayers}</span>
+                  </span>
+                </div>
+                <div className="info-row">
+                  <span className="label">Available Seats:</span>
+                  <span className="value">
+                    {table.maxPlayers - table.currentPlayers} seats left
                   </span>
                 </div>
               </div>
 
               <div className="table-actions">
                 {joinable ? (
-                  <Link 
-                    to={`/game?tableId=${table.id}`} 
+                  <button
+                    onClick={() => navigate(`/game?tableId=${table.id}`)}
                     className="join-btn"
-                    state={{ tableId: table.id }}
                   >
                     Join Table
-                  </Link>
+                  </button>
                 ) : (
                   <button className="join-btn disabled" disabled>
                     {table.status === 'full' ? 'Table Full' : 'Insufficient Chips'}

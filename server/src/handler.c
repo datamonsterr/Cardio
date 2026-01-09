@@ -286,11 +286,62 @@ void handle_join_table_request(conn_data_t* conn_data, char* data, size_t data_l
         is_valid = 0;
     }
 
+    int table_id = decode_join_table_request(packet->data);
+    
+    // If user is already at a table, check if it's the same table
     if (conn_data->table_id != 0)
     {
-        snprintf(log_msg, sizeof(log_msg), "User already at table (table_id=%d)", conn_data->table_id);
-        logger_ex(MAIN_LOG, "ERROR", __func__, log_msg, 1);
-        is_valid = 0;
+        if (conn_data->table_id == table_id)
+        {
+            // User is already at this table - send game state instead of rejecting
+            snprintf(log_msg, sizeof(log_msg), "User already at table (table_id=%d), sending game state", conn_data->table_id);
+            logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+            
+            int table_index = find_table_by_id(table_list, table_id);
+            if (table_index >= 0)
+            {
+                Table* table = &table_list->tables[table_index];
+                RawBytes* game_state_data = encode_game_state(table->game_state, conn_data->user_id);
+                
+                if (game_state_data) {
+                    RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_JOIN_TABLE, game_state_data->data, game_state_data->len);
+                    if (sendall(conn_data->fd, response->data, (int*) &(response->len)) == -1)
+                    {
+                        logger_ex(MAIN_LOG, "ERROR", __func__, "Cannot send game state", 1);
+                    }
+                    free(response);
+                    free(game_state_data);
+                } else {
+                    RawBytes* raw_bytes = encode_response(R_JOIN_TABLE_OK);
+                    RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_JOIN_TABLE, raw_bytes->data, raw_bytes->len);
+                    if (sendall(conn_data->fd, response->data, (int*) &(response->len)) == -1)
+                    {
+                        logger_ex(MAIN_LOG, "ERROR", __func__, "Cannot send response", 1);
+                    }
+                    free(response);
+                    free(raw_bytes);
+                }
+            } else {
+                RawBytes* raw_bytes = encode_response(R_JOIN_TABLE_NOT_OK);
+                RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_JOIN_TABLE, raw_bytes->data, raw_bytes->len);
+                if (sendall(conn_data->fd, response->data, (int*) &(response->len)) == -1)
+                {
+                    logger_ex(MAIN_LOG, "ERROR", __func__, "Cannot send response", 1);
+                }
+                free(response);
+                free(raw_bytes);
+            }
+            
+            free_packet(packet);
+            return;
+        }
+        else
+        {
+            // User is at a different table - reject
+            snprintf(log_msg, sizeof(log_msg), "User already at different table (table_id=%d, requested=%d)", conn_data->table_id, table_id);
+            logger_ex(MAIN_LOG, "ERROR", __func__, log_msg, 1);
+            is_valid = 0;
+        }
     }
 
     if (is_valid == 0)
@@ -306,8 +357,6 @@ void handle_join_table_request(conn_data_t* conn_data, char* data, size_t data_l
         free_packet(packet);
         return;
     }
-
-    int table_id = decode_join_table_request(packet->data);
     snprintf(log_msg, sizeof(log_msg), "User '%s' attempting to join table_id=%d", 
              conn_data->username, table_id);
     logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);

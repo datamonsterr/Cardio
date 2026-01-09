@@ -1,0 +1,18 @@
+check branch này và kiểm tra xem tôi đã làm gì và cần làm gì Server:
+Invite friend:
+Add friend
+Save scoreboard (có thể phải sửa view scoreboard)
+cái này cứ database function trong lib/db -> encode/decode trong protocol.c follow PROTOCOL.md -> handler trong handler.c -> main
+
+Client:
+Đã xong login checked ok
+Signup đã có, table đã có, nhớ test lại kỹ
+Chưa xong gồm
+Create table, join table, leave table (check log server.log nếu lỗi cho vào AI)
+Gameplay chính (ưu tiên làm trước, check lib pokergame và e2e multiplayer test, docs)
+Invite/add/remove friend
+View scoreboard, save scoreboard sau mỗi lần leave table (lưu lại các hand vào database sau mỗi hand đấu, nhớ là mỗi hand có nhiều player thì vẫn lưu nhiều record có cột user id để query group by cho dễ )
+
+Ngoài ra có thể test nhanh bằng ./server/build/client.c hoặc viết thêm e2e test
+
+Khi code client nhớ mention các file document kiểu PROTOCOL.md và file handler.c protocol.h protocol.c để nó dùng đúng packet type và dùng messagePack, gửi đúng

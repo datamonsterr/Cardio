@@ -26,6 +26,9 @@ const heartbeatService = new HeartbeatService({
   }
 });
 
+// Game packet listeners
+const gamePacketListeners: Set<(packet: Packet) => void> = new Set();
+
 // Create auth service instance
 const serverConfig = getServerConfig();
 const authService = new AuthService({
@@ -41,6 +44,16 @@ const authService = new AuthService({
       heartbeatService.onPongReceived();
       return;
     }
+    
+    // Forward game packets to listeners
+    const packetType = packet.header.packet_type;
+    if (packetType === PACKET_TYPE.JOIN_TABLE_RESPONSE ||
+        packetType === PACKET_TYPE.UPDATE_GAMESTATE ||
+        packetType === PACKET_TYPE.ACTION_RESULT ||
+        packetType === PACKET_TYPE.LEAVE_TABLE_RESPONSE) {
+      gamePacketListeners.forEach(listener => listener(packet));
+    }
+    
     console.log('Received packet:', packet.header.packet_type);
   },
   onConnectionStatusChange: (status: ConnectionStatus, message?: string) => {
@@ -70,6 +83,19 @@ export const subscribeToConnectionStatus = (
   // Immediately call with current status
   listener(globalConnectionStatus, globalConnectionMessage);
   return () => connectionStatusListeners.delete(listener);
+};
+
+// Export authService for game pages to access TcpClient
+export const getAuthService = (): AuthService => {
+  return authService;
+};
+
+// Subscribe to game packets
+export const subscribeToGamePackets = (
+  listener: (packet: Packet) => void
+): (() => void) => {
+  gamePacketListeners.add(listener);
+  return () => gamePacketListeners.delete(listener);
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
