@@ -138,7 +138,7 @@ FriendList* dbGetFriendList(PGconn* conn, int user_id)
     for (int i = 0; i < numRow; i++)
     {
         friendlist->friends[i].user_id = atoi(PQgetvalue(res, i, 0));
-        strncpy(friendlist->friends[i].user_name, PQgetvalue(res, 0, 1), sizeof(friendlist->friends[i].user_name));
+        strncpy(friendlist->friends[i].user_name, PQgetvalue(res, i, 1), sizeof(friendlist->friends[i].user_name));
     }
 
     PQclear(res);
