@@ -3,6 +3,7 @@ import type { User, AuthContextType } from '../types';
 import { AuthService, ConnectionStatus } from '../services/auth/AuthService';
 import { HeartbeatService } from '../services/network/HeartbeatService';
 import { Packet, SignupRequest, PACKET_TYPE } from '../services/protocol';
+import { getServerConfig } from '../config/server';
 
 // Global connection status state
 let globalConnectionStatus: ConnectionStatus = 'disconnected';
@@ -26,9 +27,10 @@ const heartbeatService = new HeartbeatService({
 });
 
 // Create auth service instance
+const serverConfig = getServerConfig();
 const authService = new AuthService({
-  host: 'localhost',
-  port: 8080,
+  host: serverConfig.host,
+  port: serverConfig.port,
   onDisconnect: () => {
     console.log('Disconnected from server');
     heartbeatService.stop();

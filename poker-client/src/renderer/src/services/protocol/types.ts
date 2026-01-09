@@ -153,3 +153,19 @@ export interface JoinTableRequest {
 export interface LeaveTableRequest {
   table_id: number;
 }
+
+// ===== Lobby / Tables =====
+
+// Matches server/src/protocol.c encode_full_tables_response()
+export interface ServerTableSummary {
+  id: number;
+  tableName: string;
+  maxPlayer: number;
+  minBet: number;
+  currentPlayer: number;
+}
+
+export interface FullTablesResponse {
+  size: number;
+  tables: ServerTableSummary[];
+}

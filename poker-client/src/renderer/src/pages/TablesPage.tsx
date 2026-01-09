@@ -1,17 +1,72 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
-import { mockTables } from '../data/mockTables';
 import type { Table } from '../types';
+import { TablesService } from '../services/tables/TablesService';
+
+const tablesService = new TablesService();
 
 const TablesPage: React.FC = () => {
   const { user } = useAuth();
   const [filter, setFilter] = useState<'all' | 'available' | 'full' | 'affordable'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [tables, setTables] = useState<Table[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   if (!user) return null;
 
-  const filteredTables = mockTables.filter((table: Table) => {
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadTables = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const res = await tablesService.getTables();
+
+        const mapped: Table[] = (res.tables || []).map((t) => {
+          const status: Table['status'] =
+            t.currentPlayer >= t.maxPlayer
+              ? 'full'
+              : t.currentPlayer === 0
+                ? 'waiting'
+                : 'active';
+
+          return {
+            id: String(t.id),
+            name: t.tableName,
+            minBet: t.minBet,
+            maxPlayers: t.maxPlayer,
+            currentPlayers: t.currentPlayer,
+            status,
+            players: []
+          };
+        });
+
+        if (isMounted) {
+          setTables(mapped);
+        }
+      } catch (e) {
+        if (isMounted) {
+          setError(e instanceof Error ? e.message : String(e));
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadTables();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const filteredTables = useMemo(() => tables.filter((table: Table) => {
     const matchesSearch = table.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter =
       filter === 'all' ||
@@ -20,7 +75,7 @@ const TablesPage: React.FC = () => {
       (filter === 'affordable' && table.minBet <= user.chips);
 
     return matchesSearch && matchesFilter;
-  });
+  }), [tables, searchTerm, filter, user.chips]);
 
   const getStatusBadge = (
     status: Table['status']
@@ -43,6 +98,12 @@ const TablesPage: React.FC = () => {
         <h1>Poker Tables</h1>
         <p>Choose a table and start playing</p>
       </div>
+
+      {error && (
+        <div className="no-tables">
+          <p>Failed to load tables: {error}</p>
+        </div>
+      )}
 
       <div className="tables-controls">
         <div className="search-box">
@@ -85,7 +146,12 @@ const TablesPage: React.FC = () => {
       </div>
 
       <div className="tables-grid">
-        {filteredTables.map((table: Table) => {
+        {loading ? (
+          <div className="no-tables">
+            <p>Loading tables...</p>
+          </div>
+        ) : (
+        filteredTables.map((table: Table) => {
           const status = getStatusBadge(table.status);
           const joinable = canJoinTable(table);
 
@@ -126,10 +192,10 @@ const TablesPage: React.FC = () => {
               </div>
             </div>
           );
-        })}
+        }))}
       </div>
 
-      {filteredTables.length === 0 && (
+      {!loading && !error && filteredTables.length === 0 && (
         <div className="no-tables">
           <p>No tables found matching your criteria</p>
         </div>

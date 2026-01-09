@@ -12,7 +12,8 @@ import {
   LoginResponse,
   SignupRequest,
   SignupResponse,
-  GenericResponse
+  GenericResponse,
+  FullTablesResponse
 } from './types';
 import { HEADER_SIZE } from './constants';
 
@@ -139,6 +140,22 @@ export function decodeSignupResponse(data: Uint8Array): SignupResponse {
  */
 export function decodeGenericResponse(data: Uint8Array): GenericResponse {
   return msgpackDecode(data) as GenericResponse;
+}
+
+/**
+ * Decode full tables response payload (PACKET_TABLES = 500)
+ * Matches encode_full_tables_response() in server/src/protocol.c
+ */
+export function decodeFullTablesResponse(data: Uint8Array): FullTablesResponse {
+  return msgpackDecode(data) as FullTablesResponse;
+}
+
+/**
+ * Encode get-tables request payload.
+ * Server expects an empty payload for PACKET_TABLES.
+ */
+export function encodeGetTablesRequest(): Uint8Array {
+  return new Uint8Array(0);
 }
 
 /**
