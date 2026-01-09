@@ -16,10 +16,11 @@ export interface User {
   password?: string; // Optional since we remove it after auth
   email: string;
   chips: number;
-  level: number;
+  level?: number;
   gamesPlayed: number;
   wins: number;
-  avatarURL: string;
+  avatarURL?: string;
+  totalWinnings?: number;
 }
 
 // Player Types
@@ -92,10 +93,23 @@ export interface ShowDownMessage {
 // Auth Context Types
 export interface AuthContextType {
   user: User | null;
-  login: (username: string, password: string) => boolean;
+  login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   updateChips: (amount: number) => void;
   loading: boolean;
+  signup?: (request: SignupRequestType) => Promise<void>;
+}
+
+// Signup request type
+export interface SignupRequestType {
+  user: string;
+  pass: string;
+  email: string;
+  phone: string;
+  fullname: string;
+  country: string;
+  gender: string;
+  dob: string;
 }
 
 // Slider Types

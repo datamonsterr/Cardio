@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthProvider, useAuth, subscribeToConnectionStatus } from './contexts/AuthContext';
 import Navigation from './components/Navigation';
+import ConnectionStatus from './components/ConnectionStatus';
 import LoginPage from './pages/LoginPage';
+import SignupPage from './pages/SignupPage';
 import HomePage from './pages/HomePage';
 import TablesPage from './pages/TablesPage';
 import GamePage from './pages/GamePage';
+import type { ConnectionStatusType } from './components/ConnectionStatus';
 
 // Import CSS
 import './assets/app.css';
@@ -58,8 +61,29 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 function AppContent(): React.JSX.Element {
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatusType>('disconnected');
+  const [connectionMessage, setConnectionMessage] = useState<string>('');
+
+  useEffect(() => {
+    const unsubscribe = subscribeToConnectionStatus((status, message) => {
+      // Map internal status to component status
+      const statusMap: Record<string, ConnectionStatusType> = {
+        'disconnected': 'disconnected',
+        'connecting': 'connecting',
+        'handshaking': 'connecting',
+        'connected': 'connected',
+        'error': 'disconnected'
+      };
+      setConnectionStatus(statusMap[status] || 'disconnected');
+      setConnectionMessage(message);
+    });
+
+    return unsubscribe;
+  }, []);
+
   return (
     <div className="app-container">
+      <ConnectionStatus status={connectionStatus} message={connectionMessage} />
       <Navigation />
       <Routes>
         <Route
@@ -67,6 +91,14 @@ function AppContent(): React.JSX.Element {
           element={
             <PublicRoute>
               <LoginPage />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/signup"
+          element={
+            <PublicRoute>
+              <SignupPage />
             </PublicRoute>
           }
         />

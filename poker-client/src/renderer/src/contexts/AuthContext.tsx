@@ -1,6 +1,39 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { User, AuthContextType } from '../types';
-import { authenticateUser } from '../data/mockUsers';
+import { AuthService, ConnectionStatus } from '../services/auth/AuthService';
+import { Packet, SignupRequest } from '../services/protocol';
+
+// Global connection status state
+let globalConnectionStatus: ConnectionStatus = 'disconnected';
+let globalConnectionMessage: string = '';
+const connectionStatusListeners: Set<(status: ConnectionStatus, message: string) => void> = new Set();
+
+// Create auth service instance
+const authService = new AuthService({
+  host: 'localhost',
+  port: 8080,
+  onDisconnect: () => {
+    console.log('Disconnected from server');
+  },
+  onPacket: (packet: Packet) => {
+    console.log('Received packet:', packet.header.packet_type);
+  },
+  onConnectionStatusChange: (status: ConnectionStatus, message?: string) => {
+    console.log('Connection status:', status, message);
+    globalConnectionStatus = status;
+    globalConnectionMessage = message || '';
+    connectionStatusListeners.forEach(listener => listener(status, message || ''));
+  }
+});
+
+export const subscribeToConnectionStatus = (
+  listener: (status: ConnectionStatus, message: string) => void
+): (() => void) => {
+  connectionStatusListeners.add(listener);
+  // Immediately call with current status
+  listener(globalConnectionStatus, globalConnectionMessage);
+  return () => connectionStatusListeners.delete(listener);
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -24,24 +57,53 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
       }
     }
     setLoading(false);
+
+    // Connect to server immediately on app start
+    const connectToServer = async () => {
+      try {
+        await authService.connect();
+        console.log('Connected to server on app start');
+      } catch (error) {
+        console.error('Failed to connect to server on app start:', error);
+      }
+    };
+
+    connectToServer();
   }, []);
 
-  const login = (username: string, password: string): boolean => {
-    const authenticatedUser = authenticateUser(username, password);
+  const login = async (username: string, password: string): Promise<boolean> => {
+    try {
+      const authenticatedUser = await authService.login(username, password);
 
-    if (authenticatedUser) {
-      // Remove password before storing
-      const { password: _, ...userWithoutPassword } = authenticatedUser;
-      setUser(userWithoutPassword as User);
-      localStorage.setItem('pokerUser', JSON.stringify(userWithoutPassword));
+      // Convert AuthUser to our User type and store
+      const user: User = {
+        id: authenticatedUser.user_id.toString(),
+        username: authenticatedUser.username,
+        email: authenticatedUser.email,
+        chips: authenticatedUser.balance,
+        avatarURL: authenticatedUser.avatar_url,
+        gamesPlayed: 0,
+        wins: 0,
+        totalWinnings: 0
+      };
+
+      setUser(user);
+      localStorage.setItem('pokerUser', JSON.stringify(user));
       return true;
+    } catch (error) {
+      console.error('Login failed:', error);
+      return false;
     }
-    return false;
   };
 
   const logout = (): void => {
+    authService.logout();
     setUser(null);
     localStorage.removeItem('pokerUser');
+  };
+
+  const signup = async (request: SignupRequest): Promise<void> => {
+    await authService.signup(request);
   };
 
   const updateChips = (amount: number): void => {
@@ -54,7 +116,7 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, updateChips, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, updateChips, loading, signup }}>
       {children}
     </AuthContext.Provider>
   );

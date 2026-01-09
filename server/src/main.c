@@ -111,11 +111,46 @@ int main(void)
                     close_connection(epoll_fd, conn_data);
                     continue;
                 }
+
+                // Handle handshake first (4 bytes: length=2, protocol_version=2)
+                if (nbytes == 4 && conn_data->user_id == 0)
+                {
+                    uint16_t handshake_len = ntohs(*(uint16_t*)&buf[0]);
+                    uint16_t protocol_ver = ntohs(*(uint16_t*)&buf[2]);
+                    
+                    char log_msg[128];
+                    snprintf(log_msg, sizeof(log_msg), "Handshake from fd=%d: len=%d, ver=%d", 
+                             conn_data->fd, handshake_len, protocol_ver);
+                    logger(MAIN_LOG, "Info", log_msg);
+                    
+                    // Handshake response: [length:2, code:1]
+                    char response[3];
+                    uint16_t resp_len = htons(1);  // 1 byte follows
+                    memcpy(response, &resp_len, 2);
+                    
+                    if (protocol_ver == 0x0001 && handshake_len == 2)
+                    {
+                        response[2] = 0x00;  // HANDSHAKE_OK
+                        logger(MAIN_LOG, "Info", "Handshake OK");
+                    }
+                    else
+                    {
+                        response[2] = 0x01;  // PROTOCOL_NOT_SUPPORTED
+                        logger(MAIN_LOG, "Warn", "Handshake failed - unsupported protocol");
+                    }
+                    
+                    send(conn_data->fd, response, 3, 0);
+                    continue;
+                }
+                
                 Header* header = decode_header(buf);
 
                 if (header == NULL)
                 {
-                    logger(MAIN_LOG, "Error", "Cannot decode header");
+                    char log_msg[256];
+                    snprintf(log_msg, sizeof(log_msg), "Cannot decode header, received %d bytes", nbytes);
+                    logger(MAIN_LOG, "Error", log_msg);
+                    printf("Unknown request, received %d bytes\n", nbytes);
                     close_connection(epoll_fd, conn_data);
                     continue;
                 }

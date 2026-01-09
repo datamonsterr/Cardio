@@ -208,3 +208,21 @@
     font-size: 2rem;
   }
 }
+
+@media (max-width: 768px) {
+  .login-card {
+    max-width: 90%;
+    padding: 2.5rem;
+  }
+}
+
+@media (min-width: 1920px) {
+  .login-card {
+    max-width: 500px;
+    padding: 3.5rem;
+  }
+  
+  .login-header h1 {
+    font-size: 3rem;
+  }
+}
