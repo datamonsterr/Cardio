@@ -663,3 +663,397 @@ void handle_action_request(conn_data_t* conn_data, char* data, size_t data_len, 
     free(action_req);
     free_packet(packet);
 }
+// ===== Friend Management Handlers =====
+
+void handle_add_friend_request(conn_data_t* conn_data, char* data, size_t data_len)
+{
+    char log_msg[256];
+    snprintf(log_msg, sizeof(log_msg), "Add friend request from fd=%d user='%s'", 
+             conn_data->fd, conn_data->username);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    
+    if (conn_data->user_id == 0)
+    {
+        RawBytes* raw_bytes = encode_response(R_ADD_FRIEND_NOT_OK);
+        RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_ADD_FRIEND, raw_bytes->data, raw_bytes->len);
+        sendall(conn_data->fd, response->data, (int*) &(response->len));
+        free(response);
+        free(raw_bytes);
+        logger_ex(MAIN_LOG, "ERROR", __func__, "User not logged in", 1);
+        return;
+    }
+
+    Packet* packet = decode_packet(data, data_len);
+    if (!packet || packet->header->packet_type != PACKET_ADD_FRIEND)
+    {
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Invalid packet", 1);
+        if (packet) free_packet(packet);
+        return;
+    }
+
+    AddFriendRequest* request = decode_add_friend_request(packet->data);
+    if (!request)
+    {
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Failed to decode request", 1);
+        free_packet(packet);
+        return;
+    }
+
+    snprintf(log_msg, sizeof(log_msg), "User '%s' adding friend '%s'", 
+             conn_data->username, request->username);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+
+    PGconn* conn = PQconnectdb(dbconninfo);
+    int res = dbAddFriend(conn, conn_data->user_id, request->username);
+    PQfinish(conn);
+
+    RawBytes* raw_bytes;
+    if (res == DB_OK)
+    {
+        raw_bytes = encode_response(R_ADD_FRIEND_OK);
+        snprintf(log_msg, sizeof(log_msg), "Add friend SUCCESS: user='%s' added '%s'", 
+                 conn_data->username, request->username);
+        logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    }
+    else if (res == -1)
+    {
+        raw_bytes = encode_response_msg(R_ADD_FRIEND_NOT_OK, "User not found");
+        snprintf(log_msg, sizeof(log_msg), "Add friend FAILED: user '%s' not found", request->username);
+        logger_ex(MAIN_LOG, "WARN", __func__, log_msg, 1);
+    }
+    else if (res == -2)
+    {
+        raw_bytes = encode_response_msg(R_ADD_FRIEND_NOT_OK, "Cannot add yourself");
+        logger_ex(MAIN_LOG, "WARN", __func__, "User tried to add themselves", 1);
+    }
+    else if (res == -3)
+    {
+        raw_bytes = encode_response(R_ADD_FRIEND_ALREADY_EXISTS);
+        snprintf(log_msg, sizeof(log_msg), "Add friend FAILED: already friends with '%s'", 
+                 request->username);
+        logger_ex(MAIN_LOG, "WARN", __func__, log_msg, 1);
+    }
+    else
+    {
+        raw_bytes = encode_response(R_ADD_FRIEND_NOT_OK);
+        snprintf(log_msg, sizeof(log_msg), "Add friend FAILED: error=%d", res);
+        logger_ex(MAIN_LOG, "ERROR", __func__, log_msg, 1);
+    }
+
+    RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_ADD_FRIEND, raw_bytes->data, raw_bytes->len);
+    sendall(conn_data->fd, response->data, (int*) &(response->len));
+
+    free(response);
+    free(raw_bytes);
+    free(request);
+    free_packet(packet);
+}
+
+void handle_invite_friend_request(conn_data_t* conn_data, char* data, size_t data_len)
+{
+    char log_msg[256];
+    snprintf(log_msg, sizeof(log_msg), "Invite friend request from fd=%d user='%s'", 
+             conn_data->fd, conn_data->username);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    
+    if (conn_data->user_id == 0)
+    {
+        RawBytes* raw_bytes = encode_response(R_INVITE_FRIEND_NOT_OK);
+        RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_INVITE_FRIEND, raw_bytes->data, raw_bytes->len);
+        sendall(conn_data->fd, response->data, (int*) &(response->len));
+        free(response);
+        free(raw_bytes);
+        logger_ex(MAIN_LOG, "ERROR", __func__, "User not logged in", 1);
+        return;
+    }
+
+    Packet* packet = decode_packet(data, data_len);
+    if (!packet || packet->header->packet_type != PACKET_INVITE_FRIEND)
+    {
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Invalid packet", 1);
+        if (packet) free_packet(packet);
+        return;
+    }
+
+    InviteFriendRequest* request = decode_invite_friend_request(packet->data);
+    if (!request)
+    {
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Failed to decode request", 1);
+        free_packet(packet);
+        return;
+    }
+
+    snprintf(log_msg, sizeof(log_msg), "User '%s' inviting '%s'", 
+             conn_data->username, request->username);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+
+    PGconn* conn = PQconnectdb(dbconninfo);
+    int res = dbSendFriendInvite(conn, conn_data->user_id, request->username);
+    PQfinish(conn);
+
+    RawBytes* raw_bytes;
+    if (res == DB_OK)
+    {
+        raw_bytes = encode_response(R_INVITE_FRIEND_OK);
+        snprintf(log_msg, sizeof(log_msg), "Invite friend SUCCESS: user='%s' invited '%s'", 
+                 conn_data->username, request->username);
+        logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    }
+    else if (res == -1)
+    {
+        raw_bytes = encode_response_msg(R_INVITE_FRIEND_NOT_OK, "User not found");
+        snprintf(log_msg, sizeof(log_msg), "Invite friend FAILED: user '%s' not found", 
+                 request->username);
+        logger_ex(MAIN_LOG, "WARN", __func__, log_msg, 1);
+    }
+    else if (res == -2)
+    {
+        raw_bytes = encode_response_msg(R_INVITE_FRIEND_NOT_OK, "Cannot invite yourself");
+        logger_ex(MAIN_LOG, "WARN", __func__, "User tried to invite themselves", 1);
+    }
+    else if (res == -3)
+    {
+        raw_bytes = encode_response_msg(R_INVITE_FRIEND_NOT_OK, "Already friends");
+        snprintf(log_msg, sizeof(log_msg), "Invite friend FAILED: already friends with '%s'", 
+                 request->username);
+        logger_ex(MAIN_LOG, "WARN", __func__, log_msg, 1);
+    }
+    else if (res == -4)
+    {
+        raw_bytes = encode_response(R_INVITE_ALREADY_SENT);
+        snprintf(log_msg, sizeof(log_msg), "Invite friend FAILED: invite already sent to '%s'", 
+                 request->username);
+        logger_ex(MAIN_LOG, "WARN", __func__, log_msg, 1);
+    }
+    else
+    {
+        raw_bytes = encode_response(R_INVITE_FRIEND_NOT_OK);
+        snprintf(log_msg, sizeof(log_msg), "Invite friend FAILED: error=%d", res);
+        logger_ex(MAIN_LOG, "ERROR", __func__, log_msg, 1);
+    }
+
+    RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_INVITE_FRIEND, raw_bytes->data, raw_bytes->len);
+    sendall(conn_data->fd, response->data, (int*) &(response->len));
+
+    free(response);
+    free(raw_bytes);
+    free(request);
+    free_packet(packet);
+}
+
+void handle_accept_invite_request(conn_data_t* conn_data, char* data, size_t data_len)
+{
+    char log_msg[256];
+    snprintf(log_msg, sizeof(log_msg), "Accept invite request from fd=%d user='%s'", 
+             conn_data->fd, conn_data->username);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    
+    if (conn_data->user_id == 0)
+    {
+        RawBytes* raw_bytes = encode_response(R_ACCEPT_INVITE_NOT_OK);
+        RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_ACCEPT_INVITE, raw_bytes->data, raw_bytes->len);
+        sendall(conn_data->fd, response->data, (int*) &(response->len));
+        free(response);
+        free(raw_bytes);
+        logger_ex(MAIN_LOG, "ERROR", __func__, "User not logged in", 1);
+        return;
+    }
+
+    Packet* packet = decode_packet(data, data_len);
+    if (!packet || packet->header->packet_type != PACKET_ACCEPT_INVITE)
+    {
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Invalid packet", 1);
+        if (packet) free_packet(packet);
+        return;
+    }
+
+    InviteActionRequest* request = decode_invite_action_request(packet->data);
+    if (!request)
+    {
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Failed to decode request", 1);
+        free_packet(packet);
+        return;
+    }
+
+    snprintf(log_msg, sizeof(log_msg), "User '%s' accepting invite_id=%d", 
+             conn_data->username, request->invite_id);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+
+    PGconn* conn = PQconnectdb(dbconninfo);
+    int res = dbAcceptFriendInvite(conn, conn_data->user_id, request->invite_id);
+    PQfinish(conn);
+
+    RawBytes* raw_bytes;
+    if (res == DB_OK)
+    {
+        raw_bytes = encode_response(R_ACCEPT_INVITE_OK);
+        snprintf(log_msg, sizeof(log_msg), "Accept invite SUCCESS: user='%s' invite_id=%d", 
+                 conn_data->username, request->invite_id);
+        logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    }
+    else if (res == -1)
+    {
+        raw_bytes = encode_response_msg(R_ACCEPT_INVITE_NOT_OK, "Invite not found");
+        snprintf(log_msg, sizeof(log_msg), "Accept invite FAILED: invite_id=%d not found", 
+                 request->invite_id);
+        logger_ex(MAIN_LOG, "WARN", __func__, log_msg, 1);
+    }
+    else if (res == -2)
+    {
+        raw_bytes = encode_response_msg(R_ACCEPT_INVITE_NOT_OK, "Invite already processed");
+        snprintf(log_msg, sizeof(log_msg), "Accept invite FAILED: invite_id=%d already processed", 
+                 request->invite_id);
+        logger_ex(MAIN_LOG, "WARN", __func__, log_msg, 1);
+    }
+    else
+    {
+        raw_bytes = encode_response(R_ACCEPT_INVITE_NOT_OK);
+        snprintf(log_msg, sizeof(log_msg), "Accept invite FAILED: error=%d", res);
+        logger_ex(MAIN_LOG, "ERROR", __func__, log_msg, 1);
+    }
+
+    RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_ACCEPT_INVITE, raw_bytes->data, raw_bytes->len);
+    sendall(conn_data->fd, response->data, (int*) &(response->len));
+
+    free(response);
+    free(raw_bytes);
+    free(request);
+    free_packet(packet);
+}
+
+void handle_reject_invite_request(conn_data_t* conn_data, char* data, size_t data_len)
+{
+    char log_msg[256];
+    snprintf(log_msg, sizeof(log_msg), "Reject invite request from fd=%d user='%s'", 
+             conn_data->fd, conn_data->username);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    
+    if (conn_data->user_id == 0)
+    {
+        RawBytes* raw_bytes = encode_response(R_REJECT_INVITE_NOT_OK);
+        RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_REJECT_INVITE, raw_bytes->data, raw_bytes->len);
+        sendall(conn_data->fd, response->data, (int*) &(response->len));
+        free(response);
+        free(raw_bytes);
+        logger_ex(MAIN_LOG, "ERROR", __func__, "User not logged in", 1);
+        return;
+    }
+
+    Packet* packet = decode_packet(data, data_len);
+    if (!packet || packet->header->packet_type != PACKET_REJECT_INVITE)
+    {
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Invalid packet", 1);
+        if (packet) free_packet(packet);
+        return;
+    }
+
+    InviteActionRequest* request = decode_invite_action_request(packet->data);
+    if (!request)
+    {
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Failed to decode request", 1);
+        free_packet(packet);
+        return;
+    }
+
+    snprintf(log_msg, sizeof(log_msg), "User '%s' rejecting invite_id=%d", 
+             conn_data->username, request->invite_id);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+
+    PGconn* conn = PQconnectdb(dbconninfo);
+    int res = dbRejectFriendInvite(conn, conn_data->user_id, request->invite_id);
+    PQfinish(conn);
+
+    RawBytes* raw_bytes;
+    if (res == DB_OK)
+    {
+        raw_bytes = encode_response(R_REJECT_INVITE_OK);
+        snprintf(log_msg, sizeof(log_msg), "Reject invite SUCCESS: user='%s' invite_id=%d", 
+                 conn_data->username, request->invite_id);
+        logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    }
+    else if (res == -1)
+    {
+        raw_bytes = encode_response_msg(R_REJECT_INVITE_NOT_OK, "Invite not found");
+        snprintf(log_msg, sizeof(log_msg), "Reject invite FAILED: invite_id=%d not found", 
+                 request->invite_id);
+        logger_ex(MAIN_LOG, "WARN", __func__, log_msg, 1);
+    }
+    else if (res == -2)
+    {
+        raw_bytes = encode_response_msg(R_REJECT_INVITE_NOT_OK, "Invite already processed");
+        snprintf(log_msg, sizeof(log_msg), "Reject invite FAILED: invite_id=%d already processed", 
+                 request->invite_id);
+        logger_ex(MAIN_LOG, "WARN", __func__, log_msg, 1);
+    }
+    else
+    {
+        raw_bytes = encode_response(R_REJECT_INVITE_NOT_OK);
+        snprintf(log_msg, sizeof(log_msg), "Reject invite FAILED: error=%d", res);
+        logger_ex(MAIN_LOG, "ERROR", __func__, log_msg, 1);
+    }
+
+    RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_REJECT_INVITE, raw_bytes->data, raw_bytes->len);
+    sendall(conn_data->fd, response->data, (int*) &(response->len));
+
+    free(response);
+    free(raw_bytes);
+    free(request);
+    free_packet(packet);
+}
+
+void handle_get_invites_request(conn_data_t* conn_data, char* data, size_t data_len)
+{
+    char log_msg[256];
+    snprintf(log_msg, sizeof(log_msg), "Get invites request from fd=%d user='%s'", 
+             conn_data->fd, conn_data->username);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    
+    if (conn_data->user_id == 0)
+    {
+        RawBytes* raw_bytes = encode_response(R_GET_INVITES_NOT_OK);
+        RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_GET_INVITES, raw_bytes->data, raw_bytes->len);
+        sendall(conn_data->fd, response->data, (int*) &(response->len));
+        free(response);
+        free(raw_bytes);
+        logger_ex(MAIN_LOG, "ERROR", __func__, "User not logged in", 1);
+        return;
+    }
+
+    Packet* packet = decode_packet(data, data_len);
+    if (!packet || packet->header->packet_type != PACKET_GET_INVITES)
+    {
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Invalid packet", 1);
+        if (packet) free_packet(packet);
+        return;
+    }
+
+    PGconn* conn = PQconnectdb(dbconninfo);
+    dbInviteList* invites = dbGetPendingInvites(conn, conn_data->user_id);
+    PQfinish(conn);
+
+    if (!invites)
+    {
+        RawBytes* raw_bytes = encode_response(R_GET_INVITES_NOT_OK);
+        RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_GET_INVITES, raw_bytes->data, raw_bytes->len);
+        sendall(conn_data->fd, response->data, (int*) &(response->len));
+        free(response);
+        free(raw_bytes);
+        free_packet(packet);
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Failed to get invites from database", 1);
+        return;
+    }
+
+    snprintf(log_msg, sizeof(log_msg), "Get invites SUCCESS: user='%s' has %d pending invites", 
+             conn_data->username, invites->num);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+
+    RawBytes* raw_bytes = encode_invites_response(invites);
+    RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_GET_INVITES, raw_bytes->data, raw_bytes->len);
+    sendall(conn_data->fd, response->data, (int*) &(response->len));
+
+    free(response);
+    free(raw_bytes);
+    free(invites->invites);
+    free(invites);
+    free_packet(packet);
+}

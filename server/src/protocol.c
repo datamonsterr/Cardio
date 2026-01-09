@@ -477,3 +477,108 @@ RawBytes* encode_login_success_response(dbUser* user)
 
     return raw_bytes;
 }
+// ===== Friend Management Protocol Functions =====
+
+AddFriendRequest* decode_add_friend_request(char* payload)
+{
+    mpack_reader_t reader;
+    mpack_reader_init_data(&reader, payload, 1024);
+
+    mpack_expect_map_max(&reader, 1);
+    mpack_expect_cstr_match(&reader, "username");
+    const char* username = mpack_expect_cstr_alloc(&reader, 32);
+
+    if (mpack_reader_destroy(&reader) != mpack_ok)
+    {
+        fprintf(stderr, "decode_add_friend_request: An error occurred decoding the message\n");
+        return NULL;
+    }
+
+    AddFriendRequest* request = malloc(sizeof(AddFriendRequest));
+    strncpy(request->username, username, 32);
+    request->username[31] = '\0';
+
+    return request;
+}
+
+InviteFriendRequest* decode_invite_friend_request(char* payload)
+{
+    mpack_reader_t reader;
+    mpack_reader_init_data(&reader, payload, 1024);
+
+    mpack_expect_map_max(&reader, 1);
+    mpack_expect_cstr_match(&reader, "username");
+    const char* username = mpack_expect_cstr_alloc(&reader, 32);
+
+    if (mpack_reader_destroy(&reader) != mpack_ok)
+    {
+        fprintf(stderr, "decode_invite_friend_request: An error occurred decoding the message\n");
+        return NULL;
+    }
+
+    InviteFriendRequest* request = malloc(sizeof(InviteFriendRequest));
+    strncpy(request->username, username, 32);
+    request->username[31] = '\0';
+
+    return request;
+}
+
+InviteActionRequest* decode_invite_action_request(char* payload)
+{
+    mpack_reader_t reader;
+    mpack_reader_init_data(&reader, payload, 1024);
+
+    mpack_expect_map_max(&reader, 1);
+    mpack_expect_cstr_match(&reader, "invite_id");
+    int invite_id = mpack_expect_i32(&reader);
+
+    if (mpack_reader_destroy(&reader) != mpack_ok)
+    {
+        fprintf(stderr, "decode_invite_action_request: An error occurred decoding the message\n");
+        return NULL;
+    }
+
+    InviteActionRequest* request = malloc(sizeof(InviteActionRequest));
+    request->invite_id = invite_id;
+
+    return request;
+}
+
+RawBytes* encode_invites_response(dbInviteList* invites)
+{
+    mpack_writer_t writer;
+    char buffer[MAXLINE];
+    mpack_writer_init(&writer, buffer, MAXLINE);
+    
+    mpack_start_array(&writer, invites->num);
+    for (int i = 0; i < invites->num; i++)
+    {
+        mpack_start_map(&writer, 5);
+        mpack_write_cstr(&writer, "invite_id");
+        mpack_write_i32(&writer, invites->invites[i].invite_id);
+        mpack_write_cstr(&writer, "from_user_id");
+        mpack_write_i32(&writer, invites->invites[i].from_user_id);
+        mpack_write_cstr(&writer, "from_username");
+        mpack_write_cstr(&writer, invites->invites[i].from_username);
+        mpack_write_cstr(&writer, "status");
+        mpack_write_cstr(&writer, invites->invites[i].status);
+        mpack_write_cstr(&writer, "created_at");
+        mpack_write_cstr(&writer, invites->invites[i].created_at);
+        mpack_finish_map(&writer);
+    }
+    mpack_finish_array(&writer);
+
+    char* data = writer.buffer;
+    if (mpack_writer_destroy(&writer) != mpack_ok)
+    {
+        fprintf(stderr, "MPack encoding error: %s\n", mpack_error_to_string(mpack_writer_destroy(&writer)));
+        return NULL;
+    }
+
+    RawBytes* raw_bytes = malloc(sizeof(RawBytes));
+    raw_bytes->len = mpack_writer_buffer_used(&writer);
+    raw_bytes->data = malloc(raw_bytes->len);
+    memcpy(raw_bytes->data, data, raw_bytes->len);
+
+    return raw_bytes;
+}

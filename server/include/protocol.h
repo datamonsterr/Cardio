@@ -44,6 +44,28 @@
 #define R_FRIENDLIST_OK 901
 #define R_FRIENDLIST_NOT_OK 902
 
+#define PACKET_ADD_FRIEND 910
+#define R_ADD_FRIEND_OK 911
+#define R_ADD_FRIEND_NOT_OK 912
+#define R_ADD_FRIEND_ALREADY_EXISTS 913
+
+#define PACKET_INVITE_FRIEND 920
+#define R_INVITE_FRIEND_OK 921
+#define R_INVITE_FRIEND_NOT_OK 922
+#define R_INVITE_ALREADY_SENT 923
+
+#define PACKET_ACCEPT_INVITE 930
+#define R_ACCEPT_INVITE_OK 931
+#define R_ACCEPT_INVITE_NOT_OK 932
+
+#define PACKET_REJECT_INVITE 940
+#define R_REJECT_INVITE_OK 941
+#define R_REJECT_INVITE_NOT_OK 942
+
+#define PACKET_GET_INVITES 950
+#define R_GET_INVITES_OK 951
+#define R_GET_INVITES_NOT_OK 952
+
 // Game action packets (following protocol spec)
 #define PACKET_ACTION_REQUEST 450
 #define PACKET_ACTION_RESULT 451
@@ -137,6 +159,31 @@ RawBytes* encode_friendlist_response(FriendList* friendlist);
 
 // Encode login success response
 RawBytes* encode_login_success_response(dbUser* user);
+
+// ===== Friend Management =====
+
+// Add friend request
+typedef struct {
+    char username[32];  // Username to add as friend
+} AddFriendRequest;
+
+// Invite friend request
+typedef struct {
+    char username[32];  // Username to invite
+} InviteFriendRequest;
+
+// Accept/Reject invite request
+typedef struct {
+    int invite_id;      // ID of the invite to accept/reject
+} InviteActionRequest;
+
+// Decode friend management requests
+AddFriendRequest* decode_add_friend_request(char* payload);
+InviteFriendRequest* decode_invite_friend_request(char* payload);
+InviteActionRequest* decode_invite_action_request(char* payload);
+
+// Encode friend invite list response
+RawBytes* encode_invites_response(dbInviteList* invites);
 
 // ===== Game Action Packets =====
 
