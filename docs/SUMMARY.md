@@ -11,9 +11,9 @@ This document summarizes the complete implementation of modular poker game logic
 A production-ready, modular poker game engine implementing complete Texas Hold'em rules.
 
 **New Files:**
-- `backend/lib/pokergame/include/game_engine.h` (5.6 KB)
-- `backend/lib/pokergame/src/game_engine.c` (23.3 KB)
-- `backend/lib/pokergame/test/game_engine_test.c` (7.7 KB)
+- `server/lib/pokergame/include/game_engine.h` (5.6 KB)
+- `server/lib/pokergame/src/game_engine.c` (23.3 KB)
+- `server/lib/pokergame/test/game_engine_test.c` (7.7 KB)
 
 **Features:**
 - Complete Texas Hold'em implementation
@@ -30,7 +30,7 @@ A production-ready, modular poker game engine implementing complete Texas Hold'e
 ### 2. Protocol Extension
 
 **Modified Files:**
-- `backend/include/protocol.h`
+- `server/include/protocol.h`
 
 **Added Packet Types:**
 - `450` - PACKET_ACTION_REQUEST (player actions)
@@ -44,7 +44,7 @@ A production-ready, modular poker game engine implementing complete Texas Hold'e
 **New Documentation Files:**
 - `PROTOCOL.md` (24.9 KB) - Complete wire protocol specification
 - `IMPLEMENTATION.md` (18.1 KB) - Architecture and implementation guide
-- `backend/lib/pokergame/README.md` (11.8 KB) - Developer API reference
+- `server/lib/pokergame/README.md` (11.8 KB) - Developer API reference
 
 ## Architecture
 
@@ -57,7 +57,7 @@ A production-ready, modular poker game engine implementing complete Texas Hold'e
 └──────────────┬──────────────────────┘
                │ TCP/TLS + Protocol
 ┌──────────────▼──────────────────────┐
-│      Server Layer (backend/)        │
+│      Server Layer (server/)        │
 │                                     │
 │  ┌────────────────────────────┐    │
 │  │  Connection Handler         │    │
@@ -233,7 +233,7 @@ Architecture and implementation guide covering:
 - Performance considerations
 - Future enhancements
 
-### 3. backend/lib/pokergame/README.md (11.8 KB)
+### 3. server/lib/pokergame/README.md (11.8 KB)
 
 Developer API reference including:
 - Quick start guide
@@ -321,20 +321,20 @@ void handle_action_request(conn_data_t *conn, char *data, size_t len) {
 ### Added Files (7)
 1. `PROTOCOL.md` - Wire protocol specification
 2. `IMPLEMENTATION.md` - Architecture documentation
-3. `backend/lib/pokergame/README.md` - API reference
-4. `backend/lib/pokergame/include/game_engine.h` - Game engine header
-5. `backend/lib/pokergame/src/game_engine.c` - Game engine implementation
-6. `backend/lib/pokergame/test/game_engine_test.c` - Unit tests
+3. `server/lib/pokergame/README.md` - API reference
+4. `server/lib/pokergame/include/game_engine.h` - Game engine header
+5. `server/lib/pokergame/src/game_engine.c` - Game engine implementation
+6. `server/lib/pokergame/test/game_engine_test.c` - Unit tests
 7. `SUMMARY.md` - This file
 
 ### Modified Files (1)
-1. `backend/include/protocol.h` - Added 5 new packet type definitions
+1. `server/include/protocol.h` - Added 5 new packet type definitions
 
 ## Verification
 
 ### Build Verification
 ```bash
-cd backend
+cd server
 ./build_all.sh
 # Result: All libraries built successfully
 # 0 errors, 0 warnings
@@ -342,14 +342,14 @@ cd backend
 
 ### Test Verification
 ```bash
-cd backend/lib/pokergame
+cd server/lib/pokergame
 ./build/game_engine_test
 # Result: All tests passed (7/7)
 ```
 
 ### Integration Verification
 ```bash
-cd backend/build
+cd server/build
 cmake ..
 make
 # Result: Server builds and links successfully

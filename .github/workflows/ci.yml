@@ -28,7 +28,7 @@ jobs:
 
     - name: Check code formatting
       run: |
-        find backend -type f \( -name "*.c" -o -name "*.h" \) ! -path "*/build/*" ! -path "*/mpack/*" -exec clang-format --dry-run --Werror {} +
+        find server -type f \( -name "*.c" -o -name "*.h" \) ! -path "*/build/*" ! -path "*/mpack/*" -exec clang-format --dry-run --Werror {} +
 
   lint:
     name: Static Analysis with clang-tidy
@@ -84,27 +84,27 @@ jobs:
       uses: actions/cache@v3
       with:
         path: |
-          backend/lib/*/build
-        key: libs-${{ runner.os }}-${{ hashFiles('backend/lib/**/*.c', 'backend/lib/**/CMakeLists.txt') }}
+          server/lib/*/build
+        key: libs-${{ runner.os }}-${{ hashFiles('server/lib/**/*.c', 'server/lib/**/CMakeLists.txt') }}
         restore-keys: |
           libs-${{ runner.os }}-
 
     - name: Build all libraries
       run: |
-        cd backend
+        cd server
         ./build_all.sh
 
     - name: Cache main project build
       uses: actions/cache@v3
       with:
-        path: backend/build
-        key: main-build-${{ runner.os }}-${{ hashFiles('backend/src/**/*.c', 'backend/CMakeLists.txt') }}
+        path: server/build
+        key: main-build-${{ runner.os }}-${{ hashFiles('server/src/**/*.c', 'server/CMakeLists.txt') }}
         restore-keys: |
           main-build-${{ runner.os }}-
 
     - name: Build main project
       run: |
-        cd backend
+        cd server
         mkdir -p build
         cd build
         cmake ..
@@ -115,11 +115,11 @@ jobs:
       with:
         name: build-artifacts
         path: |
-          backend/build/Kasino_server
-          backend/build/test
-          backend/build/client
-          backend/lib/*/build/*.a
-          backend/lib/*/build/*_test
+          server/build/Cardio_server
+          server/build/test
+          server/build/client
+          server/lib/*/build/*.a
+          server/lib/*/build/*_test
         retention-days: 1
 
   unit-tests:
@@ -135,12 +135,12 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: build-artifacts
-        path: backend/
+        path: server/
 
     - name: Make executables executable
       run: |
-        chmod +x backend/lib/*/build/*_test || true
-        chmod +x backend/build/test || true
+        chmod +x server/lib/*/build/*_test || true
+        chmod +x server/build/test || true
 
     - name: Run all library tests
       run: |
@@ -159,7 +159,7 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: build-artifacts
-        path: backend/
+        path: server/
 
     - name: Install PostgreSQL
       run: |
@@ -174,11 +174,11 @@ jobs:
 
     - name: Make executables executable
       run: |
-        chmod +x backend/build/Kasino_server || true
-        chmod +x backend/build/client || true
-        chmod +x backend/build/test || true
+        chmod +x server/build/Cardio_server || true
+        chmod +x server/build/client || true
+        chmod +x server/build/test || true
 
     - name: Run integration tests
       run: |
-        cd backend
+        cd server
         ./run_integration_tests.sh

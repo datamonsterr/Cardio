@@ -673,6 +673,6 @@ This architecture provides a solid foundation for building a production-quality 
 ## References
 
 - [PROTOCOL.md](PROTOCOL.md) - Complete protocol specification
-- [game_engine.h](backend/lib/pokergame/include/game_engine.h) - Game engine API
-- [protocol.h](backend/include/protocol.h) - Protocol packet definitions
+- [game_engine.h](server/lib/pokergame/include/game_engine.h) - Game engine API
+- [protocol.h](server/include/protocol.h) - Protocol packet definitions
 - [README.md](README.md) - Build and setup instructions
