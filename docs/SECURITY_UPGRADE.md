@@ -111,7 +111,7 @@ SHA-512 is approved by NIST and widely used in industry.
 ## Files Modified
 
 ```
-backend/lib/db/
+server/lib/db/
 ├── include/
 │   └── db.h                    (Modified: password field 32→128)
 ├── src/
@@ -147,7 +147,7 @@ This will:
 1. ✅ Backup your database
 2. ✅ Update the schema
 3. ✅ Hash all existing passwords
-4. ✅ Rebuild the backend
+4. ✅ Rebuild the server
 
 See `database/MIGRATION_GUIDE.md` for details.
 
@@ -155,7 +155,7 @@ See `database/MIGRATION_GUIDE.md` for details.
 
 ### Unit Tests ✅
 ```bash
-cd backend/lib/db
+cd server/lib/db
 gcc -o test_password_hash test/test_password_hash.c src/password_hash.c \
     -I./include -I/usr/include/postgresql -lcrypt
 ./test_password_hash

@@ -48,7 +48,7 @@ This will:
 2. Update the schema
 3. Compile the migration tool
 4. Hash all existing passwords
-5. Rebuild the backend
+5. Rebuild the server
 
 See **MIGRATION_GUIDE.md** for detailed instructions and troubleshooting.
 
@@ -116,7 +116,7 @@ $6$randomsalt1234$hashedpassworddata...
 
 ### Connection Info
 
-Default connection parameters (defined in `migrate_passwords.c` and backend):
+Default connection parameters (defined in `migrate_passwords.c` and server):
 
 ```
 Database: cardio

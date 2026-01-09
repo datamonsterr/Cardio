@@ -96,19 +96,19 @@ Migration Summary:
 ========================
 ```
 
-### Step 5: Rebuild the Backend
+### Step 5: Rebuild the server
 
-After migration, rebuild the backend with the new secure authentication:
+After migration, rebuild the server with the new secure authentication:
 
 ```bash
-cd ../backend/lib/db
+cd ../server/lib/db
 rm -rf build
 mkdir build
 cd build
 cmake ..
 make
 
-# Return to main backend
+# Return to main server
 cd ../../..
 rm -rf build
 mkdir build
@@ -123,7 +123,7 @@ Test that login still works with the hashed passwords:
 
 ```bash
 # Start your server
-./Kasino_server
+./Cardio_server
 
 # Test login with existing credentials
 # The password verification will now use hash comparison
@@ -203,7 +203,7 @@ ls -la /usr/lib/x86_64-linux-gnu/libcrypt.so*
 
 ### Login fails after migration
 
-1. Check that backend was rebuilt with new code
+1. Check that server was rebuilt with new code
 2. Verify passwords were actually hashed (check database)
 3. Test with a fresh signup (should work immediately)
 
@@ -256,11 +256,11 @@ If you encounter issues:
 
 ## Files Modified
 
-- `backend/lib/db/include/db.h` - Added password hashing functions
-- `backend/lib/db/src/password_hash.c` - Password hashing implementation
-- `backend/lib/db/src/login.c` - Updated to verify hashed passwords
-- `backend/lib/db/src/signup.c` - Updated to hash passwords before storage
-- `backend/lib/db/CMakeLists.txt` - Added libcrypt dependency
+- `server/lib/db/include/db.h` - Added password hashing functions
+- `server/lib/db/src/password_hash.c` - Password hashing implementation
+- `server/lib/db/src/login.c` - Updated to verify hashed passwords
+- `server/lib/db/src/signup.c` - Updated to hash passwords before storage
+- `server/lib/db/CMakeLists.txt` - Added libcrypt dependency
 - `database/migration_hash_passwords.sql` - Schema migration
 - `database/migrate_passwords.c` - Password migration tool
 

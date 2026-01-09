@@ -2,7 +2,7 @@
 ## Prequesite
 
 ### Development Tools
-- Using Linux or Unix is requirement for backend
+- Using Linux or Unix is requirement for server
 - **Compiler**: clang (not gcc)
 - **Build System**: cmake >= 3.22 (see [CMake 3.22 Installation](#cmake-322-installation) below)
 - **IDE**: VSCode recommended
@@ -64,16 +64,16 @@ cmake ../
 make
 
 # Run the server
-./backend/build/Kasino_server
+./server/build/Cardio_server
 ```
 
 ### Test the Server
 ```sh
 # Interactive test client
-./backend/build/client localhost 8080
+./server/build/client localhost 8080
 
 # Automated E2E test suite
-./backend/build/e2e_test_client localhost 8080
+./server/build/e2e_test_client localhost 8080
 ```
 
 **Important:** All user passwords in the initial dataset ([data.sql](database/data.sql#L1)) are `password12345`
@@ -114,7 +114,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_COMPILER clang)
 set(CMAKE_C_FLAGS "-Wall")
 
-project(Kasino_server C) # SET PROJECT NAME HERE, start with Kasino_{name}
+project(Cardio_server C) # SET PROJECT NAME HERE, start with Cardio_{name}
 
 file(GLOB_RECURSE SOURCES "src/*.c")
 
@@ -124,7 +124,7 @@ list(APPEND ALL_LIBS card pokergame) # APPEND LIB HERE (directory name of lib)
 
 foreach(LIB IN LISTS ALL_LIBS)
     list(APPEND ALL_INCLUDES "${LIB_DIR}/${LIB}/include")
-    list(APPEND ALL_LIBRARIES "${LIB_DIR}/${LIB}/build/libKasino_${LIB}.a")
+    list(APPEND ALL_LIBRARIES "${LIB_DIR}/${LIB}/build/libCardio_${LIB}.a")
 endforeach()
 
 add_executable(${PROJECT_NAME} ${SOURCES})
@@ -135,7 +135,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC ${ALL_LIBRARIES})
 - Libraries have similar file structure:
 
 ```
-backend
+server
 |
 |---include
 |---src

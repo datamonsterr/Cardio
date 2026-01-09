@@ -4,7 +4,7 @@ This document describes the testing infrastructure and guidelines for the Cardio
 
 ## Overview
 
-The Cardio project uses a custom lightweight testing framework defined in `backend/lib/utils/testing.h`. Each library has its own set of unit tests that validate the functionality of its main functions.
+The Cardio project uses a custom lightweight testing framework defined in `server/lib/utils/testing.h`. Each library has its own set of unit tests that validate the functionality of its main functions.
 
 ## Testing Framework
 
@@ -54,23 +54,23 @@ Each library can be tested independently:
 
 ```bash
 # Card library tests
-cd backend/lib/card/build
-./Kasino_card_test
+cd server/lib/card/build
+./Cardio_card_test
 
 # Logger library tests
-cd backend/lib/logger/build
-./Kasino_logger_test
+cd server/lib/logger/build
+./Cardio_logger_test
 
 # Pokergame library tests
-cd backend/lib/pokergame/build
-./Kasino_pokergame_test
+cd server/lib/pokergame/build
+./Cardio_pokergame_test
 
 # Database library tests
-cd backend/lib/db/build
-./Kasino_db_test
+cd server/lib/db/build
+./Cardio_db_test
 
 # Main project tests
-cd backend/build
+cd server/build
 ./test
 ```
 
@@ -80,11 +80,11 @@ Tests are automatically built when you build the libraries:
 
 ```bash
 # Build all libraries (including tests)
-cd backend
+cd server
 ./build_all.sh
 
 # Or build individual library
-cd backend/lib/card
+cd server/lib/card
 mkdir -p build
 cd build
 cmake ..
@@ -93,7 +93,7 @@ make
 
 ## Test Coverage
 
-### Card Library (`backend/lib/card`)
+### Card Library (`server/lib/card`)
 
 Tests cover the following functions:
 
@@ -127,7 +127,7 @@ Tests cover the following functions:
 - `test_shuffle_maintains_card_count` - No cards lost
 - `test_shuffle_preserves_all_cards` - All suits preserved
 
-### Logger Library (`backend/lib/logger`)
+### Logger Library (`server/lib/logger`)
 
 Tests cover the following functions:
 
@@ -142,13 +142,13 @@ Tests cover the following functions:
 - `test_logger_long_message` - Large message handling
 - `test_logger_special_characters` - Special character handling
 
-### Pokergame Library (`backend/lib/pokergame`)
+### Pokergame Library (`server/lib/pokergame`)
 
 Tests cover:
 - `test_card_toString` - Card string representation
 - `test_hand_toString` - Hand display
 
-### Database Library (`backend/lib/db`)
+### Database Library (`server/lib/db`)
 
 Tests cover:
 - `test_db_get_user_info` - User information retrieval
@@ -156,7 +156,7 @@ Tests cover:
 - `test_db_scoreboard` - Leaderboard functionality
 - `test_db_friendlist` - Friend list retrieval
 
-### Main Project (`backend/test`)
+### Main Project (`server/test`)
 
 Tests cover:
 - Packet encoding/decoding
@@ -306,7 +306,7 @@ This helps identify potential bugs and code quality issues.
 ### Tests fail to build
 
 - Ensure all dependencies are installed
-- Rebuild all libraries: `cd backend && ./build_all.sh`
+- Rebuild all libraries: `cd server && ./build_all.sh`
 - Check that CMakeLists.txt includes test sources
 
 ### Tests fail to run
@@ -337,7 +337,7 @@ If you encounter issues with testing:
 
 1. Check the existing tests for examples
 2. Review this documentation
-3. Consult `backend/lib/utils/testing.h` for available macros
+3. Consult `server/lib/utils/testing.h` for available macros
 4. Ask the team for guidance
 
 ## Future Improvements

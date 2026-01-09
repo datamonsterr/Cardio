@@ -70,9 +70,9 @@ CONNINFO="dbname=$DB_NAME user=$DB_USER password=$DB_PASSWORD host=$DB_HOST port
 }
 echo ""
 
-# Step 5: Rebuild backend
-echo "Step 5: Rebuilding backend with new security features..."
-cd ../backend/lib/db
+# Step 5: Rebuild server
+echo "Step 5: Rebuilding server with new security features..."
+cd ../server/lib/db
 
 if [ -d build ]; then
     rm -rf build
@@ -82,10 +82,10 @@ cd build
 
 echo "  Building db library..."
 cmake .. > /dev/null 2>&1 && make > /dev/null 2>&1 || {
-    echo "⚠️  Warning: Backend rebuild might have issues"
+    echo "⚠️  Warning: server rebuild might have issues"
 }
 
-echo "✓ Backend rebuilt"
+echo "✓ server rebuilt"
 echo ""
 
 # Success message
