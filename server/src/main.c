@@ -205,6 +205,32 @@ int main(void)
                     logger(MAIN_LOG, "Info", "Get friendlist request from client");
                     handle_get_friendlist(conn_data, buf, nbytes);
                     break;
+                
+                case PACKET_ADD_FRIEND:
+                    logger(MAIN_LOG, "Info", "Add friend request from client");
+                    handle_add_friend_request(conn_data, buf, nbytes);
+                    break;
+                
+                case PACKET_INVITE_FRIEND:
+                    logger(MAIN_LOG, "Info", "Invite friend request from client");
+                    handle_invite_friend_request(conn_data, buf, nbytes);
+                    break;
+                
+                case PACKET_ACCEPT_INVITE:
+                    logger(MAIN_LOG, "Info", "Accept invite request from client");
+                    handle_accept_invite_request(conn_data, buf, nbytes);
+                    break;
+                
+                case PACKET_REJECT_INVITE:
+                    logger(MAIN_LOG, "Info", "Reject invite request from client");
+                    handle_reject_invite_request(conn_data, buf, nbytes);
+                    break;
+                
+                case PACKET_GET_INVITES:
+                    logger(MAIN_LOG, "Info", "Get invites request from client");
+                    handle_get_invites_request(conn_data, buf, nbytes);
+                    break;
+                
                 case PACKET_LEAVE_TABLE:
                     logger(MAIN_LOG, "Info", "Leave table request from client");
                     handle_leave_table_request(conn_data, buf, nbytes, table_list);

@@ -11,22 +11,26 @@ set(TEST_NAME test)
 set(CLIENT_NAME client)
 set(E2E_TEST_NAME e2e_test_client)
 set(E2E_MULTIPLAYER_TEST_NAME e2e_multiplayer_test)
+set(E2E_FRIEND_TEST_NAME e2e_friend_test)
 
 file(GLOB_RECURSE SOURCES "src/*.c")
 file(GLOB_RECURSE TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/test/unit_test.c)
 SET(CLIENT_SOURCES "test/client.c")
 SET(E2E_TEST_SOURCES "test/e2e_test_client.c")
 SET(E2E_MULTIPLAYER_TEST_SOURCES "test/e2e_multiplayer_test.c")
+SET(E2E_FRIEND_TEST_SOURCES "test/e2e_friend_test.c")
 
 list(APPEND TEST_SOURCES ${SOURCES})
 list(APPEND CLIENT_SOURCES ${SOURCES})
 list(APPEND E2E_TEST_SOURCES ${SOURCES})
 list(APPEND E2E_MULTIPLAYER_TEST_SOURCES ${SOURCES})
+list(APPEND E2E_FRIEND_TEST_SOURCES ${SOURCES})
 
 list(FILTER CLIENT_SOURCES EXCLUDE REGEX ".*main.c$")
 list(FILTER TEST_SOURCES EXCLUDE REGEX ".*main.c$")
 list(FILTER E2E_TEST_SOURCES EXCLUDE REGEX ".*main.c$")
 list(FILTER E2E_MULTIPLAYER_TEST_SOURCES EXCLUDE REGEX ".*main.c$")
+list(FILTER E2E_FRIEND_TEST_SOURCES EXCLUDE REGEX ".*main.c$")
 # print all sources
 foreach(SOURCE IN LISTS TEST_SOURCES)
     message(STATUS "SOURCE: ${SOURCE}")
@@ -53,6 +57,7 @@ add_executable(${TEST_NAME} ${TEST_SOURCES})
 add_executable(${CLIENT_NAME} ${CLIENT_SOURCES})
 add_executable(${E2E_TEST_NAME} ${E2E_TEST_SOURCES})
 add_executable(${E2E_MULTIPLAYER_TEST_NAME} ${E2E_MULTIPLAYER_TEST_SOURCES})
+add_executable(${E2E_FRIEND_TEST_NAME} ${E2E_FRIEND_TEST_SOURCES})
 
 target_include_directories(${PROJECT_NAME} PUBLIC "include")
 target_include_directories(${PROJECT_NAME} PUBLIC ${ALL_INCLUDES})
@@ -73,6 +78,10 @@ target_link_libraries(${E2E_TEST_NAME} PRIVATE ${ALL_LIBRARIES})
 target_include_directories(${E2E_MULTIPLAYER_TEST_NAME} PUBLIC "include")
 target_include_directories(${E2E_MULTIPLAYER_TEST_NAME} PUBLIC ${ALL_INCLUDES})
 target_link_libraries(${E2E_MULTIPLAYER_TEST_NAME} PRIVATE ${ALL_LIBRARIES})
+
+target_include_directories(${E2E_FRIEND_TEST_NAME} PUBLIC "include")
+target_include_directories(${E2E_FRIEND_TEST_NAME} PUBLIC ${ALL_INCLUDES})
+target_link_libraries(${E2E_FRIEND_TEST_NAME} PRIVATE ${ALL_LIBRARIES})
 
 
 

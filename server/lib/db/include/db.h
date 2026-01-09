@@ -50,6 +50,23 @@ typedef struct
     int num;
 } FriendList;
 
+// Friend invite structure
+typedef struct
+{
+    int invite_id;
+    int from_user_id;
+    char from_username[32];
+    int to_user_id;
+    char status[16];  // 'pending', 'accepted', 'rejected'
+    char created_at[32];
+} dbInvite;
+
+typedef struct
+{
+    dbInvite* invites;
+    int num;
+} dbInviteList;
+
 // This function connect to database.
 // Output is none if connection is ok, or an error message if connection is failed.
 void connection(PGconn* conn);
@@ -64,6 +81,20 @@ void dbDeleteUser(PGconn* conn, int user_id);
 dbScoreboard* dbGetScoreBoard(PGconn* conn);
 // This function return the friendlist of a player
 FriendList* dbGetFriendList(PGconn* conn, int user_id);
+
+// Friend management functions
+// Add a friend directly (mutual friendship)
+int dbAddFriend(PGconn* conn, int user_id, const char* friend_username);
+// Send a friend invite
+int dbSendFriendInvite(PGconn* conn, int from_user_id, const char* to_username);
+// Accept a friend invite
+int dbAcceptFriendInvite(PGconn* conn, int user_id, int invite_id);
+// Reject a friend invite
+int dbRejectFriendInvite(PGconn* conn, int user_id, int invite_id);
+// Get pending invites for a user
+dbInviteList* dbGetPendingInvites(PGconn* conn, int user_id);
+// Get user ID by username
+int dbGetUserIdByUsername(PGconn* conn, const char* username);
 
 // This function take input: username, password.
 // If username and password are valid, it create a new user in database

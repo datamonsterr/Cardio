@@ -24,3 +24,18 @@ CREATE TABLE Friend
 );
 
 SELECT * FROM "User";
+-- Friend invites table
+CREATE TABLE IF NOT EXISTS friend_invites
+(
+    invite_id SERIAL PRIMARY KEY,
+    from_user_id INTEGER NOT NULL,
+    to_user_id INTEGER NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (from_user_id) REFERENCES "User"(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (to_user_id) REFERENCES "User"(user_id) ON DELETE CASCADE,
+    UNIQUE (from_user_id, to_user_id)
+);
+
+CREATE INDEX idx_friend_invites_to_user ON friend_invites(to_user_id) WHERE status = 'pending';
+CREATE INDEX idx_friend_invites_from_user ON friend_invites(from_user_id);

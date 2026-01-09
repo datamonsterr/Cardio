@@ -39,6 +39,11 @@ void handle_get_all_tables_request(conn_data_t* conn_data, char* data, size_t da
 void handle_join_table_request(conn_data_t* conn_data, char* data, size_t data_len, TableList* table_list);
 void handle_get_scoreboard(conn_data_t* conn_data, char* data, size_t data_len);
 void handle_get_friendlist(conn_data_t* conn_data, char* data, size_t data_len);
+void handle_add_friend_request(conn_data_t* conn_data, char* data, size_t data_len);
+void handle_invite_friend_request(conn_data_t* conn_data, char* data, size_t data_len);
+void handle_accept_invite_request(conn_data_t* conn_data, char* data, size_t data_len);
+void handle_reject_invite_request(conn_data_t* conn_data, char* data, size_t data_len);
+void handle_get_invites_request(conn_data_t* conn_data, char* data, size_t data_len);
 void handle_unknown_request(conn_data_t* conn_data, char* data, size_t data_len);
 void handle_leave_table_request(conn_data_t* conn_data, char* data, size_t data_len, TableList* table_list);
 void handle_action_request(conn_data_t* conn_data, char* data, size_t data_len, TableList* table_list);
