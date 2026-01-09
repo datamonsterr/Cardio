@@ -12,6 +12,44 @@ if [ ! -d "$BASE_DIR" ]; then
     exit 1
 fi
 
+LOGGER_DIR="lib/logger"
+
+build_lib() {
+    local LIB_DIR=$1
+
+    echo "Processing library: $LIB_DIR"
+
+    # Create build directory inside the library folder
+    BUILD_DIR="$LIB_DIR/build"
+    mkdir -p "$BUILD_DIR"
+
+    # Navigate to the build directory
+    cd "$BUILD_DIR" || exit
+
+    # Run cmake and make
+    echo "Running cmake in $BUILD_DIR..."
+    if cmake ..; then
+        echo "Running make in $BUILD_DIR..."
+        if make; then
+            echo "Build successful for $LIB_DIR"
+        else
+            echo "Make failed for $LIB_DIR"
+            exit 1
+        fi
+    else
+        echo "CMake configuration failed for $LIB_DIR"
+        exit 1
+    fi
+
+    # Return to the base directory
+    cd - > /dev/null || exit
+}
+
+# First build logger because other libs depend on it
+if [ -d "$LOGGER_DIR" ]; then
+    build_lib "$LOGGER_DIR"
+fi
+
 # Iterate through each folder in the base directory
 for LIB_DIR in "$BASE_DIR"/*; do
     if [ -d "$LIB_DIR" ]; then
@@ -21,32 +59,12 @@ for LIB_DIR in "$BASE_DIR"/*; do
             continue
         fi
 
-        echo "Processing library: $LIB_DIR"
-
-        # Create build directory inside the library folder
-        BUILD_DIR="$LIB_DIR/build"
-        mkdir -p "$BUILD_DIR"
-
-        # Navigate to the build directory
-        cd "$BUILD_DIR" || exit
-
-        # Run cmake and make
-        echo "Running cmake in $BUILD_DIR..."
-        if cmake ..; then
-            echo "Running make in $BUILD_DIR..."
-            if make; then
-                echo "Build successful for $LIB_DIR"
-            else
-                echo "Make failed for $LIB_DIR"
-                exit 1
-            fi
-        else
-            echo "CMake configuration failed for $LIB_DIR"
-            exit 1
+        # Skip logger as it is already built
+        if [ "$LIB_DIR" == "$LOGGER_DIR" ]; then
+            continue
         fi
 
-        # Return to the base directory
-        cd - > /dev/null || exit
+        build_lib "$LIB_DIR"
     fi
 done
 
