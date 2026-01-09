@@ -13,7 +13,7 @@ import {
   SignupRequest,
   SignupResponse,
   GenericResponse,
-  FullTablesResponse
+  TableListResponse
 } from './types';
 import { HEADER_SIZE } from './constants';
 
@@ -143,19 +143,11 @@ export function decodeGenericResponse(data: Uint8Array): GenericResponse {
 }
 
 /**
- * Decode full tables response payload (PACKET_TABLES = 500)
+ * Decode table list response payload (PACKET_TABLES = 500)
  * Matches encode_full_tables_response() in server/src/protocol.c
  */
-export function decodeFullTablesResponse(data: Uint8Array): FullTablesResponse {
-  return msgpackDecode(data) as FullTablesResponse;
-}
-
-/**
- * Encode get-tables request payload.
- * Server expects an empty payload for PACKET_TABLES.
- */
-export function encodeGetTablesRequest(): Uint8Array {
-  return new Uint8Array(0);
+export function decodeTableListResponse(data: Uint8Array): TableListResponse {
+  return msgpackDecode(data) as TableListResponse;
 }
 
 /**
@@ -200,4 +192,13 @@ export function parseHandshakeResponse(data: Uint8Array): { code: number } {
   }
 
   return { code };
+}
+
+/**
+ * Encode GET_TABLES request (empty payload)
+ * Packet ID: 500
+ */
+export function encodeGetTablesRequest(): Uint8Array {
+  // GET_TABLES request has empty payload
+  return new Uint8Array(0);
 }

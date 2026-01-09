@@ -1,70 +1,65 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import type { Table } from '../types';
-import { TablesService } from '../services/tables/TablesService';
-
-const tablesService = new TablesService();
+import type { TableListResponse } from '../services/protocol';
 
 const TablesPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, getTables } = useAuth();
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<'all' | 'available' | 'full' | 'affordable'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [tables, setTables] = useState<Table[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  if (!user) return null;
+  const fetchTables = async () => {
+    if (!getTables) {
+      setError('Tables service not available');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      const response: TableListResponse = await getTables();
+      
+      // Map server response to Table format
+      const mappedTables: Table[] = response.tables.map((table) => {
+        // Determine status based on current vs max players
+        let status: 'active' | 'waiting' | 'full' = 'waiting';
+        if (table.currentPlayer >= table.maxPlayer) {
+          status = 'full';
+        } else if (table.currentPlayer > 0) {
+          status = 'active';
+        }
+
+        return {
+          id: table.id.toString(),
+          name: table.tableName,
+          minBet: table.minBet,
+          maxPlayers: table.maxPlayer,
+          currentPlayers: table.currentPlayer,
+          status: status,
+          players: [] // Server doesn't send player details in table list
+        };
+      });
+
+      setTables(mappedTables);
+    } catch (err) {
+      console.error('Failed to fetch tables:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load tables');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    let isMounted = true;
+    fetchTables();
+  }, [getTables]);
 
-    const loadTables = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const res = await tablesService.getTables();
-
-        const mapped: Table[] = (res.tables || []).map((t) => {
-          const status: Table['status'] =
-            t.currentPlayer >= t.maxPlayer
-              ? 'full'
-              : t.currentPlayer === 0
-                ? 'waiting'
-                : 'active';
-
-          return {
-            id: String(t.id),
-            name: t.tableName,
-            minBet: t.minBet,
-            maxPlayers: t.maxPlayer,
-            currentPlayers: t.currentPlayer,
-            status,
-            players: []
-          };
-        });
-
-        if (isMounted) {
-          setTables(mapped);
-        }
-      } catch (e) {
-        if (isMounted) {
-          setError(e instanceof Error ? e.message : String(e));
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadTables();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  if (!user) return null;
 
   const filteredTables = useMemo(() => tables.filter((table: Table) => {
     const matchesSearch = table.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -75,7 +70,7 @@ const TablesPage: React.FC = () => {
       (filter === 'affordable' && table.minBet <= user.chips);
 
     return matchesSearch && matchesFilter;
-  }), [tables, searchTerm, filter, user.chips]);
+  }), [tables, searchTerm, filter, user?.chips]);
 
   const getStatusBadge = (
     status: Table['status']
@@ -92,11 +87,45 @@ const TablesPage: React.FC = () => {
     return table.status !== 'full' && user.chips >= table.minBet;
   };
 
+  const handleReturn = (): void => {
+    navigate('/home');
+  };
+
   return (
     <div className="tables-container">
       <div className="tables-header">
-        <h1>Poker Tables</h1>
-        <p>Choose a table and start playing</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+          <div>
+            <h1>Poker Tables</h1>
+            <p>Choose a table and start playing</p>
+          </div>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <button
+              onClick={handleReturn}
+              className="return-button"
+              title="Return to Home"
+            >
+              ← Return
+            </button>
+            <button
+              onClick={fetchTables}
+              disabled={loading}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: loading ? '#2a3447' : 'linear-gradient(135deg, #ffd700 0%, #ffed4e 100%)',
+                color: loading ? '#b8c5d6' : '#000',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 600,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                transition: 'all 0.3s',
+              }}
+              title="Refresh tables"
+            >
+              {loading ? 'Loading...' : '🔄 Refresh'}
+            </button>
+          </div>
+        </div>
       </div>
 
       {error && (
@@ -181,7 +210,11 @@ const TablesPage: React.FC = () => {
 
               <div className="table-actions">
                 {joinable ? (
-                  <Link to="/game" className="join-btn">
+                  <Link 
+                    to={`/game?tableId=${table.id}`} 
+                    className="join-btn"
+                    state={{ tableId: table.id }}
+                  >
                     Join Table
                   </Link>
                 ) : (

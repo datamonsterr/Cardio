@@ -98,6 +98,7 @@ export interface AuthContextType {
   updateChips: (amount: number) => void;
   loading: boolean;
   signup?: (request: SignupRequestType) => Promise<void>;
+  getTables?: () => Promise<any>;
 }
 
 // Signup request type

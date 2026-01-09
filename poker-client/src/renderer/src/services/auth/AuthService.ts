@@ -8,11 +8,14 @@ import {
   Packet,
   LoginResponse,
   SignupResponse,
+  TableListResponse,
   encodePacket,
   encodeLoginRequest,
   encodeSignupRequest,
+  encodeGetTablesRequest,
   decodeLoginResponse,
   decodeSignupResponse,
+  decodeTableListResponse,
   PACKET_TYPE,
   PROTOCOL_V1,
   SignupRequest
@@ -130,6 +133,10 @@ export class AuthService {
           case PACKET_TYPE.SIGNUP_RESPONSE:
             response = decodeSignupResponse(packet.data);
             console.log('Signup response decoded:', response);
+            break;
+          case PACKET_TYPE.PACKET_TABLES:
+            response = decodeTableListResponse(packet.data);
+            console.log('Table list response decoded:', response);
             break;
           default:
             response = { res: -1, msg: 'Unknown packet type' };
@@ -293,6 +300,42 @@ export class AuthService {
       throw new Error('Not connected to server');
     }
     this.client.send(data);
+  }
+
+  /**
+   * Get all tables from server
+   */
+  async getTables(): Promise<TableListResponse> {
+    await this.ensureConnected();
+
+    return new Promise<TableListResponse>((resolve, reject) => {
+      try {
+        // Encode GET_TABLES request (empty payload)
+        const payload = encodeGetTablesRequest();
+        const packet = encodePacket(PROTOCOL_V1, PACKET_TYPE.PACKET_TABLES, payload);
+
+        // Register pending request
+        this.pendingRequests.set(PACKET_TYPE.PACKET_TABLES, {
+          resolve: (response: TableListResponse) => {
+            resolve(response);
+          },
+          reject
+        });
+
+        // Send packet
+        this.client!.send(packet.data);
+
+        // Set timeout
+        setTimeout(() => {
+          if (this.pendingRequests.has(PACKET_TYPE.PACKET_TABLES)) {
+            this.pendingRequests.delete(PACKET_TYPE.PACKET_TABLES);
+            reject(new Error('Get tables request timeout'));
+          }
+        }, 10000);
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
+    });
   }
 
   /**
