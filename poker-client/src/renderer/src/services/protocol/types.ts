@@ -135,12 +135,11 @@ export interface TableListResponse {
   tables: TableInfo[];
 }
 
-// Create table request
+// Create table request (matches server protocol - decode_create_table_request)
 export interface CreateTableRequest {
-  name: string;
-  min_bet: number;
-  max_bet: number;
-  max_players: number;
+  name: string;        // Max 32 chars (server expects "name" key)
+  max_player: number; // 2-9 (server expects "max_player" key)
+  min_bet: number;    // Minimum bet (big blind) (server expects "min_bet" key)
 }
 
 // Join table request

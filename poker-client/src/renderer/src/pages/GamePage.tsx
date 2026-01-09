@@ -156,7 +156,6 @@ const GamePage: React.FC = () => {
             className="poker-table--table-image"
             src={tableImg}
             alt="Poker Table"
-            style={{ width: '600px', height: '600px' }}
           />
           
           {/* Players would be rendered here in a circle around the table */}

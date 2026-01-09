@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import type { User, AuthContextType } from '../types';
+import type { User, AuthContextType, CreateTableRequestType } from '../types';
 import { AuthService, ConnectionStatus } from '../services/auth/AuthService';
 import { HeartbeatService } from '../services/network/HeartbeatService';
-import { Packet, SignupRequest, PACKET_TYPE } from '../services/protocol';
+import { Packet, SignupRequest, CreateTableRequest, PACKET_TYPE } from '../services/protocol';
 import { getServerConfig } from '../config/server';
 
 // Global connection status state
@@ -163,8 +163,22 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
     }
   };
 
+  const createTable = async (request: CreateTableRequestType) => {
+    try {
+      const createRequest: CreateTableRequest = {
+        name: request.name,
+        max_player: request.max_player,
+        min_bet: request.min_bet
+      };
+      await authService.createTable(createRequest);
+    } catch (error) {
+      console.error('Failed to create table:', error);
+      throw error;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, updateChips, loading, signup, getTables }}>
+    <AuthContext.Provider value={{ user, login, logout, updateChips, loading, signup, getTables, createTable }}>
       {children}
     </AuthContext.Provider>
   );

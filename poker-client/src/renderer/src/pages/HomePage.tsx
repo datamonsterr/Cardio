@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { mockUserStats, mockRecentGames } from '../data/mockTables';
+import { TablesIcon, ScoreboardIcon, FriendsIcon } from '../components/icons/HomeIcons';
 
 const HomePage: React.FC = () => {
   const { user, logout } = useAuth();
@@ -50,7 +51,9 @@ const HomePage: React.FC = () => {
 
       <div className="main-buttons-grid">
         <button className="main-button" onClick={handleViewTables}>
-          <div className="button-icon">🎲</div>
+          <div className="button-icon">
+            <TablesIcon size={64} />
+          </div>
           <div className="button-text">
             <h2>Tables</h2>
             <p>Browse & Join Tables</p>
@@ -69,7 +72,9 @@ const HomePage: React.FC = () => {
           className="main-button"
           onClick={() => setActiveSection('scoreboard')}
         >
-          <div className="button-icon">🏆</div>
+          <div className="button-icon">
+            <ScoreboardIcon size={64} />
+          </div>
           <div className="button-text">
             <h2>Scoreboard</h2>
             <p>View Rankings</p>
@@ -80,7 +85,9 @@ const HomePage: React.FC = () => {
           className="main-button"
           onClick={() => setActiveSection('friends')}
         >
-          <div className="button-icon">👥</div>
+          <div className="button-icon">
+            <FriendsIcon size={64} />
+          </div>
           <div className="button-text">
             <h2>Friends</h2>
             <p>Connect & Compete</p>

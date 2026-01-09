@@ -1,17 +1,24 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
-import type { Table } from '../types';
+import type { Table, CreateTableRequestType } from '../types';
 import type { TableListResponse } from '../services/protocol';
 
 const TablesPage: React.FC = () => {
-  const { user, getTables } = useAuth();
+  const { user, getTables, createTable } = useAuth();
   const navigate = useNavigate();
   const [filter, setFilter] = useState<'all' | 'available' | 'full' | 'affordable'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [tables, setTables] = useState<Table[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
+  const [creating, setCreating] = useState<boolean>(false);
+  const [createForm, setCreateForm] = useState<CreateTableRequestType>({
+    name: '',
+    max_player: 6,
+    min_bet: 10
+  });
 
   const fetchTables = async () => {
     if (!getTables) {
@@ -91,6 +98,46 @@ const TablesPage: React.FC = () => {
     navigate('/home');
   };
 
+  const handleCreateTable = async (): Promise<void> => {
+    if (!createTable) {
+      setError('Create table service not available');
+      return;
+    }
+
+    if (!createForm.name.trim()) {
+      setError('Table name is required');
+      return;
+    }
+
+    if (createForm.name.length > 32) {
+      setError('Table name must be 32 characters or less');
+      return;
+    }
+
+    if (createForm.max_player < 2 || createForm.max_player > 9) {
+      setError('Max players must be between 2 and 9');
+      return;
+    }
+
+    if (createForm.min_bet < 1) {
+      setError('Min bet must be at least 1');
+      return;
+    }
+
+    try {
+      setCreating(true);
+      setError(null);
+      await createTable(createForm);
+      setShowCreateModal(false);
+      setCreateForm({ name: '', max_player: 6, min_bet: 10 });
+      await fetchTables();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create table');
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <div className="tables-container">
       <div className="tables-header">
@@ -106,6 +153,13 @@ const TablesPage: React.FC = () => {
               title="Return to Home"
             >
               ← Return
+            </button>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="create-table-button"
+              title="Create New Table"
+            >
+              + Create Table
             </button>
             <button
               onClick={fetchTables}
@@ -231,6 +285,76 @@ const TablesPage: React.FC = () => {
       {!loading && !error && filteredTables.length === 0 && (
         <div className="no-tables">
           <p>No tables found matching your criteria</p>
+        </div>
+      )}
+
+      {/* Create Table Modal */}
+      {showCreateModal && (
+        <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
+          <div className="modal-content create-table-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="close-btn" onClick={() => setShowCreateModal(false)}>
+              ✕
+            </button>
+            <h2>Create New Table</h2>
+            <div className="create-table-form">
+              <div className="form-group">
+                <label htmlFor="table-name">Table Name</label>
+                <input
+                  id="table-name"
+                  type="text"
+                  value={createForm.name}
+                  onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                  placeholder="Enter table name (max 32 chars)"
+                  maxLength={32}
+                  className="form-input"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="max-players">Max Players</label>
+                <input
+                  id="max-players"
+                  type="number"
+                  min="2"
+                  max="9"
+                  value={createForm.max_player}
+                  onChange={(e) => setCreateForm({ ...createForm, max_player: parseInt(e.target.value) || 6 })}
+                  className="form-input"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="min-bet">Min Bet (Big Blind)</label>
+                <input
+                  id="min-bet"
+                  type="number"
+                  min="1"
+                  value={createForm.min_bet}
+                  onChange={(e) => setCreateForm({ ...createForm, min_bet: parseInt(e.target.value) || 10 })}
+                  className="form-input"
+                />
+              </div>
+              {error && (
+                <div className="form-error">
+                  {error}
+                </div>
+              )}
+              <div className="form-actions">
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="cancel-btn"
+                  disabled={creating}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateTable}
+                  className="create-btn"
+                  disabled={creating}
+                >
+                  {creating ? 'Creating...' : 'Create Table'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

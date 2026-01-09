@@ -9,13 +9,17 @@ import {
   LoginResponse,
   SignupResponse,
   TableListResponse,
+  GenericResponse,
+  CreateTableRequest,
   encodePacket,
   encodeLoginRequest,
   encodeSignupRequest,
   encodeGetTablesRequest,
+  encodeCreateTableRequest,
   decodeLoginResponse,
   decodeSignupResponse,
   decodeTableListResponse,
+  decodeGenericResponse,
   PACKET_TYPE,
   PROTOCOL_V1,
   SignupRequest
@@ -137,6 +141,10 @@ export class AuthService {
           case PACKET_TYPE.PACKET_TABLES:
             response = decodeTableListResponse(packet.data);
             console.log('Table list response decoded:', response);
+            break;
+          case PACKET_TYPE.CREATE_TABLE_RESPONSE:
+            response = decodeGenericResponse(packet.data);
+            console.log('Create table response decoded:', response);
             break;
           default:
             response = { res: -1, msg: 'Unknown packet type' };
@@ -330,6 +338,48 @@ export class AuthService {
           if (this.pendingRequests.has(PACKET_TYPE.PACKET_TABLES)) {
             this.pendingRequests.delete(PACKET_TYPE.PACKET_TABLES);
             reject(new Error('Get tables request timeout'));
+          }
+        }, 10000);
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
+    });
+  }
+
+  /**
+   * Create a new table
+   */
+  async createTable(request: CreateTableRequest): Promise<void> {
+    await this.ensureConnected();
+
+    return new Promise<void>((resolve, reject) => {
+      try {
+        // Encode create table request
+        const payload = encodeCreateTableRequest(request);
+        const packet = encodePacket(PROTOCOL_V1, PACKET_TYPE.CREATE_TABLE_REQUEST, payload);
+
+        // Register pending request
+        this.pendingRequests.set(PACKET_TYPE.CREATE_TABLE_RESPONSE, {
+          resolve: (response: GenericResponse) => {
+            if (response.res === PACKET_TYPE.R_CREATE_TABLE_OK) {
+              // Table created successfully
+              resolve();
+            } else {
+              // Table creation failed
+              reject(new Error(response.msg || 'Failed to create table'));
+            }
+          },
+          reject
+        });
+
+        // Send packet
+        this.client!.send(packet.data);
+
+        // Set timeout
+        setTimeout(() => {
+          if (this.pendingRequests.has(PACKET_TYPE.CREATE_TABLE_RESPONSE)) {
+            this.pendingRequests.delete(PACKET_TYPE.CREATE_TABLE_RESPONSE);
+            reject(new Error('Create table request timeout'));
           }
         }, 10000);
       } catch (error) {

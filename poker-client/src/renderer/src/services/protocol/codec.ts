@@ -13,7 +13,8 @@ import {
   SignupRequest,
   SignupResponse,
   GenericResponse,
-  TableListResponse
+  TableListResponse,
+  CreateTableRequest
 } from './types';
 import { HEADER_SIZE } from './constants';
 
@@ -201,4 +202,13 @@ export function parseHandshakeResponse(data: Uint8Array): { code: number } {
 export function encodeGetTablesRequest(): Uint8Array {
   // GET_TABLES request has empty payload
   return new Uint8Array(0);
+}
+
+/**
+ * Encode create table request payload
+ * Matches decode_create_table_request() format in server/src/protocol.c
+ * Server expects: { "name": string, "max_player": int, "min_bet": int }
+ */
+export function encodeCreateTableRequest(req: CreateTableRequest): Uint8Array {
+  return new Uint8Array(msgpackEncode(req));
 }
