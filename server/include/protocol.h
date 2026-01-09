@@ -66,6 +66,10 @@
 #define R_GET_INVITES_OK 951
 #define R_GET_INVITES_NOT_OK 952
 
+#define PACKET_GET_FRIEND_LIST 960
+#define R_GET_FRIEND_LIST_OK 961
+#define R_GET_FRIEND_LIST_NOT_OK 962
+
 // Game action packets (following protocol spec)
 #define PACKET_ACTION_REQUEST 450
 #define PACKET_ACTION_RESULT 451
@@ -184,6 +188,9 @@ InviteActionRequest* decode_invite_action_request(char* payload);
 
 // Encode friend invite list response
 RawBytes* encode_invites_response(dbInviteList* invites);
+
+// Encode friend list response
+RawBytes* encode_friend_list_response(dbFriendList* friends);
 
 // ===== Game Action Packets =====
 

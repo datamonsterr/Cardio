@@ -1,41 +1,45 @@
-import React, { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { mockUserStats, mockRecentGames } from '../data/mockTables';
-import { TablesIcon, ScoreboardIcon, FriendsIcon } from '../components/icons/HomeIcons';
+import React, { useState } from 'react'
+import { useAuth } from '../contexts/AuthContext'
+import { useNavigate } from 'react-router-dom'
+import { mockUserStats, mockRecentGames } from '../data/mockTables'
+import { TablesIcon, ScoreboardIcon, FriendsIcon, PlayNowIcon } from '../components/icons/HomeIcons'
 
 const HomePage: React.FC = () => {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+  const [activeSection, setActiveSection] = useState<string | null>(null)
 
-  if (!user) return null;
+  if (!user) return null
 
-  const closeModal = (): void => setActiveSection(null);
+  const closeModal = (): void => setActiveSection(null)
 
   const handlePlayNow = (): void => {
-    navigate('/game');
-  };
+    navigate('/game')
+  }
 
   const handleViewTables = (): void => {
-    navigate('/tables');
-  };
+    navigate('/tables')
+  }
+
+  const handleViewFriends = (): void => {
+    navigate('/friends')
+  }
 
   const handleLogout = (): void => {
-    logout();
-    navigate('/login');
-  };
+    logout()
+    navigate('/login')
+  }
 
   const handleReturn = (): void => {
-    navigate(-1); // Go back in browser history
-  };
+    navigate(-1) // Go back in browser history
+  }
 
   return (
     <div className="home-container">
       <div className="home-header">
         <div className="header-content">
           <div className="header-text">
-            <h1>Welcome back, {user.username}! 👋</h1>
+            <h1>Welcome back, {user.username}! </h1>
             <p className="balance-info">Balance: ${user.chips.toLocaleString()}</p>
           </div>
           <div className="header-actions">
@@ -61,17 +65,16 @@ const HomePage: React.FC = () => {
         </button>
 
         <button className="main-button play-now" onClick={handlePlayNow}>
-          <div className="button-icon">⚡</div>
+          <div className="button-icon">
+            <PlayNowIcon size={64} />
+          </div>
           <div className="button-text">
             <h2>Play Now</h2>
             <p>Start a Quick Game</p>
           </div>
         </button>
 
-        <button
-          className="main-button"
-          onClick={() => setActiveSection('scoreboard')}
-        >
+        <button className="main-button" onClick={() => setActiveSection('scoreboard')}>
           <div className="button-icon">
             <ScoreboardIcon size={64} />
           </div>
@@ -81,10 +84,7 @@ const HomePage: React.FC = () => {
           </div>
         </button>
 
-        <button
-          className="main-button"
-          onClick={() => setActiveSection('friends')}
-        >
+        <button className="main-button" onClick={handleViewFriends}>
           <div className="button-icon">
             <FriendsIcon size={64} />
           </div>
@@ -125,11 +125,10 @@ const HomePage: React.FC = () => {
                 <span className="game-table">{game.table}</span>
                 <span className="game-date">{game.date}</span>
               </div>
-              <div className={`game-result ${game.result.toLowerCase()}`}>
-                {game.result}
-              </div>
+              <div className={`game-result ${game.result.toLowerCase()}`}>{game.result}</div>
               <div className={`game-profit ${game.profit > 0 ? 'positive' : 'negative'}`}>
-                {game.profit > 0 ? '+' : ''}{game.profit}
+                {game.profit > 0 ? '+' : ''}
+                {game.profit}
               </div>
             </div>
           ))}
@@ -149,7 +148,7 @@ const HomePage: React.FC = () => {
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default HomePage;
+export default HomePage

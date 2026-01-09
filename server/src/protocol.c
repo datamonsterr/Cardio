@@ -582,3 +582,35 @@ RawBytes* encode_invites_response(dbInviteList* invites)
 
     return raw_bytes;
 }
+RawBytes* encode_friend_list_response(dbFriendList* friends)
+{
+    mpack_writer_t writer;
+    char buffer[MAXLINE];
+    mpack_writer_init(&writer, buffer, MAXLINE);
+    
+    mpack_start_array(&writer, friends->num);
+    for (int i = 0; i < friends->num; i++)
+    {
+        mpack_start_map(&writer, 2);
+        mpack_write_cstr(&writer, "user_id");
+        mpack_write_i32(&writer, friends->friends[i].user_id);
+        mpack_write_cstr(&writer, "username");
+        mpack_write_cstr(&writer, friends->friends[i].user_name);
+        mpack_finish_map(&writer);
+    }
+    mpack_finish_array(&writer);
+
+    char* data = writer.buffer;
+    if (mpack_writer_destroy(&writer) != mpack_ok)
+    {
+        fprintf(stderr, "MPack encoding error: %s\n", mpack_error_to_string(mpack_writer_destroy(&writer)));
+        return NULL;
+    }
+
+    RawBytes* raw_bytes = malloc(sizeof(RawBytes));
+    raw_bytes->len = mpack_writer_buffer_used(&writer);
+    raw_bytes->data = malloc(raw_bytes->len);
+    memcpy(raw_bytes->data, data, raw_bytes->len);
+
+    return raw_bytes;
+}

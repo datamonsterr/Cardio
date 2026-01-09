@@ -1057,3 +1057,60 @@ void handle_get_invites_request(conn_data_t* conn_data, char* data, size_t data_
     free(invites);
     free_packet(packet);
 }
+
+void handle_get_friend_list_request(conn_data_t* conn_data, char* data, size_t data_len)
+{
+    char log_msg[256];
+    snprintf(log_msg, sizeof(log_msg), "Get friend list request from fd=%d user='%s'", 
+             conn_data->fd, conn_data->username);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    
+    if (conn_data->user_id == 0)
+    {
+        RawBytes* raw_bytes = encode_response(R_GET_FRIEND_LIST_NOT_OK);
+        RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_GET_FRIEND_LIST, raw_bytes->data, raw_bytes->len);
+        sendall(conn_data->fd, response->data, (int*) &(response->len));
+        free(response);
+        free(raw_bytes);
+        logger_ex(MAIN_LOG, "ERROR", __func__, "User not logged in", 1);
+        return;
+    }
+
+    Packet* packet = decode_packet(data, data_len);
+    if (!packet || packet->header->packet_type != PACKET_GET_FRIEND_LIST)
+    {
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Invalid packet", 1);
+        if (packet) free_packet(packet);
+        return;
+    }
+
+    PGconn* conn = PQconnectdb(dbconninfo);
+    dbFriendList* friends = dbGetFriendList(conn, conn_data->user_id);
+    PQfinish(conn);
+
+    if (!friends)
+    {
+        RawBytes* raw_bytes = encode_response(R_GET_FRIEND_LIST_NOT_OK);
+        RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_GET_FRIEND_LIST, raw_bytes->data, raw_bytes->len);
+        sendall(conn_data->fd, response->data, (int*) &(response->len));
+        free(response);
+        free(raw_bytes);
+        free_packet(packet);
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Failed to get friend list from database", 1);
+        return;
+    }
+
+    snprintf(log_msg, sizeof(log_msg), "Get friend list SUCCESS: user='%s' has %d friends", 
+             conn_data->username, friends->num);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+
+    RawBytes* raw_bytes = encode_friend_list_response(friends);
+    RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_GET_FRIEND_LIST, raw_bytes->data, raw_bytes->len);
+    sendall(conn_data->fd, response->data, (int*) &(response->len));
+
+    free(response);
+    free(raw_bytes);
+    free(friends->friends);
+    free(friends);
+    free_packet(packet);
+}

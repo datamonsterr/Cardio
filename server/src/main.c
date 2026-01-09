@@ -231,6 +231,11 @@ int main(void)
                     handle_get_invites_request(conn_data, buf, nbytes);
                     break;
                 
+                case PACKET_GET_FRIEND_LIST:
+                    logger(MAIN_LOG, "Info", "Get friend list request from client");
+                    handle_get_friend_list_request(conn_data, buf, nbytes);
+                    break;
+                
                 case PACKET_LEAVE_TABLE:
                     logger(MAIN_LOG, "Info", "Leave table request from client");
                     handle_leave_table_request(conn_data, buf, nbytes, table_list);
