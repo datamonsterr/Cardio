@@ -261,6 +261,7 @@ export class AuthService {
       this.client = null;
     }
     this.pendingRequests.clear();
+    this.setConnectionStatus('disconnected', 'Logged out');
   }
 
   /**

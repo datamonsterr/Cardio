@@ -6,6 +6,10 @@
 #define MAXLINE 65540
 #define PROTOCOL_V1 0x01
 
+// Service packets
+#define PACKET_PING 10
+#define PACKET_PONG 11
+
 // Packet code are 16-bit unsigned integer, so the range is 0 - 65535
 #define PACKET_LOGIN 100
 #define R_LOGIN_OK 101

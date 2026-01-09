@@ -1,12 +1,29 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { User, AuthContextType } from '../types';
 import { AuthService, ConnectionStatus } from '../services/auth/AuthService';
-import { Packet, SignupRequest } from '../services/protocol';
+import { HeartbeatService } from '../services/network/HeartbeatService';
+import { Packet, SignupRequest, PACKET_TYPE } from '../services/protocol';
 
 // Global connection status state
 let globalConnectionStatus: ConnectionStatus = 'disconnected';
 let globalConnectionMessage: string = '';
 const connectionStatusListeners: Set<(status: ConnectionStatus, message: string) => void> = new Set();
+
+// Create heartbeat service instance
+const heartbeatService = new HeartbeatService({
+  onStatusChange: (status, message) => {
+    // Map heartbeat status to connection status
+    const connectionStatus: ConnectionStatus = 
+      status === 'connected' ? 'connected' :
+      status === 'reconnecting' ? 'connecting' :
+      'disconnected';
+    
+    console.log('Heartbeat status:', status, message);
+    globalConnectionStatus = connectionStatus;
+    globalConnectionMessage = message || '';
+    connectionStatusListeners.forEach(listener => listener(connectionStatus, message || ''));
+  }
+});
 
 // Create auth service instance
 const authService = new AuthService({
@@ -14,15 +31,33 @@ const authService = new AuthService({
   port: 8080,
   onDisconnect: () => {
     console.log('Disconnected from server');
+    heartbeatService.stop();
   },
   onPacket: (packet: Packet) => {
+    // Handle PONG for heartbeat
+    if (packet.header.packet_type === PACKET_TYPE.PONG) {
+      heartbeatService.onPongReceived();
+      return;
+    }
     console.log('Received packet:', packet.header.packet_type);
   },
   onConnectionStatusChange: (status: ConnectionStatus, message?: string) => {
     console.log('Connection status:', status, message);
+    // Update global status for non-heartbeat connection events
     globalConnectionStatus = status;
     globalConnectionMessage = message || '';
     connectionStatusListeners.forEach(listener => listener(status, message || ''));
+    
+    // Start/stop heartbeat based on connection status
+    if (status === 'connected') {
+      // Start heartbeat when connection is established
+      const client = authService.getClient();
+      if (client) {
+        heartbeatService.start(client);
+      }
+    } else if (status === 'disconnected' || status === 'error') {
+      heartbeatService.stop();
+    }
   }
 });
 
@@ -97,6 +132,7 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
   };
 
   const logout = (): void => {
+    heartbeatService.stop();
     authService.logout();
     setUser(null);
     localStorage.removeItem('pokerUser');

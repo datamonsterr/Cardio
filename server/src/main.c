@@ -157,6 +157,20 @@ int main(void)
 
                 switch (header->packet_type)
                 {
+                case PACKET_PING:
+                    // Respond to PING with PONG
+                    {
+                        char log_msg[128];
+                        snprintf(log_msg, sizeof(log_msg), "PING received from fd=%d, sending PONG", conn_data->fd);
+                        logger(MAIN_LOG, "Debug", log_msg);
+                        
+                        RawBytes* pong_packet = encode_packet(PROTOCOL_V1, PACKET_PONG, NULL, 0);
+                        send(conn_data->fd, pong_packet->data, pong_packet->len, 0);
+                        free(pong_packet->data);
+                        free(pong_packet);
+                    }
+                    break;
+
                 case PACKET_LOGIN:
                     logger(MAIN_LOG, "Info", "Login request from client");
                     handle_login_request(conn_data, buf, nbytes);
