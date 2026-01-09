@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { mockUserStats, mockRecentGames } from '../data/mockTables';
 
 const HomePage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<string | null>(null);
 
@@ -20,11 +20,32 @@ const HomePage: React.FC = () => {
     navigate('/tables');
   };
 
+  const handleLogout = (): void => {
+    logout();
+    navigate('/login');
+  };
+
+  const handleReturn = (): void => {
+    navigate(-1); // Go back in browser history
+  };
+
   return (
     <div className="home-container">
       <div className="home-header">
-        <h1>Welcome back, {user.username}! 👋</h1>
-        <p className="balance-info">Balance: ${user.chips.toLocaleString()}</p>
+        <div className="header-content">
+          <div className="header-text">
+            <h1>Welcome back, {user.username}! 👋</h1>
+            <p className="balance-info">Balance: ${user.chips.toLocaleString()}</p>
+          </div>
+          <div className="header-actions">
+            <button className="return-button" onClick={handleReturn} title="Go back">
+              ← Return
+            </button>
+            <button className="logout-button" onClick={handleLogout} title="Logout">
+              Logout
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="main-buttons-grid">

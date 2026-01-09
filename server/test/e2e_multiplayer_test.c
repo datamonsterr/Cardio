@@ -46,6 +46,13 @@ typedef struct {
     long timestamp;
 } TestState;
 
+// Forward declarations
+int test_signup(TestState* state, int player_num);
+int test_login(TestState* state, int player_num);
+int test_create_table(TestState* state);
+int test_get_tables(TestState* state);
+int test_join_table(TestState* state, int player_num);
+
 void print_test_header(const char* test_name) {
     printf("\n%s========================================%s\n", COLOR_CYAN, COLOR_RESET);
     printf("%s TEST: %s%s\n", COLOR_CYAN, test_name, COLOR_RESET);

@@ -120,19 +120,18 @@ export interface GameState {
   min_raise: number;
 }
 
-// Table info
+// Table info (matches server response format)
 export interface TableInfo {
-  table_id: number;
-  table_name: string;
-  min_bet: number;
-  max_bet: number;
-  max_players: number;
-  current_players: number;
+  id: number;
+  tableName: string;
+  maxPlayer: number;
+  minBet: number;
+  currentPlayer: number;
 }
 
-// Table list response
+// Table list response (matches encode_full_tables_response format)
 export interface TableListResponse {
-  res: number;
+  size: number;
   tables: TableInfo[];
 }
 

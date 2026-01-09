@@ -16,7 +16,7 @@
 #include <unistd.h>
 #include <time.h>
 
-#define conninfo "dbname=cardio user=postgres password=1234 host=localhost port=5433"
+#define conninfo "dbname=cardio user=postgres password=postgres host=localhost port=5433"
 
 // Generate a salt for password hashing using SHA-512
 char* generate_salt()

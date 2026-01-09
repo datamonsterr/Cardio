@@ -153,8 +153,18 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
     });
   };
 
+  const getTables = async () => {
+    try {
+      const response = await authService.getTables();
+      return response;
+    } catch (error) {
+      console.error('Failed to get tables:', error);
+      throw error;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, updateChips, loading, signup }}>
+    <AuthContext.Provider value={{ user, login, logout, updateChips, loading, signup, getTables }}>
       {children}
     </AuthContext.Provider>
   );
