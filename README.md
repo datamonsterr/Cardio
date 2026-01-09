@@ -54,6 +54,10 @@ docker compose up -d
 
 ### Build and Run Server
 ```sh
+# add excutable permission to build script
+chmod u+x ./server/build_all.sh
+chmod u+x ./server/clean_build.sh
+ 
 # Build all libraries and main project
 make build
 
