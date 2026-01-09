@@ -3,7 +3,7 @@
  * Mirrors the C server implementation using MessagePack
  */
 
-import { encode as msgpackEncode, decode as msgpackDecode } from '@msgpack/msgpack';
+import { encode as msgpackEncode, decode as msgpackDecode } from '@msgpack/msgpack'
 import {
   Header,
   Packet,
@@ -15,8 +15,8 @@ import {
   GenericResponse,
   TableListResponse,
   CreateTableRequest
-} from './types';
-import { HEADER_SIZE } from './constants';
+} from './types'
+import { HEADER_SIZE } from './constants'
 
 /**
  * Encode a packet header and payload into raw bytes
@@ -27,32 +27,32 @@ export function encodePacket(
   packetType: number,
   payload: Uint8Array | null
 ): RawBytes {
-  const payloadLen = payload ? payload.length : 0;
-  const totalLen = HEADER_SIZE + payloadLen;
+  const payloadLen = payload ? payload.length : 0
+  const totalLen = HEADER_SIZE + payloadLen
 
   // Allocate buffer for header + payload
-  const buffer = new Uint8Array(totalLen);
-  const view = new DataView(buffer.buffer);
+  const buffer = new Uint8Array(totalLen)
+  const view = new DataView(buffer.buffer)
 
   // Write header (5 bytes)
   // packet_len (2 bytes, big-endian)
-  view.setUint16(0, totalLen, false); // false = big-endian
+  view.setUint16(0, totalLen, false) // false = big-endian
 
   // protocol_ver (1 byte)
-  view.setUint8(2, protocolVer);
+  view.setUint8(2, protocolVer)
 
   // packet_type (2 bytes, big-endian)
-  view.setUint16(3, packetType, false); // false = big-endian
+  view.setUint16(3, packetType, false) // false = big-endian
 
   // Copy payload if present
   if (payload && payloadLen > 0) {
-    buffer.set(payload, HEADER_SIZE);
+    buffer.set(payload, HEADER_SIZE)
   }
 
   return {
     data: buffer,
     len: totalLen
-  };
+  }
 }
 
 /**
@@ -61,16 +61,16 @@ export function encodePacket(
  */
 export function decodeHeader(data: Uint8Array): Header {
   if (data.length < HEADER_SIZE) {
-    throw new Error(`Insufficient data for header: ${data.length} bytes`);
+    throw new Error(`Insufficient data for header: ${data.length} bytes`)
   }
 
-  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength)
 
   return {
-    packet_len: view.getUint16(0, false),    // false = big-endian
+    packet_len: view.getUint16(0, false), // false = big-endian
     protocol_ver: view.getUint8(2),
-    packet_type: view.getUint16(3, false)    // false = big-endian
-  };
+    packet_type: view.getUint16(3, false) // false = big-endian
+  }
 }
 
 /**
@@ -79,26 +79,24 @@ export function decodeHeader(data: Uint8Array): Header {
  */
 export function decodePacket(data: Uint8Array): Packet {
   if (data.length < HEADER_SIZE) {
-    throw new Error(`Insufficient data for packet: ${data.length} bytes`);
+    throw new Error(`Insufficient data for packet: ${data.length} bytes`)
   }
 
-  const header = decodeHeader(data);
+  const header = decodeHeader(data)
 
   // Validate packet length
   if (header.packet_len > data.length) {
-    throw new Error(
-      `Packet length mismatch: header=${header.packet_len}, actual=${data.length}`
-    );
+    throw new Error(`Packet length mismatch: header=${header.packet_len}, actual=${data.length}`)
   }
 
   // Extract payload
-  const payloadLen = header.packet_len - HEADER_SIZE;
-  const payload = data.slice(HEADER_SIZE, HEADER_SIZE + payloadLen);
+  const payloadLen = header.packet_len - HEADER_SIZE
+  const payload = data.slice(HEADER_SIZE, HEADER_SIZE + payloadLen)
 
   return {
     header,
     data: payload
-  };
+  }
 }
 
 /**
@@ -109,15 +107,15 @@ export function encodeLoginRequest(username: string, password: string): Uint8Arr
   const payload: LoginRequest = {
     user: username,
     pass: password
-  };
-  return new Uint8Array(msgpackEncode(payload));
+  }
+  return new Uint8Array(msgpackEncode(payload))
 }
 
 /**
  * Decode login response payload
  */
 export function decodeLoginResponse(data: Uint8Array): LoginResponse {
-  return msgpackDecode(data) as LoginResponse;
+  return msgpackDecode(data) as LoginResponse
 }
 
 /**
@@ -125,14 +123,14 @@ export function decodeLoginResponse(data: Uint8Array): LoginResponse {
  * Matches decode_signup_request() format in protocol.c
  */
 export function encodeSignupRequest(req: SignupRequest): Uint8Array {
-  return new Uint8Array(msgpackEncode(req));
+  return new Uint8Array(msgpackEncode(req))
 }
 
 /**
  * Decode signup response payload
  */
 export function decodeSignupResponse(data: Uint8Array): SignupResponse {
-  return msgpackDecode(data) as SignupResponse;
+  return msgpackDecode(data) as SignupResponse
 }
 
 /**
@@ -140,7 +138,7 @@ export function decodeSignupResponse(data: Uint8Array): SignupResponse {
  * Matches encode_response() and encode_response_msg() in protocol.c
  */
 export function decodeGenericResponse(data: Uint8Array): GenericResponse {
-  return msgpackDecode(data) as GenericResponse;
+  return msgpackDecode(data) as GenericResponse
 }
 
 /**
@@ -148,7 +146,7 @@ export function decodeGenericResponse(data: Uint8Array): GenericResponse {
  * Matches encode_full_tables_response() in server/src/protocol.c
  */
 export function decodeTableListResponse(data: Uint8Array): TableListResponse {
-  return msgpackDecode(data) as TableListResponse;
+  return msgpackDecode(data) as TableListResponse
 }
 
 /**
@@ -164,16 +162,16 @@ export function freePacket(_packet: Packet): void {
  * Matches the handshake protocol format
  */
 export function createHandshakeRequest(protocolVersion: number): Uint8Array {
-  const buffer = new Uint8Array(4);
-  const view = new DataView(buffer.buffer);
+  const buffer = new Uint8Array(4)
+  const view = new DataView(buffer.buffer)
 
   // length (2 bytes) - always 0x0002
-  view.setUint16(0, 2, false);
+  view.setUint16(0, 2, false)
 
   // protocol_version (2 bytes)
-  view.setUint16(2, protocolVersion, false);
+  view.setUint16(2, protocolVersion, false)
 
-  return buffer;
+  return buffer
 }
 
 /**
@@ -181,18 +179,18 @@ export function createHandshakeRequest(protocolVersion: number): Uint8Array {
  */
 export function parseHandshakeResponse(data: Uint8Array): { code: number } {
   if (data.length < 3) {
-    throw new Error(`Invalid handshake response: ${data.length} bytes`);
+    throw new Error(`Invalid handshake response: ${data.length} bytes`)
   }
 
-  const view = new DataView(data.buffer, data.byteOffset);
-  const length = view.getUint16(0, false);
-  const code = view.getUint8(2);
+  const view = new DataView(data.buffer, data.byteOffset)
+  const length = view.getUint16(0, false)
+  const code = view.getUint8(2)
 
   if (length !== 1) {
-    throw new Error(`Invalid handshake response length: ${length}`);
+    throw new Error(`Invalid handshake response length: ${length}`)
   }
 
-  return { code };
+  return { code }
 }
 
 /**
@@ -201,7 +199,7 @@ export function parseHandshakeResponse(data: Uint8Array): { code: number } {
  */
 export function encodeGetTablesRequest(): Uint8Array {
   // GET_TABLES request has empty payload
-  return new Uint8Array(0);
+  return new Uint8Array(0)
 }
 
 /**
@@ -210,5 +208,83 @@ export function encodeGetTablesRequest(): Uint8Array {
  * Server expects: { "name": string, "max_player": int, "min_bet": int }
  */
 export function encodeCreateTableRequest(req: CreateTableRequest): Uint8Array {
-  return new Uint8Array(msgpackEncode(req));
+  return new Uint8Array(msgpackEncode(req))
+}
+
+// ===== Friend Management Codec Functions =====
+
+/**
+ * Encode add friend request
+ * Matches decode_add_friend_request() in server/src/protocol.c
+ * Server expects: { "username": string }
+ */
+export function encodeAddFriendRequest(username: string): Uint8Array {
+  return new Uint8Array(msgpackEncode({ username }))
+}
+
+/**
+ * Encode invite friend request
+ * Matches decode_invite_friend_request() in server/src/protocol.c
+ * Server expects: { "username": string }
+ */
+export function encodeInviteFriendRequest(username: string): Uint8Array {
+  return new Uint8Array(msgpackEncode({ username }))
+}
+
+/**
+ * Encode accept/reject invite request
+ * Matches decode_invite_action_request() in server/src/protocol.c
+ * Server expects: { "invite_id": int }
+ */
+export function encodeInviteActionRequest(inviteId: number): Uint8Array {
+  return new Uint8Array(msgpackEncode({ invite_id: inviteId }))
+}
+
+/**
+ * Encode get invites request (empty payload)
+ */
+export function encodeGetInvitesRequest(): Uint8Array {
+  return new Uint8Array(0)
+}
+
+/**
+ * Decode generic friend response
+ * Server sends: { "res": int, "msg"?: string }
+ */
+export function decodeFriendResponse(data: Uint8Array): GenericResponse {
+  return msgpackDecode(data) as GenericResponse
+}
+
+/**
+ * Decode get invites response
+ * Server sends array of: [{ "invite_id": int, "from_user_id": int, "from_username": string, "status": string, "created_at": string }, ...]
+ */
+export function decodeGetInvitesResponse(data: Uint8Array): Array<{
+  invite_id: number
+  from_user_id: number
+  from_username: string
+  status: string
+  created_at: string
+}> {
+  return msgpackDecode(data) as Array<{
+    invite_id: number
+    from_user_id: number
+    from_username: string
+    status: string
+    created_at: string
+  }>
+}
+
+/**
+ * Decode friend list response
+ * Server sends array of: [{ "user_id": int, "username": string }, ...]
+ */
+export function decodeFriendListResponse(data: Uint8Array): Array<{
+  user_id: number
+  username: string
+}> {
+  return msgpackDecode(data) as Array<{
+    user_id: number
+    username: string
+  }>
 }

@@ -167,3 +167,41 @@ export interface FullTablesResponse {
   size: number;
   tables: ServerTableSummary[];
 }
+
+// ===== Friend Management Types =====
+
+// Add friend request
+export interface AddFriendRequest {
+  username: string;     // Username to add as friend
+}
+
+// Invite friend request
+export interface InviteFriendRequest {
+  username: string;     // Username to invite
+}
+
+// Accept/Reject invite request
+export interface InviteActionRequest {
+  invite_id: number;    // ID of the invite to accept/reject
+}
+
+// Friend invite details
+export interface FriendInvite {
+  invite_id: number;
+  from_user_id: number;
+  from_username: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  created_at: string;
+}
+
+// Get invites response
+export type GetInvitesResponse = FriendInvite[];
+
+// Friend information
+export interface Friend {
+  user_id: number;
+  username: string;
+}
+
+// Friend list response
+export type FriendListResponse = Friend[];

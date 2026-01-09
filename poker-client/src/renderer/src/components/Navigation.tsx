@@ -1,30 +1,30 @@
-import React, { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import React, { useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 
 const Navigation: React.FC = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { user, logout } = useAuth();
-  const [isVisible, setIsVisible] = useState(false);
+  const location = useLocation()
+  const navigate = useNavigate()
+  const { user, logout } = useAuth()
+  const [isVisible, setIsVisible] = useState(false)
 
-  if (!user || location.pathname === '/login') return null;
+  if (!user || location.pathname === '/login') return null
 
-  const handleMouseEnter = (): void => setIsVisible(true);
-  const handleMouseLeave = (): void => setIsVisible(false);
+  const handleMouseEnter = (): void => setIsVisible(true)
+  const handleMouseLeave = (): void => setIsVisible(false)
 
-  const isGamePage = location.pathname === '/game';
+  const isGamePage = location.pathname === '/game'
 
   const handleButtonClick = (): void => {
     if (isGamePage) {
       if (confirm('Are you sure you want to quit the game and return to home?')) {
-        navigate('/home');
+        navigate('/home')
       }
     } else {
-      logout();
-      navigate('/login');
+      logout()
+      navigate('/login')
     }
-  };
+  }
 
   return (
     <>
@@ -39,7 +39,7 @@ const Navigation: React.FC = () => {
           right: 0,
           height: '10px',
           zIndex: 999,
-          cursor: 'pointer',
+          cursor: 'pointer'
         }}
       />
 
@@ -53,7 +53,7 @@ const Navigation: React.FC = () => {
           top: 0,
           left: 0,
           right: 0,
-          zIndex: 1000,
+          zIndex: 1000
         }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -64,7 +64,17 @@ const Navigation: React.FC = () => {
               <h2>🃏 Poker Online</h2>
             </Link>
           </div>
-          <div className="nav-links">{/* Navigation links removed */}</div>
+          <div className="nav-links">
+            {/* <Link to="/home" className={location.pathname === '/home' ? 'active' : ''}>
+              Home
+            </Link>
+            <Link to="/tables" className={location.pathname === '/tables' ? 'active' : ''}>
+              Tables
+            </Link>
+            <Link to="/friends" className={location.pathname === '/friends' ? 'active' : ''}>
+              Friends
+            </Link> */}
+          </div>
           <div className="nav-user">
             <span className="user-info">
               💰 ${user.chips} | {user.username}
@@ -79,7 +89,7 @@ const Navigation: React.FC = () => {
         </div>
       </nav>
     </>
-  );
-};
+  )
+}
 
-export default Navigation;
+export default Navigation

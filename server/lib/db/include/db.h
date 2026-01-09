@@ -50,6 +50,9 @@ typedef struct
     int num;
 } FriendList;
 
+// Alias for consistency
+typedef FriendList dbFriendList;
+
 // Friend invite structure
 typedef struct
 {

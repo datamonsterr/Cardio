@@ -1,116 +1,119 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import type { User, AuthContextType, CreateTableRequestType } from '../types';
-import { AuthService, ConnectionStatus } from '../services/auth/AuthService';
-import { HeartbeatService } from '../services/network/HeartbeatService';
-import { Packet, SignupRequest, CreateTableRequest, PACKET_TYPE } from '../services/protocol';
-import { getServerConfig } from '../config/server';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import type { User, AuthContextType, CreateTableRequestType } from '../types'
+import { AuthService, ConnectionStatus } from '../services/auth/AuthService'
+import { HeartbeatService } from '../services/network/HeartbeatService'
+import { Packet, SignupRequest, CreateTableRequest, PACKET_TYPE } from '../services/protocol'
+import { getServerConfig } from '../config/server'
 
 // Global connection status state
-let globalConnectionStatus: ConnectionStatus = 'disconnected';
-let globalConnectionMessage: string = '';
-const connectionStatusListeners: Set<(status: ConnectionStatus, message: string) => void> = new Set();
+let globalConnectionStatus: ConnectionStatus = 'disconnected'
+let globalConnectionMessage: string = ''
+const connectionStatusListeners: Set<(status: ConnectionStatus, message: string) => void> =
+  new Set()
 
 // Create heartbeat service instance
 const heartbeatService = new HeartbeatService({
   onStatusChange: (status, message) => {
     // Map heartbeat status to connection status
-    const connectionStatus: ConnectionStatus = 
-      status === 'connected' ? 'connected' :
-      status === 'reconnecting' ? 'connecting' :
-      'disconnected';
-    
-    console.log('Heartbeat status:', status, message);
-    globalConnectionStatus = connectionStatus;
-    globalConnectionMessage = message || '';
-    connectionStatusListeners.forEach(listener => listener(connectionStatus, message || ''));
+    const connectionStatus: ConnectionStatus =
+      status === 'connected'
+        ? 'connected'
+        : status === 'reconnecting'
+          ? 'connecting'
+          : 'disconnected'
+
+    console.log('Heartbeat status:', status, message)
+    globalConnectionStatus = connectionStatus
+    globalConnectionMessage = message || ''
+    connectionStatusListeners.forEach((listener) => listener(connectionStatus, message || ''))
   }
-});
+})
 
 // Create auth service instance
-const serverConfig = getServerConfig();
+const serverConfig = getServerConfig()
 const authService = new AuthService({
   host: serverConfig.host,
   port: serverConfig.port,
   onDisconnect: () => {
-    console.log('Disconnected from server');
-    heartbeatService.stop();
+    console.log('Disconnected from server')
+    heartbeatService.stop()
   },
   onPacket: (packet: Packet) => {
     // Handle PONG for heartbeat
     if (packet.header.packet_type === PACKET_TYPE.PONG) {
-      heartbeatService.onPongReceived();
-      return;
+      heartbeatService.onPongReceived()
+      return
     }
-    console.log('Received packet:', packet.header.packet_type);
+    console.log('Received packet:', packet.header.packet_type)
   },
   onConnectionStatusChange: (status: ConnectionStatus, message?: string) => {
-    console.log('Connection status:', status, message);
+    console.log('Connection status:', status, message)
     // Update global status for non-heartbeat connection events
-    globalConnectionStatus = status;
-    globalConnectionMessage = message || '';
-    connectionStatusListeners.forEach(listener => listener(status, message || ''));
-    
+    globalConnectionStatus = status
+    globalConnectionMessage = message || ''
+    connectionStatusListeners.forEach((listener) => listener(status, message || ''))
+
     // Start/stop heartbeat based on connection status
     if (status === 'connected') {
       // Start heartbeat when connection is established
-      const client = authService.getClient();
+      const client = authService.getClient()
       if (client) {
-        heartbeatService.start(client);
+        heartbeatService.start(client)
       }
     } else if (status === 'disconnected' || status === 'error') {
-      heartbeatService.stop();
+      heartbeatService.stop()
     }
   }
-});
+})
 
 export const subscribeToConnectionStatus = (
   listener: (status: ConnectionStatus, message: string) => void
 ): (() => void) => {
-  connectionStatusListeners.add(listener);
+  connectionStatusListeners.add(listener)
   // Immediately call with current status
-  listener(globalConnectionStatus, globalConnectionMessage);
-  return () => connectionStatusListeners.delete(listener);
-};
+  listener(globalConnectionStatus, globalConnectionMessage)
+  return () => connectionStatusListeners.delete(listener)
+}
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 interface AuthProviderProps {
-  children: ReactNode;
+  children: ReactNode
 }
 
 export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState<boolean>(true)
 
   useEffect(() => {
     // Check for stored user on mount
-    const storedUser = localStorage.getItem('pokerUser');
+    const storedUser = localStorage.getItem('pokerUser')
     if (storedUser) {
       try {
-        setUser(JSON.parse(storedUser));
+        setUser(JSON.parse(storedUser))
       } catch (error) {
-        console.error('Failed to parse stored user:', error);
-        localStorage.removeItem('pokerUser');
+        console.error('Failed to parse stored user:', error)
+        localStorage.removeItem('pokerUser')
       }
     }
-    setLoading(false);
+    setLoading(false)
 
     // Connect to server immediately on app start
     const connectToServer = async () => {
       try {
-        await authService.connect();
-        console.log('Connected to server on app start');
+        await authService.connect()
+        console.log('Connected to server on app start')
       } catch (error) {
-        console.error('Failed to connect to server on app start:', error);
+        console.error('Failed to connect to server on app start:', error)
       }
-    };
+    }
 
-    connectToServer();
-  }, []);
+    connectToServer()
+  }, [])
 
   const login = async (username: string, password: string): Promise<boolean> => {
     try {
-      const authenticatedUser = await authService.login(username, password);
+      const authenticatedUser = await authService.login(username, password)
 
       // Convert AuthUser to our User type and store
       const user: User = {
@@ -122,46 +125,46 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
         gamesPlayed: 0,
         wins: 0,
         totalWinnings: 0
-      };
+      }
 
-      setUser(user);
-      localStorage.setItem('pokerUser', JSON.stringify(user));
-      return true;
+      setUser(user)
+      localStorage.setItem('pokerUser', JSON.stringify(user))
+      return true
     } catch (error) {
-      console.error('Login failed:', error);
-      return false;
+      console.error('Login failed:', error)
+      return false
     }
-  };
+  }
 
   const logout = (): void => {
-    heartbeatService.stop();
-    authService.logout();
-    setUser(null);
-    localStorage.removeItem('pokerUser');
-  };
+    heartbeatService.stop()
+    authService.logout()
+    setUser(null)
+    localStorage.removeItem('pokerUser')
+  }
 
   const signup = async (request: SignupRequest): Promise<void> => {
-    await authService.signup(request);
-  };
+    await authService.signup(request)
+  }
 
   const updateChips = (amount: number): void => {
     setUser((prev) => {
-      if (!prev) return null;
-      const updated = { ...prev, chips: prev.chips + amount };
-      localStorage.setItem('pokerUser', JSON.stringify(updated));
-      return updated;
-    });
-  };
+      if (!prev) return null
+      const updated = { ...prev, chips: prev.chips + amount }
+      localStorage.setItem('pokerUser', JSON.stringify(updated))
+      return updated
+    })
+  }
 
   const getTables = async () => {
     try {
-      const response = await authService.getTables();
-      return response;
+      const response = await authService.getTables()
+      return response
     } catch (error) {
-      console.error('Failed to get tables:', error);
-      throw error;
+      console.error('Failed to get tables:', error)
+      throw error
     }
-  };
+  }
 
   const createTable = async (request: CreateTableRequestType) => {
     try {
@@ -169,25 +172,41 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
         name: request.name,
         max_player: request.max_player,
         min_bet: request.min_bet
-      };
-      await authService.createTable(createRequest);
+      }
+      await authService.createTable(createRequest)
     } catch (error) {
-      console.error('Failed to create table:', error);
-      throw error;
+      console.error('Failed to create table:', error)
+      throw error
     }
-  };
+  }
+
+  const getClient = () => {
+    return authService.getClient()
+  }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, updateChips, loading, signup, getTables, createTable }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        logout,
+        updateChips,
+        loading,
+        signup,
+        getTables,
+        createTable,
+        getClient
+      }}
+    >
       {children}
     </AuthContext.Provider>
-  );
+  )
 }
 
 export function useAuth(): AuthContextType {
-  const context = useContext(AuthContext);
+  const context = useContext(AuthContext)
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error('useAuth must be used within an AuthProvider')
   }
-  return context;
+  return context
 }

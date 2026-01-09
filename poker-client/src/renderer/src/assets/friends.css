@@ -1,0 +1,404 @@
+.friends-page {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 2rem;
+  background:
+    linear-gradient(135deg, rgba(10, 14, 23, 0.92) 0%, rgba(15, 20, 25, 0.92) 100%),
+    url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800"><defs><pattern id="cards" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse"><rect x="10" y="10" width="30" height="40" fill="none" stroke="%23ffd700" stroke-width="2" rx="3"/><text x="25" y="40" text-anchor="middle" fill="%23ffd700" font-size="12">♠</text></pattern></defs><rect width="1200" height="800" fill="%230a0e17"/><rect width="1200" height="800" fill="url(%23cards)" opacity="0.05"/></svg>');
+  background-attachment: fixed;
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-y: auto;
+}
+
+.friends-container {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.friends-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding: 1.5rem 0;
+}
+
+.friends-title {
+  color: #ffd700;
+  font-size: 2.5rem;
+  font-weight: 700;
+  text-shadow: 0 2px 20px rgba(255, 215, 0, 0.3);
+  letter-spacing: -0.5px;
+  margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.refresh-button,
+.home-button {
+  padding: 0.75rem 1.5rem;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.refresh-button {
+  background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+  box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+}
+
+.refresh-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(108, 117, 125, 0.4);
+}
+
+.refresh-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.home-button {
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+  color: #0a0e17;
+  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+}
+
+.home-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 215, 0, 0.5);
+}
+
+.refresh-button svg,
+.home-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.friends-tabs {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  border-bottom: 2px solid rgba(255, 215, 0, 0.2);
+}
+
+.friends-tab {
+  padding: 1rem 2rem;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  transition: all 0.3s ease;
+}
+
+.friends-tab:hover {
+  color: rgba(255, 215, 0, 0.8);
+}
+
+.friends-tab.active {
+  color: #ffd700;
+  border-bottom-color: #ffd700;
+}
+
+.message-box {
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  font-weight: 500;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.error-message {
+  background: rgba(220, 53, 69, 0.15);
+  color: #ff6b6b;
+  border: 1px solid rgba(220, 53, 69, 0.3);
+}
+
+.success-message {
+  background: rgba(40, 167, 69, 0.15);
+  color: #51cf66;
+  border: 1px solid rgba(40, 167, 69, 0.3);
+}
+
+.invite-form {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 215, 0, 0.1);
+}
+
+.invite-input {
+  flex: 1;
+  padding: 1rem 1.5rem;
+  font-size: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 215, 0, 0.2);
+  border-radius: 8px;
+  color: white;
+  transition: all 0.3s ease;
+}
+
+.invite-input:focus {
+  outline: none;
+  border-color: #ffd700;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.1);
+}
+
+.invite-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.invite-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.invite-button {
+  padding: 1rem 2rem;
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+  color: #0a0e17;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 700;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+  white-space: nowrap;
+}
+
+.invite-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 215, 0, 0.5);
+}
+
+.invite-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.friends-content {
+  min-height: 400px;
+}
+
+.loading-text {
+  text-align: center;
+  padding: 3rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 1.1rem;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.empty-state p {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.friends-list,
+.invites-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.friend-card {
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 215, 0, 0.15);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.friend-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 215, 0, 0.3);
+  transform: translateX(5px);
+}
+
+.friend-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+  color: #0a0e17;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: bold;
+  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+}
+
+.friend-name {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: white;
+  margin-bottom: 0.25rem;
+}
+
+.friend-id {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.invite-card {
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 215, 0, 0.15);
+  border-radius: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.invite-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 215, 0, 0.3);
+}
+
+.invite-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+}
+
+.invite-name {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: white;
+  margin-bottom: 0.25rem;
+}
+
+.invite-date {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.invite-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.accept-button {
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+}
+
+.accept-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+}
+
+.accept-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.reject-button {
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+}
+
+.reject-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(220, 53, 69, 0.4);
+}
+
+.reject-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .friends-page {
+    padding: 1rem;
+  }
+
+  .friends-title {
+    font-size: 2rem;
+  }
+
+  .invite-form {
+    flex-direction: column;
+  }
+
+  .invite-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .invite-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .accept-button,
+  .reject-button {
+    flex: 1;
+  }
+}
