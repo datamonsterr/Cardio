@@ -10,10 +10,10 @@ const Handle: React.FC<HandleProps> = ({ handle: { id, value, percent }, getHand
   return (
     <div
       style={{
-        left: `${percent}%`,
+        bottom: `${percent}%`,
+        left: '50%',
+        transform: 'translate(-50%, 50%)',
         position: 'absolute',
-        marginLeft: -15,
-        marginTop: 25,
         zIndex: 2,
         width: 30,
         height: 30,
@@ -23,17 +23,22 @@ const Handle: React.FC<HandleProps> = ({ handle: { id, value, percent }, getHand
         borderRadius: '50%',
         backgroundColor: '#2C4870',
         color: '#aaa',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
       }}
       {...getHandleProps(id)}
     >
       <div
         style={{
-          display: 'flex',
+          position: 'absolute',
+          left: '40px',
+          whiteSpace: 'nowrap',
           textShadow: '2px 2px 8px rgba(0,0,0,0.95)',
-          justifyContent: 'center',
           fontFamily: 'Roboto',
-          fontSize: 11,
-          marginTop: 30,
+          fontSize: 14,
+          color: '#fff',
+          fontWeight: 'bold',
         }}
       >
         {value}

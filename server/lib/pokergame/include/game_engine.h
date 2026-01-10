@@ -118,6 +118,8 @@ typedef struct {
     
     // Game flags
     bool hand_in_progress;
+    int winner_seat;            // Winner of the hand (-1 if not determined yet)
+    int amount_won;             // Amount won by the winner (0 if not determined)
     bool waiting_for_players;   // Waiting for minimum players
 } GameState;
 

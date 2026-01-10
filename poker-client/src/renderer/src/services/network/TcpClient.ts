@@ -278,6 +278,20 @@ export class TcpClient {
   }
 
   /**
+   * Update packet handler
+   */
+  setPacketHandler(handler: ((packet: Packet) => void) | undefined): void {
+    this.config.onPacket = handler;
+  }
+
+  /**
+   * Get current packet handler
+   */
+  getPacketHandler(): ((packet: Packet) => void) | undefined {
+    return this.config.onPacket;
+  }
+
+  /**
    * Update connection state
    */
   private setState(state: ConnectionState): void {

@@ -116,6 +116,7 @@ struct LoginRequest
 LoginRequest* decode_login_request(char* data);
 RawBytes* encode_response_msg(int res, char* msg);
 RawBytes* encode_response(int res);
+RawBytes* encode_create_table_response(int res, int table_id);
 
 struct SignupRequest
 {

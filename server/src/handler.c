@@ -44,7 +44,9 @@ void handle_login_request(conn_data_t* conn_data, char* data, size_t data_len)
 
         PQfinish(conn);
 
+        free(response->data);
         free(response);
+        free(raw_bytes->data);
         free(raw_bytes);
         free(login_request);
         
@@ -64,7 +66,9 @@ void handle_login_request(conn_data_t* conn_data, char* data, size_t data_len)
 
     PQfinish(conn);
 
+    free(response->data);
     free(response);
+    free(raw_bytes->data);
     free(raw_bytes);
     free_packet(packet);
     free(login_request);
@@ -121,7 +125,9 @@ void handle_signup_request(conn_data_t* conn_data, char* data, size_t data_len)
 
         PQfinish(conn);
 
+        free(response->data);
         free(response);
+        free(raw_bytes->data);
         free(raw_bytes);
         free(signup_request);
         
@@ -140,7 +146,9 @@ void handle_signup_request(conn_data_t* conn_data, char* data, size_t data_len)
 
     PQfinish(conn);
 
+    free(response->data);
     free(response);
+    free(raw_bytes->data);
     free(raw_bytes);
     free_packet(packet);
     free(signup_request);
@@ -189,7 +197,9 @@ void handle_create_table_request(conn_data_t* conn_data, char* data, size_t data
         {
             logger_ex(MAIN_LOG, "ERROR", __func__, "Cannot send response", 1);
         }
+        free(response->data);
         free(response);
+        free(raw_bytes->data);
         free(raw_bytes);
         free_packet(packet);
         return;
@@ -208,7 +218,7 @@ void handle_create_table_request(conn_data_t* conn_data, char* data, size_t data
     RawBytes* response = malloc(sizeof(RawBytes));
     if (res > 0 && is_join_ok >= 0)
     {
-        raw_bytes = encode_response(R_CREATE_TABLE_OK);
+        raw_bytes = encode_create_table_response(R_CREATE_TABLE_OK, res);
         response = encode_packet(PROTOCOL_V1, 300, raw_bytes->data, raw_bytes->len);
         snprintf(log_msg, sizeof(log_msg), "Table created SUCCESS: id=%d name='%s' creator='%s'", 
                  res, create_table_request->table_name, conn_data->username);
@@ -227,7 +237,9 @@ void handle_create_table_request(conn_data_t* conn_data, char* data, size_t data
         logger_ex(MAIN_LOG, "ERROR", __func__, "Cannot send response", 1);
     }
 
+    free(response->data);
     free(response);
+    free(raw_bytes->data);
     free(raw_bytes);
     free_packet(packet);
     free(create_table_request);
@@ -254,7 +266,10 @@ void handle_get_all_tables_request(conn_data_t* conn_data, char* data, size_t da
         logger(MAIN_LOG, "Error", "Handle get all tables: Cannot send response");
     }
 
+    free(response->data);
     free(response);
+    free(raw_bytes->data);
+    free(raw_bytes);
     free_packet(packet);
 }
 void handle_join_table_request(conn_data_t* conn_data, char* data, size_t data_len, TableList* table_list)
@@ -286,10 +301,55 @@ void handle_join_table_request(conn_data_t* conn_data, char* data, size_t data_l
         is_valid = 0;
     }
 
+    // Parse the requested table_id early so we can check if user is rejoining same table
+    int requested_table_id = 0;
+    if (is_valid) {
+        requested_table_id = decode_join_table_request(packet->data);
+    }
+
+    // Check if user is already at a table
     if (conn_data->table_id != 0)
     {
-        snprintf(log_msg, sizeof(log_msg), "User already at table (table_id=%d)", conn_data->table_id);
-        logger_ex(MAIN_LOG, "ERROR", __func__, log_msg, 1);
+        snprintf(log_msg, sizeof(log_msg), "User already at table (table_id=%d), requested table_id=%d", 
+                 conn_data->table_id, requested_table_id);
+        logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+        
+        // If user is trying to rejoin the same table, send them the current game state
+        if (conn_data->table_id == requested_table_id) {
+            snprintf(log_msg, sizeof(log_msg), "User '%s' rejoining same table %d, sending game state", 
+                     conn_data->username, conn_data->table_id);
+            logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+            
+            // Find the table
+            Table* table = NULL;
+            for (size_t i = 0; i < table_list->size; i++) {
+                if (table_list->tables[i].id == conn_data->table_id) {
+                    table = &table_list->tables[i];
+                    break;
+                }
+            }
+            
+            if (table && table->game_state) {
+                // Send current game state
+                RawBytes* game_state_data = encode_game_state(table->game_state, conn_data->user_id);
+                if (game_state_data) {
+                    RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_JOIN_TABLE, game_state_data->data, game_state_data->len);
+                    if (sendall(conn_data->fd, response->data, (int*) &(response->len)) == -1)
+                    {
+                        logger_ex(MAIN_LOG, "ERROR", __func__, "Cannot send response", 1);
+                    }
+                    free(response->data);
+                    free(response);
+                    free(game_state_data->data);
+                    free(game_state_data);
+                    free_packet(packet);
+                    return;
+                }
+            }
+        }
+        
+        // User is trying to join a different table while already at one
+        logger_ex(MAIN_LOG, "ERROR", __func__, "User trying to join different table", 1);
         is_valid = 0;
     }
 
@@ -301,13 +361,15 @@ void handle_join_table_request(conn_data_t* conn_data, char* data, size_t data_l
         {
             logger_ex(MAIN_LOG, "ERROR", __func__, "Cannot send response", 1);
         }
+        free(response->data);
         free(response);
+        free(raw_bytes->data);
         free(raw_bytes);
         free_packet(packet);
         return;
     }
 
-    int table_id = decode_join_table_request(packet->data);
+    int table_id = requested_table_id;
     snprintf(log_msg, sizeof(log_msg), "User '%s' attempting to join table_id=%d", 
              conn_data->username, table_id);
     logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
@@ -322,12 +384,63 @@ void handle_join_table_request(conn_data_t* conn_data, char* data, size_t data_l
                  conn_data->username, table_id, conn_data->seat);
         logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
         
-        // Send game state to the joining player
         Table* table = &table_list->tables[res];
+        GameState* gs = table->game_state;
+        
+        snprintf(log_msg, sizeof(log_msg), "After join: table_id=%d num_players=%d hand_in_progress=%d", 
+                 table->id, gs->num_players, gs->hand_in_progress);
+        logger_ex(MAIN_LOG, "DEBUG", __func__, log_msg, 1);
+        
+        // Check if game should start (need at least 2 players, count WAITING/ACTIVE/ALL_IN)
+        bool game_just_started = false;
+        if (!gs->hand_in_progress && gs->num_players >= 2) {
+            // Start a new hand
+            snprintf(log_msg, sizeof(log_msg), "Starting hand %d at table %d after player join (num_players=%d)", 
+                     gs->hand_id + 1, table->id, gs->num_players);
+            logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+            
+            int start_result = game_start_hand(gs);
+            if (start_result == 0) {
+                table->game_started = true;
+                table->active_seat = gs->active_seat;
+                game_just_started = true;
+                
+                // Debug: Log player states after game start
+                for (int i = 0; i < MAX_PLAYERS; i++) {
+                    if (gs->players[i].state != PLAYER_STATE_EMPTY) {
+                        snprintf(log_msg, sizeof(log_msg), 
+                                "Player seat=%d id=%d name=%s state=%d money=%d is_dealer=%d is_sb=%d is_bb=%d", 
+                                i, gs->players[i].player_id, gs->players[i].name, 
+                                gs->players[i].state, gs->players[i].money,
+                                gs->players[i].is_dealer, gs->players[i].is_small_blind, 
+                                gs->players[i].is_big_blind);
+                        logger_ex(MAIN_LOG, "DEBUG", __func__, log_msg, 1);
+                    }
+                }
+                
+                snprintf(log_msg, sizeof(log_msg), 
+                        "Game started: hand_id=%d dealer_seat=%d active_seat=%d betting_round=%d", 
+                        gs->hand_id, gs->dealer_seat, gs->active_seat, gs->betting_round);
+                logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+            } else if (start_result == -3) {
+                snprintf(log_msg, sizeof(log_msg), "Failed to start game: No big blind found");
+                logger_ex(MAIN_LOG, "ERROR", __func__, log_msg, 1);
+            } else if (start_result == -4) {
+                snprintf(log_msg, sizeof(log_msg), "Failed to start game: No active player after big blind");
+                logger_ex(MAIN_LOG, "ERROR", __func__, log_msg, 1);
+            } else {
+                snprintf(log_msg, sizeof(log_msg), "Failed to start game: error=%d", start_result);
+                logger_ex(MAIN_LOG, "ERROR", __func__, log_msg, 1);
+            }
+        }
+        
+        // Encode the current game state for the joining player
         RawBytes* game_state_data = encode_game_state(table->game_state, conn_data->user_id);
         
-        snprintf(log_msg, sizeof(log_msg), "encode_game_state returned: %p (size=%zu)", 
-                 (void*)game_state_data, game_state_data ? game_state_data->len : 0);
+        snprintf(log_msg, sizeof(log_msg), 
+                "encode_game_state returned: %p (size=%zu) for user_id=%d, gs->active_seat=%d", 
+                (void*)game_state_data, game_state_data ? game_state_data->len : 0,
+                conn_data->user_id, gs->active_seat);
         logger_ex(MAIN_LOG, "DEBUG", __func__, log_msg, 1);
         
         if (game_state_data) {
@@ -344,8 +457,63 @@ void handle_join_table_request(conn_data_t* conn_data, char* data, size_t data_l
             raw_bytes = encode_response(R_JOIN_TABLE_OK);
         }
         
-        // Try to start game if we have enough players
-        start_game_if_ready(table);
+        // Send join response to the joining player first
+        response = encode_packet(PROTOCOL_V1, PACKET_JOIN_TABLE, raw_bytes->data, raw_bytes->len);
+        printf("response len = %d\n", response->len);
+        if (sendall(conn_data->fd, response->data, (int*) &(response->len)) == -1)
+        {
+            logger_ex(MAIN_LOG, "ERROR", __func__, "Cannot send response", 1);
+        }
+        free(response->data);
+        free(response);
+        free(raw_bytes->data);
+        free(raw_bytes);
+        free_packet(packet);
+        
+        // If game just started, broadcast to OTHER players (not the one who just joined)
+        if (game_just_started) {
+            snprintf(log_msg, sizeof(log_msg), "Broadcasting game start to other players at table %d", table->id);
+            logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+            
+            for (int i = 0; i < table->current_player; i++) {
+                conn_data_t* other_conn = table->connections[i];
+                
+                // Skip the player who just joined (they already got the state in join response)
+                if (!other_conn || other_conn->fd == conn_data->fd) {
+                    continue;
+                }
+                
+                // Encode and send game state to this player
+                RawBytes* other_game_state = encode_game_state(gs, other_conn->user_id);
+                if (other_game_state) {
+                    RawBytes* broadcast_packet = encode_packet(PROTOCOL_V1, PACKET_UPDATE_GAMESTATE,
+                                                              other_game_state->data, other_game_state->len);
+                    if (broadcast_packet) {
+                        int send_len = broadcast_packet->len;
+                        int send_result = sendall(other_conn->fd, broadcast_packet->data, &send_len);
+                        
+                        if (send_result == -1) {
+                            snprintf(log_msg, sizeof(log_msg), 
+                                    "Failed to send game state to user='%s' fd=%d", 
+                                    other_conn->username, other_conn->fd);
+                            logger_ex(MAIN_LOG, "ERROR", __func__, log_msg, 1);
+                        } else {
+                            snprintf(log_msg, sizeof(log_msg), 
+                                    "Sent game state (%d bytes) to user='%s' fd=%d", 
+                                    send_len, other_conn->username, other_conn->fd);
+                            logger_ex(MAIN_LOG, "DEBUG", __func__, log_msg, 1);
+                        }
+                        
+                        free(broadcast_packet->data);
+                        free(broadcast_packet);
+                    }
+                    free(other_game_state->data);
+                    free(other_game_state);
+                }
+            }
+        }
+        
+        return;
     }
     else if (res == -2)
     {
@@ -369,7 +537,9 @@ void handle_join_table_request(conn_data_t* conn_data, char* data, size_t data_l
     {
         logger_ex(MAIN_LOG, "ERROR", __func__, "Cannot send response", 1);
     }
+    free(response->data);
     free(response);
+    free(raw_bytes->data);
     free(raw_bytes);
     free_packet(packet);
     return;
@@ -403,7 +573,9 @@ void handle_get_scoreboard(conn_data_t* conn_data, char* data, size_t data_len)
         logger(MAIN_LOG, "Error", "Handle get scoreboard: Cannot send response");
     }
 
+    free(response->data);
     free(response);
+    free(raw_bytes->data);
     free(raw_bytes);
     free_packet(packet);
     PQfinish(conn);
@@ -438,7 +610,9 @@ void handle_get_friendlist(conn_data_t* conn_data, char* data, size_t data_len)
         logger(MAIN_LOG, "Error", "Handle get friendlist: Cannot send response");
     }
 
+    free(response->data);
     free(response);
+    free(raw_bytes->data);
     free(raw_bytes);
     free_packet(packet);
     PQfinish(conn);
@@ -446,6 +620,56 @@ void handle_get_friendlist(conn_data_t* conn_data, char* data, size_t data_len)
 
 void handle_leave_table_request(conn_data_t* conn_data, char* data, size_t data_len, TableList* table_list)
 {
+    char log_msg[256];
+    snprintf(log_msg, sizeof(log_msg), "Leave table request from fd=%d user='%s'", 
+             conn_data->fd, conn_data->username);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    
+    Packet* packet = decode_packet(data, data_len);
+    if (!packet || packet->header->packet_type != PACKET_LEAVE_TABLE) {
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Invalid packet", 1);
+        if (packet) free_packet(packet);
+        return;
+    }
+    
+    // Validate user is at a table
+    if (conn_data->table_id == 0) {
+        RawBytes* raw_bytes = encode_response(R_LEAVE_TABLE_NOT_OK);
+        RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_LEAVE_TABLE, raw_bytes->data, raw_bytes->len);
+        sendall(conn_data->fd, response->data, (int*)&response->len);
+        free(response->data);
+        free(response);
+        free(raw_bytes->data);
+        free(raw_bytes);
+        free_packet(packet);
+        logger_ex(MAIN_LOG, "WARN", __func__, "User not at a table", 1);
+        return;
+    }
+    
+    int old_table_id = conn_data->table_id;
+    int result = leave_table(conn_data, table_list);
+    
+    RawBytes* raw_bytes;
+    if (result == 0) {
+        raw_bytes = encode_response(R_LEAVE_TABLE_OK);
+        snprintf(log_msg, sizeof(log_msg), "Leave table SUCCESS: user='%s' left table_id=%d", 
+                 conn_data->username, old_table_id);
+        logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    } else {
+        raw_bytes = encode_response(R_LEAVE_TABLE_NOT_OK);
+        snprintf(log_msg, sizeof(log_msg), "Leave table FAILED: user='%s' result=%d", 
+                 conn_data->username, result);
+        logger_ex(MAIN_LOG, "ERROR", __func__, log_msg, 1);
+    }
+    
+    RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_LEAVE_TABLE, raw_bytes->data, raw_bytes->len);
+    sendall(conn_data->fd, response->data, (int*)&response->len);
+    
+    free(response->data);
+    free(response);
+    free(raw_bytes->data);
+    free(raw_bytes);
+    free_packet(packet);
 }
 
 void handle_action_request(conn_data_t* conn_data, char* data, size_t data_len, TableList* table_list)
@@ -469,8 +693,10 @@ void handle_action_request(conn_data_t* conn_data, char* data, size_t data_len, 
                                               result_bytes->data, result_bytes->len);
             if (response) {
                 sendall(conn_data->fd, response->data, (int*)&response->len);
+                free(response->data);
                 free(response);
             }
+            free(result_bytes->data);
             free(result_bytes);
         }
         return;
@@ -524,8 +750,10 @@ void handle_action_request(conn_data_t* conn_data, char* data, size_t data_len, 
                                               result_bytes->data, result_bytes->len);
             if (response) {
                 sendall(conn_data->fd, response->data, (int*)&response->len);
+                free(response->data);
                 free(response);
             }
+            free(result_bytes->data);
             free(result_bytes);
         }
         
@@ -563,8 +791,10 @@ void handle_action_request(conn_data_t* conn_data, char* data, size_t data_len, 
                                               result_bytes->data, result_bytes->len);
             if (response) {
                 sendall(conn_data->fd, response->data, (int*)&response->len);
+                free(response->data);
                 free(response);
             }
+            free(result_bytes->data);
             free(result_bytes);
         }
         
@@ -589,8 +819,10 @@ void handle_action_request(conn_data_t* conn_data, char* data, size_t data_len, 
                                               result_bytes->data, result_bytes->len);
             if (response) {
                 sendall(conn_data->fd, response->data, (int*)&response->len);
+                free(response->data);
                 free(response);
             }
+            free(result_bytes->data);
             free(result_bytes);
         }
         
@@ -614,8 +846,10 @@ void handle_action_request(conn_data_t* conn_data, char* data, size_t data_len, 
                                               result_bytes->data, result_bytes->len);
             if (response) {
                 sendall(conn_data->fd, response->data, (int*)&response->len);
+                free(response->data);
                 free(response);
             }
+            free(result_bytes->data);
             free(result_bytes);
         }
         
@@ -636,24 +870,32 @@ void handle_action_request(conn_data_t* conn_data, char* data, size_t data_len, 
                                           result_bytes->data, result_bytes->len);
         if (response) {
             sendall(conn_data->fd, response->data, (int*)&response->len);
+            free(response->data);
             free(response);
         }
+        free(result_bytes->data);
         free(result_bytes);
     }
     
     // Broadcast updated game state to all players at the table
-    for (int i = 0; i < table->current_player; i++) {
-        if (table->connections[i] != NULL && table->connections[i]->fd > 0) {
-            RawBytes* game_state_data = encode_game_state(gs, table->connections[i]->user_id);
-            if (game_state_data) {
-                RawBytes* broadcast_packet = encode_packet(PROTOCOL_V1, PACKET_UPDATE_GAMESTATE, 
-                                                          game_state_data->data, game_state_data->len);
-                if (broadcast_packet) {
-                    sendall(table->connections[i]->fd, broadcast_packet->data, (int*)&broadcast_packet->len);
-                    free(broadcast_packet);
-                }
-                free(game_state_data);
-            }
+    int broadcast_count = broadcast_game_state_to_table(table);
+    if (broadcast_count <= 0) {
+        snprintf(log_msg, sizeof(log_msg), "Warning: Failed to broadcast game state after action from user='%s'", 
+                 conn_data->username);
+        logger_ex(MAIN_LOG, "WARN", __func__, log_msg, 1);
+    } else {
+        // Update table's active_seat tracker after broadcasting
+        table->active_seat = table->game_state->active_seat;
+        
+        // Check if hand is complete (showdown finished)
+        if (table->game_state->betting_round == BETTING_ROUND_COMPLETE) {
+            table->active_seat = -1;
+            
+            snprintf(log_msg, sizeof(log_msg), "Hand completed at table %d, preparing for next hand", table->id);
+            logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+            
+            // Try to start next hand if enough players remain
+            start_game_if_ready(table);
         }
     }
     
@@ -677,7 +919,9 @@ void handle_add_friend_request(conn_data_t* conn_data, char* data, size_t data_l
         RawBytes* raw_bytes = encode_response(R_ADD_FRIEND_NOT_OK);
         RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_ADD_FRIEND, raw_bytes->data, raw_bytes->len);
         sendall(conn_data->fd, response->data, (int*) &(response->len));
+        free(response->data);
         free(response);
+        free(raw_bytes->data);
         free(raw_bytes);
         logger_ex(MAIN_LOG, "ERROR", __func__, "User not logged in", 1);
         return;
@@ -743,7 +987,9 @@ void handle_add_friend_request(conn_data_t* conn_data, char* data, size_t data_l
     RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_ADD_FRIEND, raw_bytes->data, raw_bytes->len);
     sendall(conn_data->fd, response->data, (int*) &(response->len));
 
+    free(response->data);
     free(response);
+    free(raw_bytes->data);
     free(raw_bytes);
     free(request);
     free_packet(packet);
@@ -761,7 +1007,9 @@ void handle_invite_friend_request(conn_data_t* conn_data, char* data, size_t dat
         RawBytes* raw_bytes = encode_response(R_INVITE_FRIEND_NOT_OK);
         RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_INVITE_FRIEND, raw_bytes->data, raw_bytes->len);
         sendall(conn_data->fd, response->data, (int*) &(response->len));
+        free(response->data);
         free(response);
+        free(raw_bytes->data);
         free(raw_bytes);
         logger_ex(MAIN_LOG, "ERROR", __func__, "User not logged in", 1);
         return;
@@ -835,7 +1083,9 @@ void handle_invite_friend_request(conn_data_t* conn_data, char* data, size_t dat
     RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_INVITE_FRIEND, raw_bytes->data, raw_bytes->len);
     sendall(conn_data->fd, response->data, (int*) &(response->len));
 
+    free(response->data);
     free(response);
+    free(raw_bytes->data);
     free(raw_bytes);
     free(request);
     free_packet(packet);
@@ -853,7 +1103,9 @@ void handle_accept_invite_request(conn_data_t* conn_data, char* data, size_t dat
         RawBytes* raw_bytes = encode_response(R_ACCEPT_INVITE_NOT_OK);
         RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_ACCEPT_INVITE, raw_bytes->data, raw_bytes->len);
         sendall(conn_data->fd, response->data, (int*) &(response->len));
+        free(response->data);
         free(response);
+        free(raw_bytes->data);
         free(raw_bytes);
         logger_ex(MAIN_LOG, "ERROR", __func__, "User not logged in", 1);
         return;
@@ -915,7 +1167,9 @@ void handle_accept_invite_request(conn_data_t* conn_data, char* data, size_t dat
     RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_ACCEPT_INVITE, raw_bytes->data, raw_bytes->len);
     sendall(conn_data->fd, response->data, (int*) &(response->len));
 
+    free(response->data);
     free(response);
+    free(raw_bytes->data);
     free(raw_bytes);
     free(request);
     free_packet(packet);
@@ -933,7 +1187,9 @@ void handle_reject_invite_request(conn_data_t* conn_data, char* data, size_t dat
         RawBytes* raw_bytes = encode_response(R_REJECT_INVITE_NOT_OK);
         RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_REJECT_INVITE, raw_bytes->data, raw_bytes->len);
         sendall(conn_data->fd, response->data, (int*) &(response->len));
+        free(response->data);
         free(response);
+        free(raw_bytes->data);
         free(raw_bytes);
         logger_ex(MAIN_LOG, "ERROR", __func__, "User not logged in", 1);
         return;
@@ -995,7 +1251,9 @@ void handle_reject_invite_request(conn_data_t* conn_data, char* data, size_t dat
     RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_REJECT_INVITE, raw_bytes->data, raw_bytes->len);
     sendall(conn_data->fd, response->data, (int*) &(response->len));
 
+    free(response->data);
     free(response);
+    free(raw_bytes->data);
     free(raw_bytes);
     free(request);
     free_packet(packet);
@@ -1013,7 +1271,9 @@ void handle_get_invites_request(conn_data_t* conn_data, char* data, size_t data_
         RawBytes* raw_bytes = encode_response(R_GET_INVITES_NOT_OK);
         RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_GET_INVITES, raw_bytes->data, raw_bytes->len);
         sendall(conn_data->fd, response->data, (int*) &(response->len));
+        free(response->data);
         free(response);
+        free(raw_bytes->data);
         free(raw_bytes);
         logger_ex(MAIN_LOG, "ERROR", __func__, "User not logged in", 1);
         return;
@@ -1036,7 +1296,9 @@ void handle_get_invites_request(conn_data_t* conn_data, char* data, size_t data_
         RawBytes* raw_bytes = encode_response(R_GET_INVITES_NOT_OK);
         RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_GET_INVITES, raw_bytes->data, raw_bytes->len);
         sendall(conn_data->fd, response->data, (int*) &(response->len));
+        free(response->data);
         free(response);
+        free(raw_bytes->data);
         free(raw_bytes);
         free_packet(packet);
         logger_ex(MAIN_LOG, "ERROR", __func__, "Failed to get invites from database", 1);
@@ -1051,7 +1313,9 @@ void handle_get_invites_request(conn_data_t* conn_data, char* data, size_t data_
     RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_GET_INVITES, raw_bytes->data, raw_bytes->len);
     sendall(conn_data->fd, response->data, (int*) &(response->len));
 
+    free(response->data);
     free(response);
+    free(raw_bytes->data);
     free(raw_bytes);
     free(invites->invites);
     free(invites);
@@ -1070,7 +1334,9 @@ void handle_get_friend_list_request(conn_data_t* conn_data, char* data, size_t d
         RawBytes* raw_bytes = encode_response(R_GET_FRIEND_LIST_NOT_OK);
         RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_GET_FRIEND_LIST, raw_bytes->data, raw_bytes->len);
         sendall(conn_data->fd, response->data, (int*) &(response->len));
+        free(response->data);
         free(response);
+        free(raw_bytes->data);
         free(raw_bytes);
         logger_ex(MAIN_LOG, "ERROR", __func__, "User not logged in", 1);
         return;
@@ -1093,7 +1359,9 @@ void handle_get_friend_list_request(conn_data_t* conn_data, char* data, size_t d
         RawBytes* raw_bytes = encode_response(R_GET_FRIEND_LIST_NOT_OK);
         RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_GET_FRIEND_LIST, raw_bytes->data, raw_bytes->len);
         sendall(conn_data->fd, response->data, (int*) &(response->len));
+        free(response->data);
         free(response);
+        free(raw_bytes->data);
         free(raw_bytes);
         free_packet(packet);
         logger_ex(MAIN_LOG, "ERROR", __func__, "Failed to get friend list from database", 1);
@@ -1108,7 +1376,9 @@ void handle_get_friend_list_request(conn_data_t* conn_data, char* data, size_t d
     RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_GET_FRIEND_LIST, raw_bytes->data, raw_bytes->len);
     sendall(conn_data->fd, response->data, (int*) &(response->len));
 
+    free(response->data);
     free(response);
+    free(raw_bytes->data);
     free(raw_bytes);
     free(friends->friends);
     free(friends);

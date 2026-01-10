@@ -85,6 +85,14 @@ export const PACKET_TYPE = {
   R_GET_FRIEND_LIST_NOT_OK: 962
 } as const
 
+// Export individual constants for convenience
+export const PACKET_ACTION_REQUEST = 450
+export const PACKET_ACTION_RESULT = 451
+export const PACKET_UPDATE_GAMESTATE = 600
+export const PACKET_UPDATE_BUNDLE = 460
+export const PACKET_JOIN_TABLE = 400
+export const PACKET_LEAVE_TABLE = 700
+
 // Response codes
 export const RESPONSE_CODE = {
   R_LOGIN_OK: 101,

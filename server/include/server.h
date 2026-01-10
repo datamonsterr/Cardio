@@ -54,5 +54,6 @@ int join_table(conn_data_t* conn_data, TableList* table_list, int table_id);
 
 // Game state management
 void broadcast_to_table(int table_id, TableList* table_list, char* data, int len);
+int broadcast_game_state_to_table(Table* table);
 void start_game_if_ready(Table* table);
 void process_player_action(conn_data_t* conn_data, Table* table, ActionRequest* action_req);

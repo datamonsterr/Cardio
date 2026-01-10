@@ -1,14 +1,16 @@
 // Slider style constants
 export const sliderStyle = {
   position: 'relative' as const,
-  width: '100%',
+  height: '200px',
+  width: '60px',
 };
 
 export const railStyle = {
   position: 'absolute' as const,
-  width: '100%',
-  height: 10,
-  marginTop: 35,
+  width: 10,
+  height: '100%',
+  left: '50%',
+  transform: 'translateX(-50%)',
   borderRadius: 5,
   backgroundColor: '#8B9CB6',
 };

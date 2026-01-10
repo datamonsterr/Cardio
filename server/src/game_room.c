@@ -55,6 +55,10 @@ int add_table(TableList* table_list, char* table_name, int max_player, int min_b
         table_list->tables[table_list->size].seat_to_conn_idx[i] = -1;
     }
     
+    // Initialize game tracking fields
+    table_list->tables[table_list->size].active_seat = -1;
+    table_list->tables[table_list->size].game_started = false;
+    
     table_list->size++;
     return id;
 }
@@ -174,6 +178,23 @@ int leave_table(conn_data_t* conn_data, TableList* table_list)
         table->current_player--;
     }
     
+    // Update game state tracking
+    if (table->game_state) {
+        int active_players = game_count_active_players(table->game_state);
+        
+        // If not enough players to continue, reset game state
+        if (active_players < 2) {
+            table->game_started = false;
+            table->active_seat = -1;
+        } else {
+            // Update active_seat from game state
+            table->active_seat = table->game_state->active_seat;
+            
+            // Broadcast updated game state to remaining players
+            broadcast_game_state_to_table(table);
+        }
+    }
+    
     // If no players left, clean up the table
     if (table->current_player == 0)
     {
@@ -225,6 +246,91 @@ void broadcast_to_table(int table_id, TableList* table_list, char* data, int len
     }
 }
 
+// Broadcast game state to all players at a table
+// Returns the number of successful broadcasts
+int broadcast_game_state_to_table(Table* table)
+{
+    if (!table || !table->game_state) {
+        logger(MAIN_LOG, "Error", "broadcast_game_state_to_table: Invalid table or game state");
+        return -1;
+    }
+    
+    GameState* gs = table->game_state;
+    int successful_broadcasts = 0;
+    int failed_broadcasts = 0;
+    
+    char msg[256];
+    snprintf(msg, sizeof(msg), "Broadcasting game state (hand=%u, seq=%u) to %d players at table %d", 
+             gs->hand_id, gs->seq, table->current_player, table->id);
+    logger(MAIN_LOG, "Info", msg);
+    
+    for (int i = 0; i < table->current_player; i++) {
+        if (table->connections[i] == NULL || table->connections[i]->fd <= 0) {
+            snprintf(msg, sizeof(msg), "Skipping null/invalid connection at index %d", i);
+            logger(MAIN_LOG, "Debug", msg);
+            continue;
+        }
+        
+        conn_data_t* conn = table->connections[i];
+        
+        // Encode game state for this specific player
+        RawBytes* game_state_data = encode_game_state(gs, conn->user_id);
+        if (!game_state_data) {
+            snprintf(msg, sizeof(msg), "Failed to encode game state for user_id=%d fd=%d", 
+                     conn->user_id, conn->fd);
+            logger(MAIN_LOG, "Error", msg);
+            failed_broadcasts++;
+            continue;
+        }
+        
+        // Wrap in packet
+        RawBytes* broadcast_packet = encode_packet(PROTOCOL_V1, PACKET_UPDATE_GAMESTATE, 
+                                                   game_state_data->data, game_state_data->len);
+        if (!broadcast_packet) {
+            snprintf(msg, sizeof(msg), "Failed to encode packet for user_id=%d fd=%d", 
+                     conn->user_id, conn->fd);
+            logger(MAIN_LOG, "Error", msg);
+            free(game_state_data->data);
+            free(game_state_data);
+            failed_broadcasts++;
+            continue;
+        }
+        
+        // Send to player
+        int send_len = broadcast_packet->len;
+        int result = sendall(conn->fd, broadcast_packet->data, &send_len);
+        
+        if (result == -1) {
+            snprintf(msg, sizeof(msg), "Failed to send game state to user='%s' user_id=%d fd=%d", 
+                     conn->username, conn->user_id, conn->fd);
+            logger(MAIN_LOG, "Error", msg);
+            failed_broadcasts++;
+        } else {
+            snprintf(msg, sizeof(msg), "Sent game state (%d bytes) to user='%s' user_id=%d fd=%d", 
+                     send_len, conn->username, conn->user_id, conn->fd);
+            logger(MAIN_LOG, "Debug", msg);
+            successful_broadcasts++;
+        }
+        
+        // Clean up
+        free(broadcast_packet->data);
+        free(broadcast_packet);
+        free(game_state_data->data);
+        free(game_state_data);
+    }
+    
+    if (failed_broadcasts > 0) {
+        snprintf(msg, sizeof(msg), "Broadcast complete: %d successful, %d failed", 
+                 successful_broadcasts, failed_broadcasts);
+        logger(MAIN_LOG, "Warn", msg);
+    } else {
+        snprintf(msg, sizeof(msg), "Broadcast complete: %d players notified", successful_broadcasts);
+        logger(MAIN_LOG, "Info", msg);
+    }
+    
+    return successful_broadcasts;
+}
+
 // Start game if we have enough players
 void start_game_if_ready(Table* table)
 {
@@ -255,6 +361,14 @@ void start_game_if_ready(Table* table)
         return;
     }
     
-    // TODO: Broadcast game state to all players
-    // This will be implemented with encode_game_state and encode_update_bundle
+    // Update table tracking fields
+    table->game_started = true;
+    table->active_seat = gs->active_seat;
+    
+    // Broadcast game state to all players at the table
+    int broadcast_count = broadcast_game_state_to_table(table);
+    if (broadcast_count <= 0) {
+        snprintf(msg, sizeof(msg), "Warning: No players received game start broadcast at table %d", table->id);
+        logger(MAIN_LOG, "Warn", msg);
+    }
 }

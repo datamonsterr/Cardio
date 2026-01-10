@@ -7,21 +7,37 @@
 ActionRequest* decode_action_request(char* payload)
 {
     if (!payload) {
+        logger_ex(MAIN_LOG, "ERROR", __func__, "NULL payload", 1);
         return NULL;
     }
     
     ActionRequest* req = malloc(sizeof(ActionRequest));
     if (!req) {
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Failed to allocate ActionRequest", 1);
         return NULL;
     }
     
     memset(req, 0, sizeof(ActionRequest));
     
+    // Debug: print first 50 bytes of payload
+    char debug_msg[256];
+    char hex_dump[150];
+    int dump_len = 0;
+    for (int i = 0; i < 50 && dump_len < 140; i++) {
+        dump_len += snprintf(hex_dump + dump_len, sizeof(hex_dump) - dump_len, "%02x ", (unsigned char)payload[i]);
+    }
+    snprintf(debug_msg, sizeof(debug_msg), "Payload hex: %s", hex_dump);
+    logger_ex(MAIN_LOG, "DEBUG", __func__, debug_msg, 1);
+    
+    // Note: We don't know the exact payload size, but action requests are small (< 200 bytes)
+    // Using a reasonable upper bound
     mpack_reader_t reader;
-    mpack_reader_init_data(&reader, payload, 4096);
+    mpack_reader_init_data(&reader, payload, 1024);  // Reduced from 4096 to avoid reading uninitialized memory
     
     // Read the main map
     uint32_t map_count = mpack_expect_map(&reader);
+    snprintf(debug_msg, sizeof(debug_msg), "Map count: %u", map_count);
+    logger_ex(MAIN_LOG, "DEBUG", __func__, debug_msg, 1);
     
     for (uint32_t i = 0; i < map_count; i++) {
         char key[32];
@@ -49,14 +65,21 @@ ActionRequest* decode_action_request(char* payload)
             }
         } 
         else if (strcmp(key, "client_seq") == 0) {
-            req->client_seq = mpack_expect_u32(&reader);
+            // Use mpack_expect_i64 to accept both signed and unsigned integers
+            // JavaScript msgpack may encode as int32 if high bit is set
+            int64_t seq = mpack_expect_i64(&reader);
+            req->client_seq = (uint32_t)(seq & 0xFFFFFFFF);
         }
         else {
             mpack_discard(&reader);
         }
     }
     
-    if (mpack_reader_destroy(&reader) != mpack_ok) {
+    mpack_error_t error = mpack_reader_destroy(&reader);
+    if (error != mpack_ok) {
+        char err_msg[128];
+        snprintf(err_msg, sizeof(err_msg), "mpack error: %s", mpack_error_to_string(error));
+        logger_ex(MAIN_LOG, "ERROR", __func__, err_msg, 1);
         free(req);
         return NULL;
     }
@@ -142,7 +165,7 @@ RawBytes* encode_game_state(GameState* state, int viewer_player_id)
     mpack_writer_t writer;
     mpack_writer_init(&writer, buffer, 16384);
     
-    mpack_start_map(&writer, 18);
+    mpack_start_map(&writer, 20);
     
     // Game identification
     mpack_write_cstr(&writer, "game_id");
@@ -180,6 +203,18 @@ RawBytes* encode_game_state(GameState* state, int viewer_player_id)
     
     mpack_write_cstr(&writer, "active_seat");
     mpack_write_int(&writer, state->active_seat);
+    
+    mpack_write_cstr(&writer, "winner_seat");
+    mpack_write_int(&writer, state->winner_seat);
+    
+    mpack_write_cstr(&writer, "amount_won");
+    mpack_write_int(&writer, state->amount_won);
+    
+    // Debug log the active_seat being encoded
+    char debug_msg[128];
+    snprintf(debug_msg, sizeof(debug_msg), 
+            "Encoding active_seat=%d for viewer=%d", state->active_seat, viewer_player_id);
+    logger_ex(MAIN_LOG, "DEBUG", "encode_game_state", debug_msg, 1);
     
     // Players array
     mpack_write_cstr(&writer, "players");
@@ -292,17 +327,37 @@ RawBytes* encode_game_state(GameState* state, int viewer_player_id)
     mpack_write_cstr(&writer, "available_actions");
     if (state->active_seat >= 0 && 
         state->players[state->active_seat].player_id == viewer_player_id) {
-        AvailableAction actions[10];
-        int num_actions = 0;
-        game_get_available_actions(state, viewer_player_id, actions, &num_actions);
-        
-        mpack_start_array(&writer, num_actions);
-        for (int i = 0; i < num_actions; i++) {
-            mpack_start_map(&writer, 4);
+        // Allocate on heap to avoid stack overflow - game_get_available_actions
+        // doesn't have array bounds checking
+        AvailableAction* actions = malloc(sizeof(AvailableAction) * 50);
+        if (!actions) {
+            // If allocation fails, just send empty array
+            mpack_start_array(&writer, 0);
+            mpack_finish_array(&writer);
+        } else {
+            int num_actions = 0;
+            game_get_available_actions(state, viewer_player_id, actions, &num_actions);
             
-            mpack_write_cstr(&writer, "type");
-            const char* action_names[] = {"fold", "check", "call", "bet", "raise", "all_in"};
-            mpack_write_cstr(&writer, action_names[actions[i].type]);
+            // Clamp num_actions to reasonable size to prevent buffer overread
+            if (num_actions > 50) {
+                num_actions = 50;
+            }
+            if (num_actions < 0) {
+                num_actions = 0;
+            }
+            
+            mpack_start_array(&writer, num_actions);
+            for (int i = 0; i < num_actions; i++) {
+                mpack_start_map(&writer, 4);
+                
+                mpack_write_cstr(&writer, "type");
+                const char* action_names[] = {"fold", "check", "call", "bet", "raise", "all_in"};
+                // Bounds check for action type
+                if (actions[i].type >= 0 && actions[i].type < 6) {
+                    mpack_write_cstr(&writer, action_names[actions[i].type]);
+                } else {
+                    mpack_write_cstr(&writer, "unknown");
+                }
             
             mpack_write_cstr(&writer, "min_amount");
             mpack_write_int(&writer, actions[i].min_amount);
@@ -316,6 +371,10 @@ RawBytes* encode_game_state(GameState* state, int viewer_player_id)
             mpack_finish_map(&writer);
         }
         mpack_finish_array(&writer);
+        
+        // Free the heap-allocated actions array
+        free(actions);
+        }
     } else {
         mpack_start_array(&writer, 0);
         mpack_finish_array(&writer);
