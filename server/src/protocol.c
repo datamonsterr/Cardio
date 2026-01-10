@@ -2,8 +2,15 @@
 
 void free_packet(Packet* packet)
 {
-    free(packet->header);
-    free(packet);
+    if (packet) {
+        if (packet->header) {
+            free(packet->header);
+        }
+        if (packet->data) {
+            free(packet->data);
+        }
+        free(packet);
+    }
 }
 
 RawBytes* encode_packet(__uint8_t protocol_ver, __uint16_t packet_type, char* payload, size_t payload_len)
@@ -189,6 +196,32 @@ RawBytes* encode_response(int res)
 
     RawBytes* raw_bytes = malloc(sizeof(RawBytes));
 
+    raw_bytes->len = mpack_writer_buffer_used(&writer);
+    raw_bytes->data = malloc(raw_bytes->len);
+    memcpy(raw_bytes->data, buffer, raw_bytes->len);
+
+    return raw_bytes;
+}
+
+RawBytes* encode_create_table_response(int res, int table_id)
+{
+    mpack_writer_t writer;
+    char buffer[100];
+    mpack_writer_init(&writer, buffer, 100);
+    mpack_start_map(&writer, 2);
+    mpack_write_cstr(&writer, "res");
+    mpack_write_u16(&writer, res);
+    mpack_write_cstr(&writer, "table_id");
+    mpack_write_i32(&writer, table_id);
+    mpack_finish_map(&writer);
+
+    if (mpack_writer_destroy(&writer) != mpack_ok)
+    {
+        fprintf(stderr, "Encode create table response: An error occurred encoding the message\n");
+        return NULL;
+    }
+
+    RawBytes* raw_bytes = malloc(sizeof(RawBytes));
     raw_bytes->len = mpack_writer_buffer_used(&writer);
     raw_bytes->data = malloc(raw_bytes->len);
     memcpy(raw_bytes->data, buffer, raw_bytes->len);

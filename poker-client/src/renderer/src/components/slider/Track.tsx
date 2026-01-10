@@ -12,14 +12,15 @@ const Track: React.FC<TrackProps> = ({ source, target, getTrackProps }) => {
     <div
       style={{
         position: 'absolute',
-        height: 10,
+        width: 10,
         zIndex: 1,
-        marginTop: 35,
+        left: '50%',
+        transform: 'translateX(-50%)',
         backgroundColor: '#546C91',
         borderRadius: 5,
         cursor: 'pointer',
-        left: `${source.percent}%`,
-        width: `${target.percent - source.percent}%`,
+        bottom: `${source.percent}%`,
+        height: `${target.percent - source.percent}%`,
       }}
       {...getTrackProps()}
     />

@@ -288,3 +288,67 @@ export function decodeFriendListResponse(data: Uint8Array): Array<{
     username: string
   }>
 }
+
+// ===== Game Action Codec Functions =====
+
+/**
+ * Encode action request
+ * Matches decode_action_request() in server/src/protocol.c
+ * Server expects: { "game_id": int, "action": { "type": string, "amount"?: int }, "client_seq": int }
+ */
+export function encodeActionRequest(request: {
+  game_id: number
+  action_type: string
+  amount?: number
+  client_seq: number
+}): Uint8Array {
+  const payload = {
+    game_id: request.game_id,
+    action: {
+      type: request.action_type,
+      ...(request.amount !== undefined && request.amount > 0 ? { amount: request.amount } : {})
+    },
+    client_seq: request.client_seq
+  }
+  return new Uint8Array(msgpackEncode(payload))
+}
+
+/**
+ * Decode action result
+ * Server sends: { "result": int, "client_seq": int, "reason"?: string }
+ */
+export function decodeActionResult(data: Uint8Array): {
+  result: number
+  client_seq: number
+  reason?: string
+} {
+  return msgpackDecode(data) as {
+    result: number
+    client_seq: number
+    reason?: string
+  }
+}
+
+/**
+ * Decode game state
+ * Server sends full game state with all fields
+ */
+export function decodeGameState(data: Uint8Array): any {
+  return msgpackDecode(data)
+}
+
+/**
+ * Encode join table request
+ * Server expects: { "table_id": int }
+ */
+export function encodeJoinTableRequest(tableId: number): Uint8Array {
+  return new Uint8Array(msgpackEncode({ table_id: tableId }))
+}
+
+/**
+ * Encode leave table request
+ * Server expects: { "table_id": int }
+ */
+export function encodeLeaveTableRequest(tableId: number): Uint8Array {
+  return new Uint8Array(msgpackEncode({ table_id: tableId }))
+}

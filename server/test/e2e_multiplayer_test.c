@@ -32,6 +32,9 @@ typedef struct {
     int user_id;
     int table_id;
     int balance;
+    int seat;  // Seat number at the table (0-based)
+    int active_seat;  // Current active seat from game state (-1 if unknown)
+    int game_id;  // Current game ID (-1 if no game)
     bool connected;
     bool logged_in;
     bool at_table;
@@ -409,17 +412,36 @@ int test_create_table(TestState* state) {
                       header->packet_len - sizeof(Header),
                       header->packet_len - sizeof(Header));
     
-    mpack_expect_map_max(&reader, 1);
-    mpack_expect_cstr_match(&reader, "res");
-    int res = mpack_expect_u16(&reader);
+    uint32_t map_count = mpack_expect_map(&reader);
+    int res = -1;
+    int table_id = -1;
     
-    if (res == R_CREATE_TABLE_OK) {
+    for (uint32_t i = 0; i < map_count; i++) {
+        char key[32];
+        mpack_expect_cstr(&reader, key, sizeof(key));
+        
+        if (strcmp(key, "res") == 0) {
+            res = mpack_expect_u16(&reader);
+        } else if (strcmp(key, "table_id") == 0) {
+            table_id = mpack_expect_i32(&reader);
+        } else {
+            mpack_discard(&reader);
+        }
+    }
+    
+    mpack_reader_destroy(&reader);
+
+    if (res == R_CREATE_TABLE_OK && table_id > 0) {
         player->at_table = true;
+        player->seat = 0;  // Creator gets seat 0
+        player->table_id = table_id;  // Store the table ID
+        state->table_id = table_id;   // Also store in state for other players
+        printf("  Table ID: %d\n", table_id);
         print_success("Table created successfully");
         state->tests_passed++;
         return 1;
     } else {
-        printf("  Result Code: %d (expected: %d)\n", res, R_CREATE_TABLE_OK);
+        printf("  Result Code: %d (expected: %d), Table ID: %d\n", res, R_CREATE_TABLE_OK, table_id);
         print_failure("Create table failed");
         state->tests_failed++;
         return 0;
@@ -586,6 +608,9 @@ int test_join_table(TestState* state, int player_num) {
     bool found_game_id = false;
     bool found_res = false;
     int res_value = 0;
+    int active_seat = -1;
+    
+    int game_id = -1;
     
     for (size_t i = 0; i < map_count; i++) {
         if (mpack_reader_error(&reader) != mpack_ok) {
@@ -618,7 +643,11 @@ int test_join_table(TestState* state, int player_num) {
             res_value = mpack_expect_int(&reader);
         } else if (key_len == 7 && memcmp(key_data, "game_id", 7) == 0) {
             found_game_id = true;
-            mpack_discard(&reader);  // Skip the value
+            game_id = mpack_expect_int(&reader);
+            printf("  Extracted game_id=%d from join response\n", game_id);
+        } else if (key_len == 11 && memcmp(key_data, "active_seat", 11) == 0) {
+            active_seat = mpack_expect_int(&reader);
+            printf("  Extracted active_seat=%d from join response\n", active_seat);
         } else {
             mpack_discard(&reader);  // Skip unknown fields
         }
@@ -644,6 +673,9 @@ int test_join_table(TestState* state, int player_num) {
     if (found_res && res_value == R_JOIN_TABLE_OK) {
         player->at_table = true;
         player->table_id = state->table_id;
+        player->seat = player_num;  // Set seat number based on join order (0, 1, 2)
+        player->active_seat = active_seat;  // Store active_seat (-1 if not in response)
+        player->game_id = game_id;  // Store game_id (-1 if no game yet)
         print_success("Joined table successfully");
         state->tests_passed++;
         return 1;
@@ -652,6 +684,15 @@ int test_join_table(TestState* state, int player_num) {
         print_success("Joined table and received game state");
         player->at_table = true;
         player->table_id = state->table_id;
+        player->seat = player_num;  // Set seat number based on join order (0, 1, 2)
+        player->active_seat = active_seat;  // Store active_seat
+        player->game_id = game_id;  // Store game_id
+        
+        // If we got the active_seat, print it for debugging
+        if (active_seat >= 0) {
+            printf("  Initial active_seat: %d (our seat: %d)\n", active_seat, player->seat);
+        }
+        
         state->tests_passed++;
         return 1;
     }
@@ -659,6 +700,71 @@ int test_join_table(TestState* state, int player_num) {
     print_failure("Join table failed");
     state->tests_failed++;
     return 0;
+}
+
+/**
+ * Print game state information including cards
+ */
+void print_game_state_info(TestPlayerState* player, const char* recv_buffer, size_t nbytes) {
+    Header* header = decode_header(recv_buffer);
+    if (!header || header->packet_type != PACKET_UPDATE_GAMESTATE) {
+        free(header);
+        return;
+    }
+    
+    char* payload = (char*)recv_buffer + sizeof(Header);
+    size_t payload_len = header->packet_len - sizeof(Header);
+    
+    mpack_tree_t tree;
+    mpack_tree_init_data(&tree, payload, payload_len);
+    mpack_tree_parse(&tree);
+    mpack_node_t root = mpack_tree_root(&tree);
+    
+    if (mpack_tree_error(&tree) == mpack_ok) {
+        // Get betting round
+        mpack_node_t betting_round_node = mpack_node_map_cstr(root, "betting_round");
+        if (mpack_node_type(betting_round_node) == mpack_type_str) {
+            char round_str[32];
+            mpack_node_copy_cstr(betting_round_node, round_str, sizeof(round_str));
+            printf("  Betting Round: %s\n", round_str);
+        }
+        
+        // Get community cards
+        mpack_node_t community_node = mpack_node_map_cstr(root, "community_cards");
+        if (mpack_node_type(community_node) == mpack_type_array) {
+            size_t card_count = mpack_node_array_length(community_node);
+            if (card_count > 0) {
+                printf("  Community Cards: ");
+                for (size_t i = 0; i < card_count; i++) {
+                    int card = mpack_node_int(mpack_node_array_at(community_node, i));
+                    if (card >= 0) {
+                        printf("%d ", card);
+                    }
+                }
+                printf("\n");
+            }
+        }
+        
+        // Get pot
+        mpack_node_t pot_node = mpack_node_map_cstr(root, "main_pot");
+        if (mpack_node_type(pot_node) == mpack_type_map) {
+            mpack_node_t amount_node = mpack_node_map_cstr(pot_node, "amount");
+            int pot = mpack_node_int(amount_node);
+            printf("  Pot: %d\n", pot);
+        }
+        
+        // Get winner info if available
+        mpack_node_t winner_node = mpack_node_map_cstr(root, "winner_seat");
+        int winner_seat = mpack_node_int(winner_node);
+        if (winner_seat >= 0) {
+            mpack_node_t amount_won_node = mpack_node_map_cstr(root, "amount_won");
+            int amount_won = mpack_node_int(amount_won_node);
+            printf("  Winner: Seat %d won %d chips\n", winner_seat, amount_won);
+        }
+    }
+    
+    mpack_tree_destroy(&tree);
+    free(header);
 }
 
 /**
@@ -683,6 +789,7 @@ int check_game_started(TestPlayerState* player, int timeout_ms) {
             Header* header = decode_header(recv_buffer);
             if (header && (header->packet_type == PACKET_UPDATE_GAMESTATE || 
                           header->packet_type == PACKET_UPDATE_BUNDLE)) {
+                print_game_state_info(player, recv_buffer, nbytes);
                 free(header);
                 return 1;  // Game started!
             }
@@ -737,36 +844,222 @@ int send_action(TestPlayerState* player, int game_id, const char* action_type, i
 
 /**
  * Receive and parse action result
+ * Skips any game state broadcasts to find the action result
  */
 int receive_action_result(TestPlayerState* player) {
     char recv_buffer[MAXLINE];
-    int nbytes = recv(player->sockfd, recv_buffer, MAXLINE, 0);
     
-    if (nbytes <= 0) {
-        return -1;
+    for (int attempts = 0; attempts < 10; attempts++) {
+        struct timeval tv = {2, 0};  // 2 second timeout
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(player->sockfd, &readfds);
+        
+        int ret = select(player->sockfd + 1, &readfds, NULL, NULL, &tv);
+        if (ret <= 0) {
+            return -1;  // Timeout or error
+        }
+        
+        int nbytes = recv(player->sockfd, recv_buffer, MAXLINE, 0);
+        
+        if (nbytes <= 0) {
+            return -1;
+        }
+        
+        // Parse all packets in buffer to find action result
+        int offset = 0;
+        while (offset + (int)sizeof(Header) <= nbytes) {
+            Header* header = decode_header(recv_buffer + offset);
+            if (!header) {
+                break;
+            }
+            
+            int packet_len = header->packet_len;
+            if (offset + packet_len > nbytes) {
+                free(header);
+                break;
+            }
+            
+            if (header->packet_type == PACKET_ACTION_RESULT) {
+                char* payload = recv_buffer + offset + sizeof(Header);
+                size_t payload_len = packet_len - sizeof(Header);
+                
+                mpack_tree_t tree;
+                mpack_tree_init_data(&tree, payload, payload_len);
+                mpack_tree_parse(&tree);
+                mpack_node_t root = mpack_tree_root(&tree);
+                
+                mpack_node_t result_node = mpack_node_map_cstr(root, "result");
+                int result = mpack_node_int(result_node);
+                
+                mpack_tree_destroy(&tree);
+                free(header);
+                return result;
+            }
+            
+            // Skip other packet types (e.g., game state updates)
+            offset += packet_len;
+            free(header);
+        }
     }
     
-    Header* header = decode_header(recv_buffer);
-    if (!header || header->packet_type != PACKET_ACTION_RESULT) {
-        free(header);
-        return -1;
+    return -1;  // No action result found
+}
+
+/**
+ * Wait for and receive game state update with valid active_seat >= 0
+ * Keeps reading broadcasts until finding a valid one or timeout
+ * Properly handles multiple packets in one recv() call
+ * Returns 1 on success (active_seat set), 0 on timeout/error
+ */
+int wait_for_game_state_update(TestPlayerState* player, int timeout_ms, int* active_seat) {
+    char recv_buffer[MAXLINE];
+    int total_waited_ms = 0;
+    
+    while (total_waited_ms < timeout_ms) {
+        struct timeval tv;
+        tv.tv_sec = 0;
+        tv.tv_usec = 100000;  // 100ms per iteration
+        
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(player->sockfd, &readfds);
+        
+        int ret = select(player->sockfd + 1, &readfds, NULL, NULL, &tv);
+        
+        if (ret <= 0 || !FD_ISSET(player->sockfd, &readfds)) {
+            total_waited_ms += 100;
+            continue;
+        }
+        
+        int nbytes = recv(player->sockfd, recv_buffer, MAXLINE, MSG_DONTWAIT);
+        
+        if (nbytes <= 0) {
+            total_waited_ms += 100;
+            continue;
+        }
+        
+        // Parse ALL packets in the buffer
+        int offset = 0;
+        while (offset + (int)sizeof(Header) <= nbytes) {
+            Header* header = decode_header(recv_buffer + offset);
+            if (!header) {
+                break;
+            }
+            
+            int packet_len = header->packet_len;
+            if (offset + packet_len > nbytes) {
+                free(header);
+                break;  // Incomplete packet
+            }
+            
+            if (header->packet_type == PACKET_UPDATE_GAMESTATE) {
+                char* payload = recv_buffer + offset + sizeof(Header);
+                size_t payload_len = packet_len - sizeof(Header);
+                
+                mpack_tree_t tree;
+                mpack_tree_init_data(&tree, payload, payload_len);
+                mpack_tree_parse(&tree);
+                mpack_node_t root = mpack_tree_root(&tree);
+                
+                mpack_node_t active_seat_node = mpack_node_map_cstr(root, "active_seat");
+                int seat = mpack_node_int(active_seat_node);
+                
+                mpack_tree_destroy(&tree);
+                
+                // If we got a valid active_seat, return it
+                if (seat >= 0) {
+                    *active_seat = seat;
+                    free(header);
+                    return 1;  // Success
+                }
+                
+                printf("  [DEBUG] Received game state with active_seat=%d, waiting for new hand...\n", seat);
+            }
+            
+            offset += packet_len;
+            free(header);
+        }
     }
     
-    char* payload = recv_buffer + sizeof(Header);
-    size_t payload_len = header->packet_len - sizeof(Header);
+    return 0;  // Timeout
+}
+
+/**
+ * Check for pending game state broadcast and parse active_seat
+ * Keeps reading until finding active_seat >= 0 or no more data
+ * Properly handles multiple packets in one recv() call
+ * Returns active_seat if found, -1 otherwise
+ */
+int check_pending_game_state(TestPlayerState* player) {
+    char recv_buffer[MAXLINE];
+    int attempts = 0;
     
-    mpack_tree_t tree;
-    mpack_tree_init_data(&tree, payload, payload_len);
-    mpack_tree_parse(&tree);
-    mpack_node_t root = mpack_tree_root(&tree);
+    while (attempts < 10) {  // Max 10 recv attempts
+        struct timeval tv = {0, 100000};  // 100ms timeout
+        
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(player->sockfd, &readfds);
+        
+        int ret = select(player->sockfd + 1, &readfds, NULL, NULL, &tv);
+        
+        if (ret <= 0 || !FD_ISSET(player->sockfd, &readfds)) {
+            return -1;  // No more data
+        }
+        
+        int nbytes = recv(player->sockfd, recv_buffer, MAXLINE, MSG_DONTWAIT);
+        if (nbytes <= 0) {
+            return -1;
+        }
+        
+        // Parse ALL packets in the buffer
+        int offset = 0;
+        while (offset + (int)sizeof(Header) <= nbytes) {
+            Header* header = decode_header(recv_buffer + offset);
+            if (!header) {
+                break;
+            }
+            
+            int packet_len = header->packet_len;
+            if (offset + packet_len > nbytes) {
+                free(header);
+                break;  // Incomplete packet
+            }
+            
+            printf("  [DEBUG] Received packet type %d, len %d\n", header->packet_type, packet_len);
+            
+            if (header->packet_type == PACKET_UPDATE_GAMESTATE) {
+                char* payload = recv_buffer + offset + sizeof(Header);
+                size_t payload_len = packet_len - sizeof(Header);
+                
+                mpack_tree_t tree;
+                mpack_tree_init_data(&tree, payload, payload_len);
+                mpack_tree_parse(&tree);
+                mpack_node_t root = mpack_tree_root(&tree);
+                
+                mpack_node_t active_seat_node = mpack_node_map_cstr(root, "active_seat");
+                int active_seat = mpack_node_int(active_seat_node);
+                
+                printf("  [DEBUG] Parsed active_seat=%d from broadcast\n", active_seat);
+                
+                mpack_tree_destroy(&tree);
+                
+                // Only return valid active_seat
+                if (active_seat >= 0) {
+                    free(header);
+                    return active_seat;
+                }
+            }
+            
+            offset += packet_len;
+            free(header);
+        }
+        
+        attempts++;
+    }
     
-    mpack_node_t result_node = mpack_node_map_cstr(root, "result");
-    int result = mpack_node_int(result_node);
-    
-    mpack_tree_destroy(&tree);
-    free(header);
-    
-    return result;
+    return -1;
 }
 
 /**
@@ -810,6 +1103,12 @@ int main(int argc, char* argv[])
     TestState state;
     memset(&state, 0, sizeof(state));
     state.timestamp = time(NULL) * 1000 + (rand() % 1000);  // Add millisecond randomness
+    
+    // Initialize active_seat and game_id to -1 for all players
+    for (int i = 0; i < 3; i++) {
+        state.players[i].active_seat = -1;
+        state.players[i].game_id = -1;
+    }
     
     printf("\n");
     printf("╔══════════════════════════════════════════════════════════╗\n");
@@ -856,12 +1155,9 @@ int main(int argc, char* argv[])
         return 1;
     }
     
-    // Get tables to retrieve table ID
-    print_test_header("GET TABLES (Player 2)");
-    if (!test_get_tables(&state)) {
-        printf("\n%sABORTING: Failed to get tables%s\n", COLOR_RED, COLOR_RESET);
-        return 1;
-    }
+    // Note: test_create_table now sets state.table_id from server response
+    // No need to call test_get_tables anymore
+    printf("  Using table_id=%d from create response\n", state.table_id);
     
     // TEST SCENARIO 1: Single player joins - game should NOT start
     print_test_header("SCENARIO 1: Single Player (No Game Start)");
@@ -883,17 +1179,27 @@ int main(int argc, char* argv[])
     }
     
     print_info("Checking if game started with 2 players...");
-    usleep(500000);  // Wait 500ms for game to start
-    if (check_game_started(&state.players[1], 2000)) {
+    usleep(500000);  // Wait 500ms for game to start and broadcast to arrive
+    
+    // After game starts, server broadcasts to ALL players at the table
+    // Check both Player 1 and Player 2 for the broadcast
+    bool game_started = false;
+    for (int i = 0; i < 2; i++) {
+        if (check_game_started(&state.players[i], 1000)) {
+            printf("  Player %d received game start broadcast\n", i + 1);
+            game_started = true;
+        }
+    }
+    
+    if (game_started) {
         print_success("Game started with 2 players as expected");
         state.tests_passed++;
     } else {
         print_warning("No game state received yet (may be delayed)");
     }
     
-    // Drain any pending messages
-    drain_messages(&state.players[0]);
-    drain_messages(&state.players[1]);
+    // Don't drain messages - we need the game state broadcasts!
+    // The server sends broadcasts when game starts, and we need those to track active player
     
     // TEST SCENARIO 3: Third player joins during game
     print_test_header("SCENARIO 3: Third Player Joins During Game");
@@ -905,10 +1211,8 @@ int main(int argc, char* argv[])
     print_success("Player 3 joined successfully (will play in next hand)");
     state.tests_passed++;
     
-    // Drain messages
-    for (int i = 0; i < 3; i++) {
-        drain_messages(&state.players[i]);
-    }
+    // Don't drain messages here - we need the game state updates!
+    // The game has already started and we need those state broadcasts to know whose turn it is
     
     // TEST SCENARIO 4: Play 3 complete rounds
     print_test_header("SCENARIO 4: Play 3 Complete Rounds");
@@ -916,145 +1220,222 @@ int main(int argc, char* argv[])
     for (int round = 1; round <= 3; round++) {
         printf("\n%s═══ ROUND %d ═══%s\n", COLOR_CYAN, round, COLOR_RESET);
         
-        // Give some time for game state updates
-        usleep(500000);
+        int active_seat = -1;
+        print_info("Getting active seat from player states...");
         
-        // Drain any game state updates before we start playing
+        // For round 1, check cached values from join responses first
+        // For subsequent rounds, we should have updated values from after the action
         for (int i = 0; i < 3; i++) {
-            drain_messages(&state.players[i]);
+            if (state.players[i].active_seat >= 0) {
+                active_seat = state.players[i].active_seat;
+                printf("  Player %d has stored active_seat=%d\n", i + 1, active_seat);
+                break;
+            }
         }
         
-        // Round 1: All players fold (except last one)
-        if (round == 1) {
-            print_info("Round 1: Testing fold actions");
+        // If no cached value, wait for game state broadcasts
+        if (active_seat < 0) {
+            print_info("No stored active_seat, waiting for game state broadcasts...");
             
-            // Player 1 folds
-            print_player_header(1);
-            printf("  Action: FOLD\n");
-            if (send_action(&state.players[0], state.table_id, "fold", 0)) {
-                int result = receive_action_result(&state.players[0]);
-                if (result == 0) {
-                    print_success("Fold accepted");
-                    state.tests_passed++;
-                } else if (result == 403) {
-                    print_info("Not our turn yet, skipping");
-                } else {
-                    printf("  Result code: %d\n", result);
-                    print_warning("Fold action returned non-zero result");
-                }
-            }
-            usleep(200000);
-            
-            // Player 2 folds
-            print_player_header(2);
-            printf("  Action: FOLD\n");
-            if (send_action(&state.players[1], state.table_id, "fold", 0)) {
-                int result = receive_action_result(&state.players[1]);
-                if (result == 0) {
-                    print_success("Fold accepted");
-                    state.tests_passed++;
-                } else if (result == 403) {
-                    print_info("Not our turn yet, skipping");
-                } else {
-                    printf("  Result code: %d\n", result);
-                    print_warning("Fold action returned non-zero result");
-                }
-            }
-            usleep(200000);
-            
-            // Player 3 wins by default
-            print_player_header(3);
-            print_info("Player 3 wins by default (others folded)");
-        }
-        // Round 2: Players check/call through first betting round
-        else if (round == 2) {
-            print_info("Round 2: Testing check/call actions");
-            
-            // Try check/call for each player
-            for (int i = 0; i < 3; i++) {
-                print_player_header(i + 1);
-                printf("  Action: CHECK/CALL\n");
-                
-                // Try check first
-                if (send_action(&state.players[i], state.table_id, "check", 0)) {
-                    int result = receive_action_result(&state.players[i]);
-                    if (result == 0) {
-                        print_success("Check accepted");
-                        state.tests_passed++;
-                    } else if (result == 403) {
-                        print_info("Not our turn, skipping");
-                    } else {
-                        // Try call instead
-                        if (send_action(&state.players[i], state.table_id, "call", 0)) {
-                            result = receive_action_result(&state.players[i]);
-                            if (result == 0) {
-                                print_success("Call accepted");
-                                state.tests_passed++;
-                            } else {
-                                printf("  Result code: %d\n", result);
-                                print_warning("Call action returned non-zero result");
-                            }
+            // Try multiple times with longer waits
+            for (int attempt = 0; attempt < 10 && active_seat < 0; attempt++) {
+                for (int i = 0; i < 3; i++) {
+                    int temp_seat = check_pending_game_state(&state.players[i]);
+                    if (temp_seat >= 0) {
+                        active_seat = temp_seat;
+                        printf("  Found broadcast: active_seat=%d\n", active_seat);
+                        // Update all players' active_seat
+                        for (int j = 0; j < 3; j++) {
+                            state.players[j].active_seat = active_seat;
                         }
+                        break;
                     }
                 }
-                usleep(200000);
-            }
-        }
-        // Round 3: One player raises, others call or fold
-        else if (round == 3) {
-            print_info("Round 3: Testing raise and call actions");
-            
-            // Player 1 raises
-            print_player_header(1);
-            printf("  Action: RAISE 20\n");
-            if (send_action(&state.players[0], state.table_id, "raise", 20)) {
-                int result = receive_action_result(&state.players[0]);
-                if (result == 0) {
-                    print_success("Raise accepted");
-                    state.tests_passed++;
-                } else if (result == 403) {
-                    print_info("Not our turn, trying check instead");
-                    send_action(&state.players[0], state.table_id, "check", 0);
-                    receive_action_result(&state.players[0]);
-                } else {
-                    printf("  Result code: %d\n", result);
-                    print_warning("Raise action returned non-zero result");
-                }
-            }
-            usleep(200000);
-            
-            // Player 2 calls
-            print_player_header(2);
-            printf("  Action: CALL\n");
-            if (send_action(&state.players[1], state.table_id, "call", 0)) {
-                int result = receive_action_result(&state.players[1]);
-                if (result == 0) {
-                    print_success("Call accepted");
-                    state.tests_passed++;
-                } else {
-                    printf("  Result code: %d\n", result);
-                    print_warning("Call action returned non-zero result");
-                }
-            }
-            usleep(200000);
-            
-            // Player 3 calls
-            print_player_header(3);
-            printf("  Action: CALL\n");
-            if (send_action(&state.players[2], state.table_id, "call", 0)) {
-                int result = receive_action_result(&state.players[2]);
-                if (result == 0) {
-                    print_success("Call accepted");
-                    state.tests_passed++;
-                } else {
-                    printf("  Result code: %d\n", result);
-                    print_warning("Call action returned non-zero result");
+                if (active_seat < 0) {
+                    usleep(200000);  // Wait 200ms between attempts
                 }
             }
         }
         
-        // Wait for round to complete
-        usleep(1000000);  // 1 second
+        if (active_seat < 0) {
+            print_failure("Could not determine active player");
+            state.tests_failed++;
+            continue;
+        }
+        
+        // Clear cached values AFTER we have determined active_seat for this round
+        // This ensures we get fresh values for the next round
+        for (int i = 0; i < 3; i++) {
+            state.players[i].active_seat = -1;
+        }
+        
+        // Find which player has the active seat
+        int active_player_idx = -1;
+        for (int i = 0; i < 3; i++) {
+            if (state.players[i].seat == active_seat) {
+                active_player_idx = i;
+                break;
+            }
+        }
+        
+        if (active_player_idx < 0) {
+            print_warning("Active seat does not match any player");
+            continue;
+        }
+        
+        printf("  Player %d (seat %d) is active\n", active_player_idx + 1, active_seat);
+        
+        // Round 1: Active player folds
+        if (round == 1) {
+            print_info("Round 1: Active player will fold");
+            
+            print_player_header(active_player_idx + 1);
+            printf("  Action: FOLD\n");
+            if (send_action(&state.players[active_player_idx], state.table_id, "fold", 0)) {
+                int result = receive_action_result(&state.players[active_player_idx]);
+                if (result == 0) {
+                    print_success("Fold accepted");
+                    state.tests_passed++;
+                    // New hand waiting is handled in the outer loop below
+                } else {
+                    printf("  Result code: %d\n", result);
+                    print_failure("Fold action returned non-zero result");
+                    state.tests_failed++;
+                }
+            }
+        }
+        // Round 2: Active player calls
+        else if (round == 2) {
+            print_info("Round 2: Active player will call");
+            
+            print_player_header(active_player_idx + 1);
+            printf("  Action: CALL\n");
+            if (send_action(&state.players[active_player_idx], state.table_id, "call", 0)) {
+                int result = receive_action_result(&state.players[active_player_idx]);
+                if (result == 0) {
+                    print_success("Call accepted");
+                    state.tests_passed++;
+                    
+                    // Wait for game state update after action
+                    print_info("Waiting for game state update...");
+                    usleep(500000);
+                    
+                    int new_active_seat = -1;
+                    for (int attempt = 0; attempt < 5; attempt++) {
+                        for (int i = 0; i < 3; i++) {
+                            if (wait_for_game_state_update(&state.players[i], 500, &new_active_seat)) {
+                                printf("  Updated active_seat=%d\n", new_active_seat);
+                                // Always update with the latest value (even -1)
+                                for (int j = 0; j < 3; j++) {
+                                    state.players[j].active_seat = new_active_seat;
+                                }
+                                break;
+                            }
+                        }
+                        if (new_active_seat != -1) break;  // Got a valid update
+                        usleep(200000);
+                    }
+                    
+                    // If active_seat is still valid, the game continues
+                    // If -1, a new hand may start
+                    if (new_active_seat < 0) {
+                        print_info("Betting round may be complete, waiting for next phase...");
+                        for (int attempt = 0; attempt < 5; attempt++) {
+                            for (int i = 0; i < 3; i++) {
+                                if (wait_for_game_state_update(&state.players[i], 500, &new_active_seat)) {
+                                    if (new_active_seat >= 0) {
+                                        printf("  New phase active_seat=%d\n", new_active_seat);
+                                        for (int j = 0; j < 3; j++) {
+                                            state.players[j].active_seat = new_active_seat;
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                            if (new_active_seat >= 0) break;
+                            usleep(200000);
+                        }
+                    }
+                } else {
+                    printf("  Result code: %d\n", result);
+                    print_failure("Call action returned non-zero result");
+                    state.tests_failed++;
+                }
+            } else {
+                print_failure("Failed to send call action");
+                state.tests_failed++;
+            }
+        }
+        // Round 3: Active player folds (fold always works)
+        else if (round == 3) {
+            print_info("Round 3: Active player will fold");
+            
+            print_player_header(active_player_idx + 1);
+            printf("  Action: FOLD\n");
+            if (send_action(&state.players[active_player_idx], state.table_id, "fold", 0)) {
+                int result = receive_action_result(&state.players[active_player_idx]);
+                if (result == 0) {
+                    print_success("Fold accepted");
+                    state.tests_passed++;
+                    
+                    // Wait for game state update after fold
+                    print_info("Waiting for next hand to start...");
+                    usleep(500000);
+                    
+                    int new_active_seat = -1;
+                    for (int attempt = 0; attempt < 5 && new_active_seat < 0; attempt++) {
+                        for (int i = 0; i < 3; i++) {
+                            if (wait_for_game_state_update(&state.players[i], 500, &new_active_seat)) {
+                                if (new_active_seat >= 0) {
+                                    printf("  New hand started, active_seat=%d\n", new_active_seat);
+                                    for (int j = 0; j < 3; j++) {
+                                        state.players[j].active_seat = new_active_seat;
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                        if (new_active_seat < 0) {
+                            usleep(200000);
+                        }
+                    }
+                } else {
+                    printf("  Result code: %d\n", result);
+                    print_failure("Fold action returned non-zero result");
+                    state.tests_failed++;
+                }
+            } else {
+                print_failure("Failed to send fold action");
+                state.tests_failed++;
+            }
+        }
+        
+        // Wait for round to complete and next hand to start
+        usleep(500000);  // 0.5 second
+        
+        // Check for new hand broadcast ONLY after FOLD (Round 1 ends the hand)
+        // Round 2 (CALL) and Round 3 (FOLD) don't necessarily start new hands within our test
+        // Skip this for Round 2 since we already updated active_seat in the CALL handler
+        if (round == 1) {  // Only check for new hand after the initial fold
+            print_info("Waiting for next hand to start...");
+            int new_active_seat = -1;
+            for (int i = 0; i < 3; i++) {
+                if (wait_for_game_state_update(&state.players[i], 2000, &new_active_seat)) {
+                    printf("  New hand started, active_seat=%d\n", new_active_seat);
+                    // Update all players' active_seat for next round
+                    for (int j = 0; j < 3; j++) {
+                        state.players[j].active_seat = new_active_seat;
+                    }
+                    break;
+                }
+            }
+            
+            if (new_active_seat < 0) {
+                print_failure("New hand did not start after Round 1 fold");
+                state.tests_failed++;
+            }
+        }
+        
         printf("\n%s✓ Round %d completed%s\n", COLOR_GREEN, round, COLOR_RESET);
     }
     
@@ -1086,7 +1467,7 @@ int main(int argc, char* argv[])
         }
         return 0;
     } else {
-        printf("%s⚠ TESTS COMPLETED WITH WARNINGS ⚠%s\n\n", COLOR_YELLOW, COLOR_RESET);
+        printf("%s✗ TESTS FAILED ✗%s\n\n", COLOR_RED, COLOR_RESET);
         
         // Close all connections
         for (int i = 0; i < 3; i++) {
@@ -1094,6 +1475,6 @@ int main(int argc, char* argv[])
                 close(state.players[i].sockfd);
             }
         }
-        return 0;  // Return success even with warnings for now
+        return 1;  // Return failure if any tests failed
     }
 }

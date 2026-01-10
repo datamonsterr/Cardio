@@ -174,7 +174,10 @@ int game_count_active_players(GameState *state) {
     
     int count = 0;
     for (int i = 0; i < MAX_PLAYERS; i++) {
-        if (state->players[i].state == PLAYER_STATE_ACTIVE || 
+        // Count players who are in a state where they can participate in a game
+        // WAITING = ready for next hand, ACTIVE/ALL_IN = in current hand
+        if (state->players[i].state == PLAYER_STATE_WAITING ||
+            state->players[i].state == PLAYER_STATE_ACTIVE || 
             state->players[i].state == PLAYER_STATE_ALL_IN) {
             count++;
         }
@@ -194,6 +197,8 @@ int game_start_hand(GameState *state) {
     state->hand_id++;
     state->seq = 0;
     state->hand_in_progress = true;
+    state->winner_seat = -1;  // No winner yet
+    state->amount_won = 0;    // No winnings yet
     
     // Set all waiting players to active first
     for (int i = 0; i < MAX_PLAYERS; i++) {
@@ -225,7 +230,19 @@ int game_start_hand(GameState *state) {
             break;
         }
     }
+    
+    if (bb_seat == -1) {
+        // No big blind found - this should not happen
+        state->active_seat = -1;
+        return -3;
+    }
+    
     state->active_seat = game_get_next_active_seat(state, bb_seat);
+    
+    if (state->active_seat == -1) {
+        // Could not find active player after big blind - this should not happen
+        return -4;
+    }
     
     return 0;
 }
@@ -363,6 +380,27 @@ int game_advance_betting_round(GameState *state) {
     // Collect bets into pot
     game_collect_bets_to_pot(state);
     
+    // Check if only one player remains (everyone else folded)
+    int active_count = 0;
+    int last_active_seat = -1;
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+        if (state->players[i].state == PLAYER_STATE_ACTIVE || 
+            state->players[i].state == PLAYER_STATE_ALL_IN) {
+            active_count++;
+            last_active_seat = i;
+        }
+    }
+    
+    // If only one player remains, they win immediately
+    if (active_count <= 1 && last_active_seat >= 0) {
+        game_distribute_pot(state, last_active_seat);
+        state->winner_seat = last_active_seat;
+        state->betting_round = BETTING_ROUND_COMPLETE;
+        state->hand_in_progress = false;
+        state->active_seat = -1;
+        return 0;
+    }
+    
     // Reset betting state
     state->current_bet = 0;
     state->min_raise = state->big_blind;
@@ -412,11 +450,28 @@ bool game_is_betting_round_complete(GameState *state) {
                 all_matched = false;
             }
         }
+        // Count all-in players too
+        if (p->state == PLAYER_STATE_ALL_IN) {
+            active_count++;
+        }
     }
     
-    // Round is complete if only one player left or all active players matched bet
+    // Round is complete if only one player left
     if (active_count <= 1) return true;
-    if (all_matched && state->last_aggressor_seat != -1) return true;
+    
+    // Round is complete if:
+    // 1. All active players have matched the current bet
+    // 2. AND either someone bet/raised (last_aggressor_seat != -1) OR everyone checked (current_bet == 0 && all acted)
+    if (all_matched) {
+        // If there was a bet/raise, round is complete when everyone matched
+        if (state->last_aggressor_seat != -1) return true;
+        
+        // If no bet/raise (everyone checking), need to ensure everyone has had a chance to act
+        // Check if we've gone around the table (active_seat returned to first player after dealer)
+        if (state->current_bet == 0 && state->players_acted >= active_count) {
+            return true;
+        }
+    }
     
     return false;
 }
@@ -527,6 +582,7 @@ int game_process_action(GameState *state, int player_id, Action *action) {
     if (!player) return -3;
     
     state->seq++; // Increment sequence number for this action
+    state->players_acted++; // Increment players acted counter
     
     switch (action->type) {
         case ACTION_FOLD:
@@ -667,7 +723,9 @@ int game_distribute_pot(GameState *state, int winning_seat) {
     GamePlayer *winner = game_get_player_by_seat(state, winning_seat);
     if (!winner) return -2;
     
-    winner->money += state->main_pot.amount;
+    int pot_amount = state->main_pot.amount;
+    winner->money += pot_amount;
+    state->amount_won = pot_amount;  // Store for clients
     state->main_pot.amount = 0;
     
     return 0;
@@ -685,28 +743,37 @@ int game_determine_winner(GameState *state) {
     for (int i = 0; i < MAX_PLAYERS; i++) {
         GamePlayer *p = &state->players[i];
         if (p->state == PLAYER_STATE_ACTIVE || p->state == PLAYER_STATE_ALL_IN) {
-            // Create temporary hand with hole cards and community cards
-            Hand temp_hand;
-            hand_init(&temp_hand);
+            // Calculate hand value without using add_card (which causes ownership issues)
+            // For simplified version, use card ranks directly
+            int hand_val = 0;
             
-            if (p->hole_cards[0]) add_card(&temp_hand, p->hole_cards[0]);
-            if (p->hole_cards[1]) add_card(&temp_hand, p->hole_cards[1]);
-            
-            // For simplified version, just use hand value
-            // In full implementation, would combine with community cards
-            int hand_val = hand_value(&temp_hand);
+            if (p->hole_cards[0] && p->hole_cards[1]) {
+                // Simple hand evaluation: sum of ranks (Ace=14 is high)
+                int rank1 = p->hole_cards[0]->rank;
+                int rank2 = p->hole_cards[1]->rank;
+                
+                // Convert Ace (rank 1) to 14 for evaluation
+                if (rank1 == 1) rank1 = 14;
+                if (rank2 == 1) rank2 = 14;
+                
+                // Pair bonus
+                if (rank1 == rank2) {
+                    hand_val = 1000 + rank1 * 2;
+                } else {
+                    hand_val = rank1 + rank2;
+                }
+            }
             
             if (hand_val > best_value) {
                 best_value = hand_val;
                 best_seat = i;
             }
-            
-            hand_destroy(&temp_hand);
         }
     }
     
     if (best_seat >= 0) {
         game_distribute_pot(state, best_seat);
+        state->winner_seat = best_seat;  // Store winner for clients
     }
     
     return best_seat;

@@ -16,6 +16,8 @@ struct
     GameState* game_state;       // Pointer to the game engine state
     conn_data_t* connections[MAX_PLAYERS];  // Array of connected players
     int seat_to_conn_idx[MAX_PLAYERS];      // Map seat number to connections index
+    int active_seat;             // Currently active seat number (-1 if no active player)
+    bool game_started;           // Whether the game has started
 } typedef Table;
 
 typedef struct
