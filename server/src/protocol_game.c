@@ -65,7 +65,10 @@ ActionRequest* decode_action_request(char* payload)
             }
         } 
         else if (strcmp(key, "client_seq") == 0) {
-            req->client_seq = mpack_expect_u32(&reader);
+            // Use mpack_expect_i64 to accept both signed and unsigned integers
+            // JavaScript msgpack may encode as int32 if high bit is set
+            int64_t seq = mpack_expect_i64(&reader);
+            req->client_seq = (uint32_t)(seq & 0xFFFFFFFF);
         }
         else {
             mpack_discard(&reader);

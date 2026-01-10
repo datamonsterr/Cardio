@@ -440,6 +440,44 @@ TEST(test_decode_action_request)
     free(req);
 }
 
+// Test for signed int32 client_seq (JavaScript msgpack encodes as int32 when high bit is set)
+TEST(test_decode_action_request_signed_seq)
+{
+    char buffer[4096];
+    mpack_writer_t writer;
+    mpack_writer_init(&writer, buffer, 4096);
+    
+    mpack_start_map(&writer, 3);
+    
+    mpack_write_cstr(&writer, "game_id");
+    mpack_write_int(&writer, 1);
+    
+    mpack_write_cstr(&writer, "action");
+    mpack_start_map(&writer, 1);
+    mpack_write_cstr(&writer, "type");
+    mpack_write_cstr(&writer, "call");
+    mpack_finish_map(&writer);
+    
+    mpack_write_cstr(&writer, "client_seq");
+    // Simulate JavaScript msgpack encoding: when high bit is set, it encodes as signed int32
+    // This value 0xa68faaae has high bit set, so JS would encode it as int32 (negative)
+    mpack_write_i32(&writer, (int32_t)0xa68faaae);  // This is what JS msgpack does
+    
+    mpack_finish_map(&writer);
+    
+    mpack_error_t error = mpack_writer_destroy(&writer);
+    ASSERT(error == mpack_ok);
+    
+    // Decode the action request - should handle signed int32 correctly
+    ActionRequest* req = decode_action_request(buffer);
+    ASSERT(req != NULL);
+    ASSERT(req->game_id == 1);
+    ASSERT(strcmp(req->action_type, "call") == 0);
+    ASSERT(req->client_seq == 0xa68faaae);  // Should be interpreted as unsigned
+    
+    free(req);
+}
+
 TEST(test_encode_action_result)
 {
     ActionResult result = {
@@ -485,5 +523,6 @@ int main()
     RUN_TEST(test_encode_scoreboard_response);
     RUN_TEST(test_encode_friendlist_response);
     RUN_TEST(test_decode_action_request);
+    RUN_TEST(test_decode_action_request_signed_seq);
     RUN_TEST(test_encode_action_result);
 }
