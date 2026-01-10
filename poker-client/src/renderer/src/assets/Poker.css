@@ -176,7 +176,9 @@ img {
   display: flex;
   opacity: 0;
   transform: translateX(-50%) translateY(-55px);
-  transition: opacity 1250ms ease-in-out, transform 1250ms linear;
+  transition:
+    opacity 1250ms ease-in-out,
+    transform 1250ms linear;
 }
 
 /* GAME BOARD */
@@ -333,7 +335,9 @@ img {
   background-color: #2adb2a;
   border: 3px solid white;
   outline: none;
-  transition: background-color 0.4s ease-out, color 0.4s ease-out;
+  transition:
+    background-color 0.4s ease-out,
+    color 0.4s ease-out;
 }
 .action-button:hover {
   cursor: pointer;
@@ -351,7 +355,9 @@ img {
   z-index: 100;
   border-radius: 500px;
   border: 3px solid white;
-  transition: background-color 0.4s ease-out, color 0.4s ease-out;
+  transition:
+    background-color 0.4s ease-out,
+    color 0.4s ease-out;
 }
 .fold-button:hover {
   background-color: rgb(255, 0, 0);
@@ -370,7 +376,9 @@ img {
   font-weight: 500;
   outline: none;
   border: 2px solid rgba(255, 150, 150, 0.8);
-  transition: background-color 0.3s ease-out, border-color 0.3s ease-out;
+  transition:
+    background-color 0.3s ease-out,
+    border-color 0.3s ease-out;
 }
 
 .quit-button:hover {
@@ -518,7 +526,8 @@ img {
 }
 
 @keyframes pulse-active {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 15px rgba(0, 255, 37, 0.6);
   }
   50% {
@@ -576,7 +585,7 @@ img {
   position: relative;
   max-width: 900px;
   width: 100%;
-  min-height: 600px;
+  min-height: 900px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -587,7 +596,7 @@ img {
   filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.7));
   opacity: 0.98;
   width: 100%;
-  max-width: 800px;
+  max-width: 1200px;
   height: auto;
 }
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { UserProfileDropdown } from './UserProfileDropdown'
 
 const Navigation: React.FC = () => {
   const location = useLocation()
@@ -76,15 +77,21 @@ const Navigation: React.FC = () => {
             </Link> */}
           </div>
           <div className="nav-user">
-            <span className="user-info">
-              ${user.chips} | {user.username}
-            </span>
-            <button
-              onClick={handleButtonClick}
-              className={isGamePage ? 'quit-nav-btn' : 'logout-btn'}
-            >
-              {isGamePage ? 'Quit Room' : 'Logout'}
-            </button>
+            <UserProfileDropdown
+              onLogout={
+                isGamePage
+                  ? undefined
+                  : () => {
+                      logout()
+                      navigate('/login')
+                    }
+              }
+            />
+            {isGamePage && (
+              <button onClick={handleButtonClick} className="quit-nav-btn">
+                Quit Room
+              </button>
+            )}
           </div>
         </div>
       </nav>
