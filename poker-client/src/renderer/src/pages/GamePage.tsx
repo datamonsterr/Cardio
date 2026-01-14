@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Spinner from '../components/Spinner';
 import WinScreen from '../components/WinScreen';
+import HandResult from '../components/HandResult';
 import CardComponent from '../components/card/Card';
 import Handle from '../components/slider/Handle';
 import Track from '../components/slider/Track';
@@ -124,6 +125,7 @@ interface LocalGameState {
   error: string | null;
   betAmount: number;
   actionPending: boolean;
+  showHandResult: boolean;
 }
 
 const initialState: LocalGameState = {
@@ -136,6 +138,7 @@ const initialState: LocalGameState = {
   error: null,
   betAmount: 0,
   actionPending: false,
+  showHandResult: false,
 };
 
 // Card decoding helpers
@@ -201,6 +204,11 @@ const GamePage: React.FC = () => {
       setGameState(prev => {
         // Check for winner
         const hasWinner = serverState.betting_round === 'complete' && serverState.winner_seat >= 0;
+        const showResult = serverState.betting_round === 'complete';
+        
+        // Hide result if betting round changed from complete to something else (new hand started)
+        const hideResult = prev.serverState?.betting_round === 'complete' && 
+                          serverState.betting_round !== 'complete';
         
         return {
           ...prev,
@@ -212,6 +220,7 @@ const GamePage: React.FC = () => {
           amountWon: hasWinner ? serverState.amount_won : 0,
           betAmount: prev.betAmount || serverState.big_blind || 10, // Keep bet amount or set to big blind
           actionPending: false,
+          showHandResult: showResult && !hideResult,
         };
       });
     } catch (error) {
@@ -464,8 +473,18 @@ const GamePage: React.FC = () => {
     const isMe = serverPlayer.player_id === userId;
     const cards: Card[] = [];
     
-    // Show cards if they're mine or during showdown
-    const showCards = isMe || gameState.serverState?.betting_round === 'showdown';
+    // Show cards if they're mine, during showdown, or if all remaining players are all-in
+    const isShowdown = gameState.serverState?.betting_round === 'showdown' || 
+                       gameState.serverState?.betting_round === 'complete';
+    
+    // Check if all remaining players (not folded, not empty) are all-in
+    const activePlayers = gameState.serverState?.players?.filter(p => 
+      p && p.state !== 'empty' && p.state !== 'folded'
+    ) || [];
+    const allInPlayers = activePlayers.filter(p => p.state === 'all_in');
+    const allPlayersAllIn = activePlayers.length >= 2 && allInPlayers.length === activePlayers.length;
+    
+    const showCards = isMe || isShowdown || allPlayersAllIn;
     if (showCards && Array.isArray(serverPlayer.cards)) {
       for (const cardValue of serverPlayer.cards) {
         const card = decodeCard(cardValue);
@@ -843,8 +862,22 @@ const GamePage: React.FC = () => {
             <p>{gameState.error}</p>
             <button onClick={() => navigate('/lobby')}>Back to Lobby</button>
           </div>
-        ) : gameState.winnerFound && gameState.amountWon > 0 ? (
-          <WinScreen />
+        ) : gameState.showHandResult && gameState.serverState && gameState.serverState.betting_round === 'complete' ? (
+          <HandResult
+            serverState={gameState.serverState}
+            userId={userId || 0}
+            decodeCard={decodeCard}
+            onContinue={() => {
+              setGameState(prev => ({ ...prev, showHandResult: false }));
+              // Wait for next hand to start (server will send new game state)
+            }}
+          />
+        ) : gameState.winnerFound && gameState.amountWon > 0 && gameState.serverState && gameState.serverState.current_player <= 1 ? (
+          <WinScreen 
+            isWinner={gameState.winnerSeat >= 0 && gameState.serverState?.players?.[gameState.winnerSeat]?.player_id === userId}
+            winnerName={gameState.serverState?.players?.[gameState.winnerSeat]?.name || 'Player'}
+            amountWon={gameState.amountWon}
+          />
         ) : (
           renderGame()
         )}

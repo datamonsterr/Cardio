@@ -891,11 +891,91 @@ void handle_action_request(conn_data_t* conn_data, char* data, size_t data_len, 
         if (table->game_state->betting_round == BETTING_ROUND_COMPLETE) {
             table->active_seat = -1;
             
-            snprintf(log_msg, sizeof(log_msg), "Hand completed at table %d, preparing for next hand", table->id);
-            logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+            // Remove players who have no money left (busted out)
+            // Only remove after hand is complete, not during play
+            // Iterate backwards to safely remove multiple players
+            for (int i = table->current_player - 1; i >= 0; i--) {
+                if (table->connections[i] != NULL && table->connections[i]->seat >= 0) {
+                    int seat = table->connections[i]->seat;
+                    GamePlayer* p = &table->game_state->players[seat];
+                    
+                    // Only remove if player has no money left and is not already empty
+                    if (p->money == 0 && p->state != PLAYER_STATE_EMPTY) {
+                        snprintf(log_msg, sizeof(log_msg), "Player %s (seat %d) busted out at table %d (money=0), removing from table", 
+                                 table->connections[i]->username, seat, table->id);
+                        logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+                        
+                        // Remove player from game state
+                        game_remove_player(table->game_state, seat);
+                        
+                        // Remove from connection tracking
+                        table->seat_to_conn_idx[seat] = -1;
+                        
+                        // Mark connection as leaving
+                        table->connections[i]->table_id = 0;
+                        table->connections[i]->seat = -1;
+                        table->connections[i] = NULL;
+                        
+                        // Shift connections array to remove gap
+                        for (int j = i; j < table->current_player - 1; j++) {
+                            table->connections[j] = table->connections[j + 1];
+                            if (table->connections[j] != NULL && table->connections[j]->seat >= 0) {
+                                table->seat_to_conn_idx[table->connections[j]->seat] = j;
+                            }
+                        }
+                        table->connections[table->current_player - 1] = NULL;
+                        
+                        // Decrease current_player count
+                        if (table->current_player > 0) {
+                            table->current_player--;
+                        }
+                    }
+                }
+            }
             
-            // Try to start next hand if enough players remain
-            start_game_if_ready(table);
+            // Check if winner cleaned out the lobby
+            // Count players who are not folded and have money > 0 (can continue playing)
+            int players_with_money = 0;
+            int winner_seat = table->game_state->winner_seat;
+            for (int i = 0; i < MAX_PLAYERS; i++) {
+                GamePlayer* p = &table->game_state->players[i];
+                if (p->state != PLAYER_STATE_EMPTY && 
+                    p->state != PLAYER_STATE_FOLDED && 
+                    p->money > 0) {
+                    players_with_money++;
+                }
+            }
+            
+            // If only winner has money (or no one has money but there's a winner), remove table
+            if (players_with_money <= 1 && winner_seat >= 0) {
+                snprintf(log_msg, sizeof(log_msg), "Table %d cleaned out by winner (seat %d, players_with_money=%d, current_player=%d), removing table", 
+                         table->id, winner_seat, players_with_money, table->current_player);
+                logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+                
+                // Mark all connections as leaving the table
+                for (int i = 0; i < table->current_player; i++) {
+                    if (table->connections[i] != NULL) {
+                        table->connections[i]->table_id = 0;
+                        table->connections[i]->seat = -1;
+                    }
+                }
+                
+                // Clean up game state
+                if (table->game_state) {
+                    game_state_destroy(table->game_state);
+                    table->game_state = NULL;
+                }
+                
+                // Remove table from list
+                remove_table(table_list, table->id);
+            } else {
+                snprintf(log_msg, sizeof(log_msg), "Hand completed at table %d (players_with_money=%d, current_player=%d), preparing for next hand", 
+                         table->id, players_with_money, table->current_player);
+                logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+                
+                // Try to start next hand if enough players remain
+                start_game_if_ready(table);
+            }
         }
     }
     

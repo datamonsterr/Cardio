@@ -380,19 +380,25 @@ int game_advance_betting_round(GameState *state) {
     // Collect bets into pot
     game_collect_bets_to_pot(state);
     
-    // Check if only one player remains (everyone else folded)
+    // Check how many players remain (active or all-in)
     int active_count = 0;
+    int all_in_count = 0;
     int last_active_seat = -1;
     for (int i = 0; i < MAX_PLAYERS; i++) {
-        if (state->players[i].state == PLAYER_STATE_ACTIVE || 
-            state->players[i].state == PLAYER_STATE_ALL_IN) {
+        if (state->players[i].state == PLAYER_STATE_ACTIVE) {
             active_count++;
             last_active_seat = i;
+        }
+        if (state->players[i].state == PLAYER_STATE_ALL_IN) {
+            all_in_count++;
+            if (last_active_seat < 0) {
+                last_active_seat = i;
+            }
         }
     }
     
     // If only one player remains, they win immediately
-    if (active_count <= 1 && last_active_seat >= 0) {
+    if (active_count + all_in_count <= 1 && last_active_seat >= 0) {
         game_distribute_pot(state, last_active_seat);
         state->winner_seat = last_active_seat;
         state->betting_round = BETTING_ROUND_COMPLETE;
@@ -401,13 +407,44 @@ int game_advance_betting_round(GameState *state) {
         return 0;
     }
     
-    // Reset betting state
+    // If all remaining players are all-in (no one can act),
+    // automatically deal all remaining community cards and go to showdown.
+    if (active_count == 0 && all_in_count >= 2) {
+        switch (state->betting_round) {
+            case BETTING_ROUND_PREFLOP:
+                // Deal flop, turn, and river
+                game_deal_flop(state);
+                game_deal_turn(state);
+                game_deal_river(state);
+                break;
+            case BETTING_ROUND_FLOP:
+                // Deal turn and river
+                game_deal_turn(state);
+                game_deal_river(state);
+                break;
+            case BETTING_ROUND_TURN:
+                // Deal river
+                game_deal_river(state);
+                break;
+            case BETTING_ROUND_RIVER:
+                // Already at river, will go to showdown below
+                break;
+            default:
+                break;
+        }
+        
+        state->betting_round = BETTING_ROUND_SHOWDOWN;
+        game_showdown(state);
+        return 0;
+    }
+    
+    // Reset betting state for next round
     state->current_bet = 0;
     state->min_raise = state->big_blind;
     state->last_aggressor_seat = -1;
     state->players_acted = 0;
     
-    // Advance round
+    // Advance round normally
     switch (state->betting_round) {
         case BETTING_ROUND_PREFLOP:
             game_deal_flop(state);
