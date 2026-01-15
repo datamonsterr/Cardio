@@ -196,12 +196,106 @@ const GamePage: React.FC = () => {
   const isWaitingForPlayers = () => {
     if (!gameState.serverState) return false;
     const activePlayers = gameState.serverState.players.filter(p => p && p.state !== 'empty');
-    return activePlayers.length === 1; // Only one player (us)
+    // Need at least 2 players to start a game, and game shouldn't be in progress
+    return activePlayers.length < 2 || (activePlayers.length === 1 && gameState.serverState.betting_round === 'complete');
   };
 
   const getPlayerCount = () => {
     if (!gameState.serverState) return 0;
     return gameState.serverState.players.filter(p => p && p.state !== 'empty').length;
+  };
+
+  const isGameInProgress = () => {
+    if (!gameState.serverState) return false;
+    const activePlayers = gameState.serverState.players.filter(p => p && p.state !== 'empty');
+    return activePlayers.length >= 2 && 
+           gameState.serverState.betting_round !== 'complete' && 
+           gameState.serverState.hand_id > 0;
+  };
+
+  // Friend modal functions
+  const openFriendModal = () => {
+    setShowFriendModal(true);
+    loadFriends();
+  };
+
+  const loadFriends = async () => {
+    if (!clientRef.current) return;
+    
+    setLoadingFriends(true);
+    try {
+      // Send GET_FRIENDS packet (type 910)
+      const payload = new Uint8Array(msgpackEncode({}));
+      const totalLen = 5 + payload.length;
+      const packet = new Uint8Array(totalLen);
+      const view = new DataView(packet.buffer);
+      
+      view.setUint16(0, totalLen, false);
+      view.setUint8(2, 0x01);
+      view.setUint16(3, 910, false); // GET_FRIENDS packet
+      
+      packet.set(payload, 5);
+      clientRef.current.send(packet);
+      
+      // For now, set empty friends list - in real implementation, 
+      // this would be populated by server response
+      setTimeout(() => {
+        setFriends([]);
+        setLoadingFriends(false);
+      }, 1000);
+    } catch (error) {
+      console.error('Failed to load friends:', error);
+      setLoadingFriends(false);
+    }
+  };
+
+  const addFriend = async (friendName: string) => {
+    if (!clientRef.current || !friendName) return;
+    
+    try {
+      // Send ADD_FRIEND packet (type 920)
+      const payload = new Uint8Array(msgpackEncode({ friend_name: friendName }));
+      const totalLen = 5 + payload.length;
+      const packet = new Uint8Array(totalLen);
+      const view = new DataView(packet.buffer);
+      
+      view.setUint16(0, totalLen, false);
+      view.setUint8(2, 0x01);
+      view.setUint16(3, 920, false); // ADD_FRIEND packet
+      
+      packet.set(payload, 5);
+      clientRef.current.send(packet);
+      
+      console.log('Sent friend request to:', friendName);
+    } catch (error) {
+      console.error('Failed to send friend request:', error);
+    }
+  };
+
+  const sendFriendInvite = async (friendName: string) => {
+    if (!clientRef.current || !friendName || !tableId) return;
+    
+    try {
+      // Send INVITE_FRIEND packet (type 960)
+      const payload = new Uint8Array(msgpackEncode({ 
+        friend_name: friendName,
+        table_id: tableId 
+      }));
+      const totalLen = 5 + payload.length;
+      const packet = new Uint8Array(totalLen);
+      const view = new DataView(packet.buffer);
+      
+      view.setUint16(0, totalLen, false);
+      view.setUint8(2, 0x01);
+      view.setUint16(3, 960, false); // INVITE_FRIEND packet
+      
+      packet.set(payload, 5);
+      clientRef.current.send(packet);
+      
+      console.log('Sent table invite to:', friendName);
+    } catch (error) {
+      console.error('Failed to send table invite:', error);
+    }
   };
 
   // Handle game state update from server
@@ -225,7 +319,10 @@ const GamePage: React.FC = () => {
       setGameState(prev => {
         // Check for winner
         const hasWinner = serverState.betting_round === 'complete' && serverState.winner_seat >= 0;
-        const showResult = serverState.betting_round === 'complete';
+        
+        // Only show hand result if the game actually happened (at least 2 players)
+        const activePlayers = serverState.players.filter(p => p && p.state !== 'empty');
+        const showResult = serverState.betting_round === 'complete' && activePlayers.length >= 2;
         
         // Hide result if betting round changed from complete to something else (new hand started)
         // Also check if hand_id changed, which indicates a new hand has started
@@ -668,7 +765,7 @@ const GamePage: React.FC = () => {
             {player.allIn && <div className="all-in-badge">ALL IN</div>}
             
             {/* Add Friend button for other players */}
-            {player.playerId !== userId && (
+            {serverPlayer.player_id !== userId && (
               <button 
                 className="add-friend-btn"
                 onClick={() => addFriend(player.name)}
@@ -739,7 +836,7 @@ const GamePage: React.FC = () => {
           />
           
           {/* Betting round indicator */}
-          {serverState && serverState.betting_round && !isWaitingForPlayers() && (
+          {serverState && serverState.betting_round && isGameInProgress() && (
             <div className="betting-round-indicator">
               <span className="round-name">{serverState.betting_round.toUpperCase()}</span>
               <span className="hand-info">Hand #{serverState.hand_id}</span>
@@ -750,8 +847,12 @@ const GamePage: React.FC = () => {
           {isWaitingForPlayers() && (
             <div className="waiting-for-players">
               <div className="waiting-box">
-                <h3>Waiting for other players...</h3>
-                <p>You need at least 1 more player to start the game</p>
+                <h3>Waiting for players...</h3>
+                <p>{getPlayerCount() < 2 
+                  ? `Need ${2 - getPlayerCount()} more player${2 - getPlayerCount() === 1 ? '' : 's'} to start` 
+                  : 'Waiting for next hand...'}
+                </p>
+                <p>Current players: {getPlayerCount()}</p>
                 <div className="waiting-actions">
                   <button 
                     className="invite-friends-btn"
@@ -917,7 +1018,7 @@ const GamePage: React.FC = () => {
         )}
 
         {/* Waiting message when not my turn */}
-        {!myTurn && !gameState.winnerFound && serverState && Array.isArray(serverState.players) && serverState.active_seat >= 0 && serverState.active_seat < serverState.players.length && (
+        {!myTurn && !gameState.winnerFound && !isWaitingForPlayers() && serverState && Array.isArray(serverState.players) && serverState.active_seat >= 0 && serverState.active_seat < serverState.players.length && (
           <div className="waiting-message">
             Waiting for {serverState.players[serverState.active_seat]?.name || 'opponent'}...
           </div>
@@ -963,7 +1064,7 @@ const GamePage: React.FC = () => {
             <p>{gameState.error}</p>
             <button onClick={() => navigate('/lobby')}>Back to Lobby</button>
           </div>
-        ) : gameState.showHandResult && gameState.serverState && gameState.serverState.betting_round === 'complete' ? (
+        ) : gameState.showHandResult && gameState.serverState && gameState.serverState.betting_round === 'complete' && !isWaitingForPlayers() ? (
           <HandResult
             serverState={gameState.serverState}
             decodeCard={decodeCard}

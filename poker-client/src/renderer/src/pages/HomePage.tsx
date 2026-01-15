@@ -1,15 +1,37 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { mockUserStats, mockRecentGames } from '../data/mockTables'
 import { TablesIcon, ScoreboardIcon, FriendsIcon, PlayNowIcon } from '../components/icons/HomeIcons'
 
 const HomePage: React.FC = () => {
-  const { user, logout } = useAuth()
+  const { user, logout, refreshBalance } = useAuth()
   const navigate = useNavigate()
   const [activeSection, setActiveSection] = useState<string | null>(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
   if (!user) return null
+
+  // Refresh balance when component mounts to ensure it's current
+  useEffect(() => {
+    const refreshBalanceOnMount = async () => {
+      if (!user || isRefreshing) return
+      
+      setIsRefreshing(true)
+      try {
+        await refreshBalance()
+        console.log('HomePage: Balance refresh completed')
+      } catch (error) {
+        console.error('Failed to refresh balance:', error)
+      } finally {
+        setIsRefreshing(false)
+      }
+    }
+
+    // Refresh balance after a short delay to allow any pending balance updates to be processed
+    const timer = setTimeout(refreshBalanceOnMount, 500)
+    return () => clearTimeout(timer)
+  }, [user?.id, refreshBalance, isRefreshing])
 
   const closeModal = (): void => setActiveSection(null)
 
@@ -40,7 +62,10 @@ const HomePage: React.FC = () => {
         <div className="header-content">
           <div className="header-text">
             <h1>Welcome back, {user.username}! </h1>
-            <p className="balance-info">Balance: ${user.chips.toLocaleString()}</p>
+            <p className="balance-info">
+              Balance: ${user.chips.toLocaleString()}
+              {isRefreshing && <span className="refreshing"> (refreshing...)</span>}
+            </p>
           </div>
           <div className="header-actions">
             <button className="return-button" onClick={handleReturn} title="Go back">

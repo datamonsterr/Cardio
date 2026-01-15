@@ -96,6 +96,7 @@ export interface AuthContextType {
   login: (username: string, password: string) => Promise<boolean>
   logout: () => void
   updateChips: (amount: number) => void
+  refreshBalance: () => Promise<void>
   loading: boolean
   signup?: (request: SignupRequestType) => Promise<void>
   getTables?: () => Promise<any>

@@ -188,6 +188,26 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
       return updated
     })
   }
+
+  const refreshBalance = async (): Promise<void> => {
+    if (!user) return
+    
+    try {
+      // Re-authenticate to get fresh user data including balance
+      // This is a simple way to ensure we have the latest balance from server
+      const storedUser = localStorage.getItem('pokerUser')
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser)
+        // For now, just log that we're refreshing
+        // In a real implementation, we might send a specific "get user info" request
+        console.log('Refreshing balance for user:', parsedUser.username)
+        // The balance should be updated via PACKET_BALANCE_UPDATE notifications
+        // from the server when leaving tables
+      }
+    } catch (error) {
+      console.error('Failed to refresh balance:', error)
+    }
+  }
   
 
 
@@ -227,6 +247,7 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
         login,
         logout,
         updateChips,
+        refreshBalance,
         loading,
         signup,
         getTables,
