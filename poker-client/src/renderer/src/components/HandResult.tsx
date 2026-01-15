@@ -18,7 +18,6 @@ interface HandResultProps {
     } | null>;
     community_cards: number[];
   };
-  userId: number;
   onContinue: () => void;
   decodeCard: (encoded: number) => Card | null;
 }
@@ -40,7 +39,7 @@ const getHandRankName = (rank: number | undefined): string => {
   return handNames[rank] || '';
 };
 
-const HandResult: React.FC<HandResultProps> = ({ serverState, userId, onContinue, decodeCard }) => {
+const HandResult: React.FC<HandResultProps> = ({ serverState, onContinue, decodeCard }) => {
   // Count players who participated in showdown (not folded, not empty, have cards)
   const showdownPlayers = serverState.players.filter(p => 
     p && 

@@ -13,6 +13,8 @@ import {
   SignupRequest,
   SignupResponse,
   GenericResponse,
+  CreateTableResponse,
+  BalanceUpdateNotification,
   TableListResponse,
   CreateTableRequest
 } from './types'
@@ -139,6 +141,22 @@ export function decodeSignupResponse(data: Uint8Array): SignupResponse {
  */
 export function decodeGenericResponse(data: Uint8Array): GenericResponse {
   return msgpackDecode(data) as GenericResponse
+}
+
+/**
+ * Decode create table response (PACKET_TYPE = 300)
+ * Matches encode_create_table_response() in server/src/protocol.c
+ */
+export function decodeCreateTableResponse(data: Uint8Array): CreateTableResponse {
+  return msgpackDecode(data) as CreateTableResponse
+}
+
+/**
+ * Decode balance update notification (PACKET_BALANCE_UPDATE = 970)
+ * Matches encode_balance_update_notification() in server/src/protocol.c
+ */
+export function decodeBalanceUpdateNotification(data: Uint8Array): BalanceUpdateNotification {
+  return msgpackDecode(data) as BalanceUpdateNotification
 }
 
 /**
@@ -351,4 +369,64 @@ export function encodeJoinTableRequest(tableId: number): Uint8Array {
  */
 export function encodeLeaveTableRequest(tableId: number): Uint8Array {
   return new Uint8Array(msgpackEncode({ table_id: tableId }))
+}
+
+/**
+ * Encode table invite request (packet 980)
+ * Server expects: { "friend_username": string, "table_id": int }
+ */
+export function encodeTableInviteRequest(friendUsername: string, tableId: number): Uint8Array {
+  return new Uint8Array(
+    msgpackEncode({
+      friend_username: friendUsername,
+      table_id: tableId
+    })
+  )
+}
+
+/**
+ * Decode table invite response
+ * Server sends: { "result": int, "message": string }
+ * Response codes:
+ * - 981: R_INVITE_TO_TABLE_OK
+ * - 982: R_INVITE_TO_TABLE_NOT_OK
+ * - 983: R_INVITE_TO_TABLE_NOT_FRIENDS
+ * - 984: R_INVITE_TO_TABLE_ALREADY_IN_GAME
+ */
+export interface TableInviteResponse {
+  result: number
+  message: string
+}
+
+export function decodeTableInviteResponse(data: Uint8Array): TableInviteResponse {
+  const decoded = msgpackDecode(data) as { res?: number; result?: number; message?: string }
+  return {
+    result: decoded.result || decoded.res || 0,
+    message: decoded.message || 'Unknown response'
+  }
+}
+
+/**
+ * Decode incoming table invite notification (packet 985)
+ * Server sends: { "from_user": string, "table_id": int, "table_name": string }
+ */
+export interface TableInviteNotificationData {
+  fromUser: string
+  tableId: number
+  tableName: string
+}
+
+export function decodeTableInviteNotification(
+  data: Uint8Array
+): TableInviteNotificationData {
+  const decoded = msgpackDecode(data) as {
+    from_user: string
+    table_id: number
+    table_name: string
+  }
+  return {
+    fromUser: decoded.from_user,
+    tableId: decoded.table_id,
+    tableName: decoded.table_name
+  }
 }

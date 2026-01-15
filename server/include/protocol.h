@@ -70,6 +70,17 @@
 #define R_GET_FRIEND_LIST_OK 961
 #define R_GET_FRIEND_LIST_NOT_OK 962
 
+// Balance update notification (server -> client)
+#define PACKET_BALANCE_UPDATE 970
+
+// Table invite packets (invite friends to join a game table)
+#define PACKET_INVITE_TO_TABLE 980
+#define PACKET_TABLE_INVITE_NOTIFICATION 985  // Sent to invited user
+#define R_INVITE_TO_TABLE_OK 981
+#define R_INVITE_TO_TABLE_NOT_OK 982
+#define R_INVITE_TO_TABLE_NOT_FRIENDS 983
+#define R_INVITE_TO_TABLE_ALREADY_IN_GAME 984
+
 // Game action packets (following protocol spec)
 #define PACKET_ACTION_REQUEST 450
 #define PACKET_ACTION_RESULT 451
@@ -192,6 +203,20 @@ RawBytes* encode_invites_response(dbInviteList* invites);
 
 // Encode friend list response
 RawBytes* encode_friend_list_response(dbFriendList* friends);
+
+// Encode balance update notification
+RawBytes* encode_balance_update_notification(int new_balance, const char* reason);
+
+// ===== Table Invite =====
+
+// Table invite request
+typedef struct {
+    char friend_username[32];  // Username to invite to table
+    int table_id;              // Table ID to invite them to
+} TableInviteRequest;
+
+// Decode table invite request
+TableInviteRequest* decode_table_invite_request(char* payload);
 
 // ===== Game Action Packets =====
 

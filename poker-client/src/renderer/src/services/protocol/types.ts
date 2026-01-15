@@ -67,6 +67,19 @@ export interface GenericResponse {
   msg?: string;
 }
 
+// Create table response
+export interface CreateTableResponse {
+  res: number;
+  table_id?: number;
+  msg?: string;
+}
+
+// Balance update notification (server -> client)
+export interface BalanceUpdateNotification {
+  balance: number;      // new balance amount
+  reason: string;       // reason for update (e.g., "table_join", "table_leave")
+}
+
 // Action request
 export interface ActionRequest {
   game_id: number;

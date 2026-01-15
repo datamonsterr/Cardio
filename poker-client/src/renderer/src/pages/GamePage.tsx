@@ -1,10 +1,15 @@
 import React, { useEffect, useState, useCallback, useRef, Component, ErrorInfo, ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { FriendService } from '../services/friend/FriendService';
+import { TableInviteService } from '../services/table/TableInviteService';
+import { PACKET_TABLE_INVITE_NOTIFICATION } from '../services/protocol/constants';
+import { decodeTableInviteNotification } from '../services/protocol/codec';
 import Spinner from '../components/Spinner';
 import WinScreen from '../components/WinScreen';
 import HandResult from '../components/HandResult';
 import CardComponent from '../components/card/Card';
+import TableInviteNotification, { TableInvite } from '../components/TableInviteNotification';
 import Handle from '../components/slider/Handle';
 import Track from '../components/slider/Track';
 import { sliderStyle, railStyle } from '../components/slider/types';
@@ -183,9 +188,136 @@ const GamePage: React.FC = () => {
   const hasJoinedRef = useRef(false);
   const handResultTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasRequestedRefreshRef = useRef(false);
+  const friendServiceRef = useRef<FriendService | null>(null);
+  const tableInviteServiceRef = useRef<TableInviteService | null>(null);
+
+  // Friend invite modal state
+  const [showFriendModal, setShowFriendModal] = useState(false);
+  const [friends, setFriends] = useState<any[]>([]);
+  const [loadingFriends, setLoadingFriends] = useState(false);
+  
+  // Table invite notifications
+  const [tableInvites, setTableInvites] = useState<TableInvite[]>([]);
 
   // Get user ID for checking if it's our turn
   const userId = user?.id ? parseInt(user.id, 10) : 0;
+
+  // Helper functions to check game state
+  const isWaitingForPlayers = () => {
+    if (!gameState.serverState) return false;
+    const activePlayers = gameState.serverState.players.filter(p => p && p.state !== 'empty');
+    // Need at least 2 players to start a game, and game shouldn't be in progress
+    return activePlayers.length < 2 || (activePlayers.length === 1 && gameState.serverState.betting_round === 'complete');
+  };
+
+  const getPlayerCount = () => {
+    if (!gameState.serverState) return 0;
+    return gameState.serverState.players.filter(p => p && p.state !== 'empty').length;
+  };
+
+  const isGameInProgress = () => {
+    if (!gameState.serverState) return false;
+    const activePlayers = gameState.serverState.players.filter(p => p && p.state !== 'empty');
+    return activePlayers.length >= 2 && 
+           gameState.serverState.betting_round !== 'complete' && 
+           gameState.serverState.hand_id > 0;
+  };
+
+  // Friend modal functions
+  const openFriendModal = () => {
+    setShowFriendModal(true);
+    loadFriends();
+  };
+
+  const loadFriends = async () => {
+    if (!friendServiceRef.current) {
+      console.warn('Friend service not initialized');
+      return;
+    }
+    
+    setLoadingFriends(true);
+    try {
+      const friendList = await friendServiceRef.current.getFriendList();
+      console.log('Loaded friends:', friendList);
+      setFriends(friendList);
+    } catch (error) {
+      console.error('Failed to load friends:', error);
+      setFriends([]);
+    } finally {
+      setLoadingFriends(false);
+    }
+  };
+
+  const addFriend = async (friendName: string) => {
+    if (!friendServiceRef.current || !friendName) {
+      console.warn('Friend service not initialized or no friend name provided');
+      return;
+    }
+    
+    try {
+      await friendServiceRef.current.addFriend(friendName);
+      console.log('Successfully added friend:', friendName);
+      // Reload friends list
+      await loadFriends();
+    } catch (error) {
+      console.error('Failed to add friend:', error);
+      alert(`Failed to add friend: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  const sendFriendInvite = async (friendName: string) => {
+    if (!tableInviteServiceRef.current || !friendName || !tableId) {
+      console.warn('Table invite service not initialized, no friend name, or no table ID');
+      return;
+    }
+    
+    try {
+      const response = await tableInviteServiceRef.current.inviteToTable(friendName, tableId);
+      
+      if (TableInviteService.isSuccess(response)) {
+        console.log('Successfully sent table invite to:', friendName);
+        alert(`Invited ${friendName} to join your table!`);
+      } else {
+        const errorMsg = TableInviteService.getErrorMessage(response);
+        console.warn('Table invite failed:', errorMsg);
+        alert(`Failed to invite ${friendName}: ${errorMsg}`);
+      }
+    } catch (error) {
+      console.error('Failed to send table invite:', error);
+      alert(`Failed to invite friend: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  // Handle receiving table invite from another player
+  const handleTableInviteReceived = (fromUsername: string, tableId: number, tableName?: string) => {
+    console.log('[GamePage] Received table invite from:', fromUsername, 'table:', tableId);
+    
+    const newInvite: TableInvite = {
+      id: `${fromUsername}-${tableId}-${Date.now()}`,
+      fromUsername,
+      tableId,
+      tableName,
+      timestamp: Date.now()
+    };
+    
+    setTableInvites((prev) => [...prev, newInvite]);
+  };
+
+  const handleAcceptTableInvite = (invite: TableInvite) => {
+    console.log('[GamePage] Accepting table invite:', invite);
+    // TODO: Join the table
+    // navigate(`/game?tableId=${invite.tableId}`);
+    alert(`Joining table ${invite.tableId}...`);
+  };
+
+  const handleRejectTableInvite = (invite: TableInvite) => {
+    console.log('[GamePage] Rejecting table invite:', invite);
+    // Just remove from list - already handled by notification component
+  };
+
+  const handleDismissTableInvite = (inviteId: string) => {
+    setTableInvites((prev) => prev.filter((inv) => inv.id !== inviteId));
+  };
 
   // Handle game state update from server
   const handleGameStateUpdate = useCallback((data: Uint8Array) => {
@@ -208,7 +340,10 @@ const GamePage: React.FC = () => {
       setGameState(prev => {
         // Check for winner
         const hasWinner = serverState.betting_round === 'complete' && serverState.winner_seat >= 0;
-        const showResult = serverState.betting_round === 'complete';
+        
+        // Only show hand result if the game actually happened (at least 2 players)
+        const activePlayers = serverState.players.filter(p => p && p.state !== 'empty');
+        const showResult = serverState.betting_round === 'complete' && activePlayers.length >= 2;
         
         // Hide result if betting round changed from complete to something else (new hand started)
         // Also check if hand_id changed, which indicates a new hand has started
@@ -357,6 +492,21 @@ const GamePage: React.FC = () => {
         clientRef.current = client;
         console.log('[GamePage] Got client, setting up packet handler');
 
+        // Initialize FriendService and TableInviteService
+        try {
+          friendServiceRef.current = new FriendService({ client });
+          console.log('[GamePage] FriendService initialized');
+        } catch (error) {
+          console.error('[GamePage] Failed to initialize FriendService:', error);
+        }
+
+        try {
+          tableInviteServiceRef.current = new TableInviteService({ client });
+          console.log('[GamePage] TableInviteService initialized');
+        } catch (error) {
+          console.error('[GamePage] Failed to initialize TableInviteService:', error);
+        }
+
         // Store original handler - check if method exists
         const originalOnPacket = typeof client.getPacketHandler === 'function' 
           ? client.getPacketHandler() 
@@ -384,6 +534,11 @@ const GamePage: React.FC = () => {
               // Action result
               console.log('[GamePage] Received ACTION_RESULT');
               handleActionResult(packet.data);
+            } else if (packetType === PACKET_TABLE_INVITE_NOTIFICATION) {
+              // Table invite notification
+              console.log('[GamePage] Received TABLE_INVITE_NOTIFICATION');
+              const inviteData = decodeTableInviteNotification(packet.data);
+              handleTableInviteReceived(inviteData.fromUser, inviteData.tableId, inviteData.tableName);
             }
           } catch (err) {
             console.error('[GamePage] Error handling packet:', err);
@@ -536,7 +691,7 @@ const GamePage: React.FC = () => {
     const activePlayers = gameState.serverState?.players?.filter(p => 
       p && p.state !== 'empty' && p.state !== 'folded'
     ) || [];
-    const allInPlayers = activePlayers.filter(p => p.state === 'all_in');
+    const allInPlayers = activePlayers.filter(p => p && p.state === 'all_in');
     const allPlayersAllIn = activePlayers.length >= 2 && allInPlayers.length === activePlayers.length;
     
     const showCards = isMe || isShowdown || allPlayersAllIn;
@@ -650,6 +805,17 @@ const GamePage: React.FC = () => {
             )}
             {player.allIn && <div className="all-in-badge">ALL IN</div>}
             
+            {/* Add Friend button for other players */}
+            {serverPlayer.player_id !== userId && (
+              <button 
+                className="add-friend-btn"
+                onClick={() => addFriend(player.name)}
+                title={`Add ${player.name} as friend`}
+              >
+                + Friend
+              </button>
+            )}
+            
             {/* Player cards */}
             {player.cards && player.cards.length > 0 && (
               <div className="player-cards">
@@ -711,10 +877,32 @@ const GamePage: React.FC = () => {
           />
           
           {/* Betting round indicator */}
-          {serverState && serverState.betting_round && (
+          {serverState && serverState.betting_round && isGameInProgress() && (
             <div className="betting-round-indicator">
               <span className="round-name">{serverState.betting_round.toUpperCase()}</span>
               <span className="hand-info">Hand #{serverState.hand_id}</span>
+            </div>
+          )}
+          
+          {/* Waiting for players display */}
+          {isWaitingForPlayers() && (
+            <div className="waiting-for-players">
+              <div className="waiting-box">
+                <h3>Waiting for players...</h3>
+                <p>{getPlayerCount() < 2 
+                  ? `Need ${2 - getPlayerCount()} more player${2 - getPlayerCount() === 1 ? '' : 's'} to start` 
+                  : 'Waiting for next hand...'}
+                </p>
+                <p>Current players: {getPlayerCount()}</p>
+                <div className="waiting-actions">
+                  <button 
+                    className="invite-friends-btn"
+                    onClick={openFriendModal}
+                  >
+                    Invite Friends
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -871,7 +1059,7 @@ const GamePage: React.FC = () => {
         )}
 
         {/* Waiting message when not my turn */}
-        {!myTurn && !gameState.winnerFound && serverState && Array.isArray(serverState.players) && serverState.active_seat >= 0 && serverState.active_seat < serverState.players.length && (
+        {!myTurn && !gameState.winnerFound && !isWaitingForPlayers() && serverState && Array.isArray(serverState.players) && serverState.active_seat >= 0 && serverState.active_seat < serverState.players.length && (
           <div className="waiting-message">
             Waiting for {serverState.players[serverState.active_seat]?.name || 'opponent'}...
           </div>
@@ -908,6 +1096,13 @@ const GamePage: React.FC = () => {
 
   return (
     <div className="App">
+      <TableInviteNotification
+        invites={tableInvites}
+        onAccept={handleAcceptTableInvite}
+        onReject={handleRejectTableInvite}
+        onDismiss={handleDismissTableInvite}
+      />
+      
       <div className="poker-table--wrapper">
         {gameState.loading ? (
           <Spinner />
@@ -917,10 +1112,9 @@ const GamePage: React.FC = () => {
             <p>{gameState.error}</p>
             <button onClick={() => navigate('/lobby')}>Back to Lobby</button>
           </div>
-        ) : gameState.showHandResult && gameState.serverState && gameState.serverState.betting_round === 'complete' ? (
+        ) : gameState.showHandResult && gameState.serverState && gameState.serverState.betting_round === 'complete' && !isWaitingForPlayers() ? (
           <HandResult
             serverState={gameState.serverState}
-            userId={userId || 0}
             decodeCard={decodeCard}
             onContinue={() => {
               // Hide HandResult immediately when user clicks Continue
@@ -956,7 +1150,7 @@ const GamePage: React.FC = () => {
               }
             }}
           />
-        ) : gameState.winnerFound && gameState.amountWon > 0 && gameState.serverState && gameState.serverState.current_player <= 1 ? (
+        ) : gameState.winnerFound && gameState.amountWon > 0 && gameState.serverState && gameState.serverState.max_players <= 1 ? (
           <WinScreen 
             isWinner={gameState.winnerSeat >= 0 && gameState.serverState?.players?.[gameState.winnerSeat]?.player_id === userId}
             winnerName={gameState.serverState?.players?.[gameState.winnerSeat]?.name || 'Player'}
@@ -964,6 +1158,49 @@ const GamePage: React.FC = () => {
           />
         ) : (
           renderGame()
+        )}
+        
+        {/* Friend Invite Modal */}
+        {showFriendModal && (
+          <div className="modal-overlay" onClick={() => setShowFriendModal(false)}>
+            <div className="friend-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>Invite Friends to Table</h3>
+                <button className="close-btn" onClick={() => setShowFriendModal(false)}>×</button>
+              </div>
+              <div className="modal-content">
+                {loadingFriends ? (
+                  <div className="loading-friends">
+                    <div className="spinner"></div>
+                    <p>Loading friends...</p>
+                  </div>
+                ) : friends.length === 0 ? (
+                  <div className="no-friends">
+                    <p>No friends found. Add some friends first!</p>
+                  </div>
+                ) : (
+                  <div className="friends-list">
+                    {friends.map(friend => (
+                      <div key={friend.user_id} className={`friend-item online`}>
+                        <div className="friend-info">
+                          <span className="friend-name">{friend.username}</span>
+                          <span className={`friend-status online`}>
+                            ● Online
+                          </span>
+                        </div>
+                        <button 
+                          className="invite-btn"
+                          onClick={() => sendFriendInvite(friend.username)}
+                        >
+                          Invite
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

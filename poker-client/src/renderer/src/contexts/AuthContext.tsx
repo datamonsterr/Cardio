@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import type { User, AuthContextType, CreateTableRequestType } from '../types'
 import { AuthService, ConnectionStatus } from '../services/auth/AuthService'
 import { HeartbeatService } from '../services/network/HeartbeatService'
-import { Packet, SignupRequest, CreateTableRequest, PACKET_TYPE } from '../services/protocol'
+import { Packet, SignupRequest, CreateTableRequest, PACKET_TYPE, PACKET_BALANCE_UPDATE, decodeBalanceUpdateNotification } from '../services/protocol'
 import { getServerConfig } from '../config/server'
 
 // Global connection status state
@@ -10,6 +10,10 @@ let globalConnectionStatus: ConnectionStatus = 'disconnected'
 let globalConnectionMessage: string = ''
 const connectionStatusListeners: Set<(status: ConnectionStatus, message: string) => void> =
   new Set()
+
+// Global user update management
+type UserUpdater = (updater: (prev: User | null) => User | null) => void
+let globalUserUpdater: UserUpdater | null = null
 
 // Create heartbeat service instance
 const heartbeatService = new HeartbeatService({
@@ -44,6 +48,27 @@ const authService = new AuthService({
       heartbeatService.onPongReceived()
       return
     }
+    
+    // Handle balance updates
+    if (packet.header.packet_type === PACKET_BALANCE_UPDATE) {
+      try {
+        const balanceUpdate = decodeBalanceUpdateNotification(packet.data)
+        console.log('Balance update received:', balanceUpdate)
+        // Update user balance in context using global updater
+        if (globalUserUpdater) {
+          globalUserUpdater((prev) => {
+            if (!prev) return null
+            const updated = { ...prev, chips: balanceUpdate.balance }
+            localStorage.setItem('pokerUser', JSON.stringify(updated))
+            return updated
+          })
+        }
+      } catch (error) {
+        console.error('Failed to decode balance update:', error)
+      }
+      return
+    }
+    
     console.log('Received packet:', packet.header.packet_type)
   },
   onConnectionStatusChange: (status: ConnectionStatus, message?: string) => {
@@ -84,6 +109,14 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
+
+  // Register global user updater
+  useEffect(() => {
+    globalUserUpdater = setUser
+    return () => {
+      globalUserUpdater = null
+    }
+  }, [setUser])
 
   useEffect(() => {
     // Check for stored user on mount
@@ -156,6 +189,28 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
     })
   }
 
+  const refreshBalance = async (): Promise<void> => {
+    if (!user) return
+    
+    try {
+      // Re-authenticate to get fresh user data including balance
+      // This is a simple way to ensure we have the latest balance from server
+      const storedUser = localStorage.getItem('pokerUser')
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser)
+        // For now, just log that we're refreshing
+        // In a real implementation, we might send a specific "get user info" request
+        console.log('Refreshing balance for user:', parsedUser.username)
+        // The balance should be updated via PACKET_BALANCE_UPDATE notifications
+        // from the server when leaving tables
+      }
+    } catch (error) {
+      console.error('Failed to refresh balance:', error)
+    }
+  }
+  
+
+
   const getTables = async () => {
     try {
       const response = await authService.getTables()
@@ -166,14 +221,15 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
     }
   }
 
-  const createTable = async (request: CreateTableRequestType) => {
+  const createTable = async (request: CreateTableRequestType): Promise<number> => {
     try {
       const createRequest: CreateTableRequest = {
         name: request.name,
         max_player: request.max_player,
         min_bet: request.min_bet
       }
-      await authService.createTable(createRequest)
+      const table_id = await authService.createTable(createRequest)
+      return table_id
     } catch (error) {
       console.error('Failed to create table:', error)
       throw error
@@ -191,6 +247,7 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
         login,
         logout,
         updateChips,
+        refreshBalance,
         loading,
         signup,
         getTables,
