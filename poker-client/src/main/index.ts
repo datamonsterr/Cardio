@@ -2,6 +2,17 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { config } from 'dotenv'
+import { resolve } from 'path'
+
+// Load .env file
+config({ path: resolve(__dirname, '../../.env') })
+
+console.log('Main process env vars:')
+console.log('  VITE_SERVER_ADDRESS:', process.env.VITE_SERVER_ADDRESS)
+console.log('  SERVER_ADDRESS:', process.env.SERVER_ADDRESS)
+console.log('  VITE_SERVER_PORT:', process.env.VITE_SERVER_PORT)
+console.log('  PORT:', process.env.PORT)
 
 function createWindow(): void {
   // Create the browser window.

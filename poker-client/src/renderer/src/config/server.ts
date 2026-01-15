@@ -37,6 +37,13 @@ export function getServerConfig(): ServerConfig {
 
   const port = Number.parseInt(portRaw, 10);
 
+  console.log('🔍 Server Config Debug:');
+  console.log('  VITE_SERVER_ADDRESS:', readEnv('VITE_SERVER_ADDRESS'));
+  console.log('  SERVER_ADDRESS:', readEnv('SERVER_ADDRESS'));
+  console.log('  VITE_SERVER_PORT:', readEnv('VITE_SERVER_PORT'));
+  console.log('  PORT:', readEnv('PORT'));
+  console.log('  Final config:', { host, port });
+
   return {
     host,
     port: Number.isFinite(port) ? port : 8080

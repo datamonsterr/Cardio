@@ -46,6 +46,8 @@ export class TcpClient {
       throw new Error(`Cannot connect: already ${this.state}`);
     }
 
+    console.log(`🔌 TcpClient connecting to ${this.config.host}:${this.config.port}`);
+
     return new Promise((resolve, reject) => {
       this.setState('connecting');
 
@@ -72,6 +74,7 @@ export class TcpClient {
       });
 
       this.socket.on('error', (error: Error) => {
+        console.error('❌ TcpClient connection error:', error.message);
         this.handleError(error);
         reject(error);
       });
