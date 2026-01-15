@@ -32,9 +32,7 @@ function convertBettingRound(round: string): GamePhase {
  * Convert server PlayerState to client Player format
  */
 function convertPlayer(
-  serverPlayer: PlayerState | null,
-  userPlayerId: number,
-  index: number
+  serverPlayer: PlayerState | null
 ): Player | null {
   if (!serverPlayer) {
     return null;
@@ -51,8 +49,8 @@ function convertPlayer(
   }
 
   return {
-    name: serverPlayer.name,
-    chips: serverPlayer.money,
+    name: (serverPlayer as any).name || `Player ${(serverPlayer as any).seat || 0}`,
+    chips: (serverPlayer as any).money || 0,
     position: serverPlayer.seat,
     cards: cards.length > 0 ? cards : undefined,
     bet: serverPlayer.bet,
@@ -60,7 +58,8 @@ function convertPlayer(
     allIn: serverPlayer.state === 'all_in',
     isActive: serverPlayer.state === 'active',
     showCards: serverPlayer.state === 'folded' ? false : undefined,
-    avatarURL: `https://api.dicebear.com/7.x/avataaars/svg?seed=${serverPlayer.name}`,
+    avatarURL: `https://api.dicebear.com/7.x/avataaars/svg?seed=${(serverPlayer as any).name || 'player'}`,
+
   };
 }
 
@@ -69,7 +68,7 @@ function convertPlayer(
  */
 export function convertServerGameState(
   serverState: ServerGameState,
-  userPlayerId: number
+  _userPlayerId: number
 ): {
   players: Player[];
   activePlayerIndex: number;
@@ -86,9 +85,9 @@ export function convertServerGameState(
   let activePlayerIndex = -1;
   let dealerIndex = -1;
 
-  serverState.players.forEach((serverPlayer, index) => {
+  serverState.players.forEach((serverPlayer, _index) => {
     if (serverPlayer) {
-      const player = convertPlayer(serverPlayer, userPlayerId, index);
+      const player = convertPlayer(serverPlayer);
       if (player) {
         players.push(player);
         
@@ -119,7 +118,7 @@ export function convertServerGameState(
     activePlayerIndex: activePlayerIndex >= 0 ? activePlayerIndex : 0,
     dealerIndex: dealerIndex >= 0 ? dealerIndex : 0,
     communityCards,
-    pot: serverState.main_pot,
+    pot: (serverState.main_pot as any)?.amount || 0,
     highBet: serverState.current_bet,
     betInputValue: serverState.min_raise || serverState.big_blind,
     minBet: serverState.big_blind,

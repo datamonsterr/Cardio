@@ -55,6 +55,8 @@ int test_login(TestState* state, int player_num);
 int test_create_table(TestState* state);
 int test_get_tables(TestState* state);
 int test_join_table(TestState* state, int player_num);
+int get_user_balance_from_db(int user_id);
+void print_balance_summary(TestState* state, const char* phase);
 
 void print_test_header(const char* test_name) {
     printf("\n%s========================================%s\n", COLOR_CYAN, COLOR_RESET);
@@ -122,6 +124,53 @@ int connect_to_server(const char* host, const char* port) {
 
     freeaddrinfo(servinfo);
     return sockfd;
+}
+
+/**
+ * Get user balance directly from database
+ */
+int get_user_balance_from_db(int user_id) {
+    PGconn* conn = PQconnectdb("dbname=cardio user=postgres password=postgres host=localhost port=5433");
+    if (PQstatus(conn) != CONNECTION_OK) {
+        print_failure("Failed to connect to database for balance check");
+        PQfinish(conn);
+        return -1;
+    }
+    
+    char query[256];
+    snprintf(query, sizeof(query), "SELECT balance FROM \"User\" WHERE user_id = %d", user_id);
+    
+    PGresult* res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) == 0) {
+        print_failure("Failed to get balance from database");
+        PQclear(res);
+        PQfinish(conn);
+        return -1;
+    }
+    
+    int balance = atoi(PQgetvalue(res, 0, 0));
+    PQclear(res);
+    PQfinish(conn);
+    
+    return balance;
+}
+
+/**
+ * Print balance summary for all players
+ */
+void print_balance_summary(TestState* state, const char* phase) {
+    print_info(phase);
+    for (int i = 0; i < 3; i++) {  // 3 players in test
+        TestPlayerState* player = &state->players[i];
+        if (player->user_id > 0) {
+            int db_balance = get_user_balance_from_db(player->user_id);
+            printf("  Player %d (%s): connection balance=%d, database balance=%d\n", 
+                   i+1, player->username, player->balance, db_balance);
+            
+            // Update local balance to match database
+            player->balance = db_balance;
+        }
+    }
 }
 
 /**
@@ -1217,8 +1266,16 @@ int main(int argc, char* argv[])
     // TEST SCENARIO 4: Play 3 complete rounds
     print_test_header("SCENARIO 4: Play 3 Complete Rounds");
     
+    // Check initial balances before playing
+    print_balance_summary(&state, "=== INITIAL BALANCE CHECK ===");
+    
     for (int round = 1; round <= 3; round++) {
         printf("\n%s═══ ROUND %d ═══%s\n", COLOR_CYAN, round, COLOR_RESET);
+        
+        // Check balances before this round  
+        char round_msg[100];
+        snprintf(round_msg, sizeof(round_msg), "=== BALANCE BEFORE ROUND %d ===", round);
+        print_balance_summary(&state, round_msg);
         
         int active_seat = -1;
         print_info("Getting active seat from player states...");
@@ -1438,6 +1495,9 @@ int main(int argc, char* argv[])
         
         printf("\n%s✓ Round %d completed%s\n", COLOR_GREEN, round, COLOR_RESET);
     }
+    
+    // Check final balances after all rounds
+    print_balance_summary(&state, "=== FINAL BALANCE CHECK ===");
     
     // Print final summary
     printf("\n");

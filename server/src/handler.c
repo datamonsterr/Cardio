@@ -1055,6 +1055,51 @@ void handle_action_request(conn_data_t* conn_data, char* data, size_t data_len, 
                          table->id, players_with_money, table->current_player);
                 logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
                 
+                // Sync player balances to database after hand completion
+                PGconn* db_conn = PQconnectdb(dbconninfo);
+                if (PQstatus(db_conn) == CONNECTION_OK) {
+                    int successful_updates = 0;
+                    int failed_updates = 0;
+                    
+                    // Update database balance for each player based on their current money in the game
+                    for (int i = 0; i < MAX_PLAYERS; i++) {
+                        GamePlayer *player = &table->game_state->players[i];
+                        if (player->state != PLAYER_STATE_EMPTY && player->player_id > 0) {
+                            int result = dbUpdateBalance(db_conn, player->player_id, player->money);
+                            if (result == DB_OK) {
+                                successful_updates++;
+                                // Update connection data balances to match game state
+                                for (int j = 0; j < table->current_player; j++) {
+                                    if (table->connections[j] && 
+                                        table->connections[j]->user_id == player->player_id) {
+                                        table->connections[j]->balance = player->money;
+                                        break;
+                                    }
+                                }
+                            } else {
+                                failed_updates++;
+                                snprintf(log_msg, sizeof(log_msg), 
+                                        "Failed to update balance for player %d (user_id=%d) to %d", 
+                                        i, player->player_id, player->money);
+                                logger_ex(MAIN_LOG, "ERROR", __func__, log_msg, 1);
+                            }
+                        }
+                    }
+                    
+                    if (failed_updates == 0) {
+                        snprintf(log_msg, sizeof(log_msg), "Successfully synced %d player balances to database for table %d", 
+                                successful_updates, table->id);
+                        logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+                    } else {
+                        snprintf(log_msg, sizeof(log_msg), "Synced %d balances, failed %d for table %d", 
+                                successful_updates, failed_updates, table->id);
+                        logger_ex(MAIN_LOG, "WARN", __func__, log_msg, 1);
+                    }
+                    PQfinish(db_conn);
+                } else {
+                    logger_ex(MAIN_LOG, "ERROR", __func__, "Failed to connect to database for balance sync", 1);
+                }
+                
                 // Reset player states to WAITING so they can participate in next hand
                 // This is needed because players might be in FOLDED or ALL_IN state after hand complete
                 int reset_count = 0;

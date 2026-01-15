@@ -107,6 +107,16 @@ int dbSignup(PGconn* conn, struct dbUser* user);
 // If username and password are valid and exist in database, return dbLogin successful
 int dbLogin(PGconn* conn, char* username, char* password);
 
+// Balance management functions
+// Update user balance to specific amount
+int dbUpdateBalance(PGconn* conn, int user_id, int new_balance);
+// Add/subtract amount from user balance
+int dbAddToBalance(PGconn* conn, int user_id, int amount);
+// Get current user balance
+int dbGetBalance(PGconn* conn, int user_id);
+// Transfer balance between users atomically
+int dbTransferBalance(PGconn* conn, int from_user_id, int to_user_id, int amount);
+
 // Password hashing utilities
 char* generate_salt();
 char* hash_password(const char* password, const char* salt);

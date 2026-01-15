@@ -70,6 +70,9 @@
 #define R_GET_FRIEND_LIST_OK 961
 #define R_GET_FRIEND_LIST_NOT_OK 962
 
+// Balance update notification (server -> client)
+#define PACKET_BALANCE_UPDATE 970
+
 // Game action packets (following protocol spec)
 #define PACKET_ACTION_REQUEST 450
 #define PACKET_ACTION_RESULT 451
@@ -192,6 +195,9 @@ RawBytes* encode_invites_response(dbInviteList* invites);
 
 // Encode friend list response
 RawBytes* encode_friend_list_response(dbFriendList* friends);
+
+// Encode balance update notification
+RawBytes* encode_balance_update_notification(int new_balance, const char* reason);
 
 // ===== Game Action Packets =====
 

@@ -129,9 +129,56 @@ int join_table(conn_data_t* conn_data, TableList* table_list, int table_id)
         buy_in = conn_data->balance;  // Use whatever they have
     }
     
+    // Deduct buy-in from database balance
+    PGconn* db_conn = PQconnectdb(dbconninfo);
+    if (PQstatus(db_conn) == CONNECTION_OK) {
+        int db_result = dbAddToBalance(db_conn, conn_data->user_id, -buy_in);
+        if (db_result != DB_OK) {
+            logger(MAIN_LOG, "Error", "join_table: Failed to deduct buy-in from database");
+            PQfinish(db_conn);
+            return -5;
+        }
+        
+        // Get updated balance from database to ensure consistency
+        int new_balance = dbGetBalance(db_conn, conn_data->user_id);
+        if (new_balance >= 0) {
+            conn_data->balance = new_balance;
+            char log_msg[256];
+            snprintf(log_msg, sizeof(log_msg), 
+                    "Player %s brought %d chips to table %d, remaining balance: %d", 
+                    conn_data->username, buy_in, table_id, new_balance);
+            logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+            
+            // Send balance update notification to client
+            RawBytes* balance_notification = encode_balance_update_notification(new_balance, "table_join");
+            if (balance_notification) {
+                RawBytes* packet = encode_packet(PROTOCOL_V1, PACKET_BALANCE_UPDATE, 
+                                                balance_notification->data, balance_notification->len);
+                if (packet) {
+                    sendall(conn_data->fd, packet->data, (int*)&(packet->len));
+                    free(packet->data);
+                    free(packet);
+                }
+                free(balance_notification->data);
+                free(balance_notification);
+            }
+        }
+        PQfinish(db_conn);
+    } else {
+        logger(MAIN_LOG, "Error", "join_table: Failed to connect to database");
+        return -6;
+    }
+    
     int result = game_add_player(game_state, conn_data->user_id, conn_data->username, seat, buy_in);
     if (result != 0) {
         logger(MAIN_LOG, "Error", "join_table: Failed to add player to game state");
+        // Refund the buy-in if player add failed
+        db_conn = PQconnectdb(dbconninfo);
+        if (PQstatus(db_conn) == CONNECTION_OK) {
+            dbAddToBalance(db_conn, conn_data->user_id, buy_in);
+            conn_data->balance += buy_in;
+            PQfinish(db_conn);
+        }
         return -4;
     }
     
@@ -163,6 +210,78 @@ int leave_table(conn_data_t* conn_data, TableList* table_list)
     
     // Remove player from game state if they have a seat
     if (conn_data->seat >= 0) {
+        // Return remaining chips to player's database balance
+        GamePlayer* player = game_get_player_by_seat(table->game_state, conn_data->seat);
+        if (player && player->money > 0) {
+            PGconn* db_conn = PQconnectdb(dbconninfo);
+            if (PQstatus(db_conn) == CONNECTION_OK) {
+                // Return the player's remaining table chips to database
+                int result = dbAddToBalance(db_conn, conn_data->user_id, player->money);
+                if (result == DB_OK) {
+                    // Get the updated total balance from database
+                    int new_balance = dbGetBalance(db_conn, conn_data->user_id);
+                    if (new_balance >= 0) {
+                        conn_data->balance = new_balance;
+                        char log_msg[256];
+                        snprintf(log_msg, sizeof(log_msg), 
+                                "Player %s returned %d chips to balance, total balance now: %d", 
+                                conn_data->username, player->money, new_balance);
+                        logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+                        
+                        // Send balance update notification to client with correct balance
+                        RawBytes* balance_notification = encode_balance_update_notification(new_balance, "table_leave");
+                        if (balance_notification) {
+                            RawBytes* packet = encode_packet(PROTOCOL_V1, PACKET_BALANCE_UPDATE, 
+                                                            balance_notification->data, balance_notification->len);
+                            if (packet) {
+                                sendall(conn_data->fd, packet->data, (int*)&(packet->len));
+                                free(packet->data);
+                                free(packet);
+                            }
+                            free(balance_notification->data);
+                            free(balance_notification);
+                        }
+                    }
+                } else {
+                    char log_msg[256];
+                    snprintf(log_msg, sizeof(log_msg), 
+                            "Failed to return %d chips to player %s leaving table %d", 
+                            player->money, conn_data->username, conn_data->table_id);
+                    logger_ex(MAIN_LOG, "ERROR", __func__, log_msg, 1);
+                }
+                PQfinish(db_conn);
+            }
+        } else {
+            // Player has no chips left, just update their balance from database to be sure
+            PGconn* db_conn = PQconnectdb(dbconninfo);
+            if (PQstatus(db_conn) == CONNECTION_OK) {
+                int new_balance = dbGetBalance(db_conn, conn_data->user_id);
+                if (new_balance >= 0) {
+                    conn_data->balance = new_balance;
+                    char log_msg[256];
+                    snprintf(log_msg, sizeof(log_msg), 
+                            "Player %s left table with 0 chips, balance remains: %d", 
+                            conn_data->username, new_balance);
+                    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+                    
+                    // Send balance update notification to client
+                    RawBytes* balance_notification = encode_balance_update_notification(new_balance, "table_leave");
+                    if (balance_notification) {
+                        RawBytes* packet = encode_packet(PROTOCOL_V1, PACKET_BALANCE_UPDATE, 
+                                                        balance_notification->data, balance_notification->len);
+                        if (packet) {
+                            sendall(conn_data->fd, packet->data, (int*)&(packet->len));
+                            free(packet->data);
+                            free(packet);
+                        }
+                        free(balance_notification->data);
+                        free(balance_notification);
+                    }
+                }
+                PQfinish(db_conn);
+            }
+        }
+        
         game_remove_player(table->game_state, conn_data->seat);
         
         // Remove from connection tracking

@@ -646,4 +646,41 @@ RawBytes* encode_friend_list_response(dbFriendList* friends)
     memcpy(raw_bytes->data, data, raw_bytes->len);
 
     return raw_bytes;
+}RawBytes* encode_balance_update_notification(int new_balance, const char* reason)
+{
+    char buffer[512];
+    mpack_writer_t writer;
+    mpack_writer_init(&writer, buffer, sizeof(buffer));
+    
+    mpack_start_map(&writer, 2);
+    
+    mpack_write_cstr(&writer, "balance");
+    mpack_write_int(&writer, new_balance);
+    
+    mpack_write_cstr(&writer, "reason");
+    mpack_write_cstr(&writer, reason ? reason : "balance_updated");
+    
+    mpack_finish_map(&writer);
+    
+    size_t len = mpack_writer_buffer_used(&writer);
+    mpack_error_t error = mpack_writer_destroy(&writer);
+    
+    if (error != mpack_ok) {
+        return NULL;
+    }
+    
+    RawBytes* raw_bytes = malloc(sizeof(RawBytes));
+    if (!raw_bytes) {
+        return NULL;
+    }
+    
+    raw_bytes->len = len;
+    raw_bytes->data = malloc(len);
+    if (!raw_bytes->data) {
+        free(raw_bytes);
+        return NULL;
+    }
+    
+    memcpy(raw_bytes->data, buffer, len);
+    return raw_bytes;
 }

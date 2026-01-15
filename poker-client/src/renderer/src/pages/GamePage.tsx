@@ -536,7 +536,7 @@ const GamePage: React.FC = () => {
     const activePlayers = gameState.serverState?.players?.filter(p => 
       p && p.state !== 'empty' && p.state !== 'folded'
     ) || [];
-    const allInPlayers = activePlayers.filter(p => p.state === 'all_in');
+    const allInPlayers = activePlayers.filter(p => p && p.state === 'all_in');
     const allPlayersAllIn = activePlayers.length >= 2 && allInPlayers.length === activePlayers.length;
     
     const showCards = isMe || isShowdown || allPlayersAllIn;
@@ -920,7 +920,6 @@ const GamePage: React.FC = () => {
         ) : gameState.showHandResult && gameState.serverState && gameState.serverState.betting_round === 'complete' ? (
           <HandResult
             serverState={gameState.serverState}
-            userId={userId || 0}
             decodeCard={decodeCard}
             onContinue={() => {
               // Hide HandResult immediately when user clicks Continue
@@ -956,7 +955,7 @@ const GamePage: React.FC = () => {
               }
             }}
           />
-        ) : gameState.winnerFound && gameState.amountWon > 0 && gameState.serverState && gameState.serverState.current_player <= 1 ? (
+        ) : gameState.winnerFound && gameState.amountWon > 0 && gameState.serverState && gameState.serverState.max_players <= 1 ? (
           <WinScreen 
             isWinner={gameState.winnerSeat >= 0 && gameState.serverState?.players?.[gameState.winnerSeat]?.player_id === userId}
             winnerName={gameState.serverState?.players?.[gameState.winnerSeat]?.name || 'Player'}

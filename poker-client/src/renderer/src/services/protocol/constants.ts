@@ -92,6 +92,7 @@ export const PACKET_UPDATE_GAMESTATE = 600
 export const PACKET_UPDATE_BUNDLE = 460
 export const PACKET_JOIN_TABLE = 400
 export const PACKET_LEAVE_TABLE = 700
+export const PACKET_BALANCE_UPDATE = 970
 
 // Response codes
 export const RESPONSE_CODE = {

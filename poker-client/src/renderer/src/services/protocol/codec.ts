@@ -13,6 +13,7 @@ import {
   SignupRequest,
   SignupResponse,
   GenericResponse,
+  BalanceUpdateNotification,
   TableListResponse,
   CreateTableRequest
 } from './types'
@@ -139,6 +140,14 @@ export function decodeSignupResponse(data: Uint8Array): SignupResponse {
  */
 export function decodeGenericResponse(data: Uint8Array): GenericResponse {
   return msgpackDecode(data) as GenericResponse
+}
+
+/**
+ * Decode balance update notification (PACKET_BALANCE_UPDATE = 970)
+ * Matches encode_balance_update_notification() in server/src/protocol.c
+ */
+export function decodeBalanceUpdateNotification(data: Uint8Array): BalanceUpdateNotification {
+  return msgpackDecode(data) as BalanceUpdateNotification
 }
 
 /**

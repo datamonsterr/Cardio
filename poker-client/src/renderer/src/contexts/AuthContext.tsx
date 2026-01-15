@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import type { User, AuthContextType, CreateTableRequestType } from '../types'
 import { AuthService, ConnectionStatus } from '../services/auth/AuthService'
 import { HeartbeatService } from '../services/network/HeartbeatService'
-import { Packet, SignupRequest, CreateTableRequest, PACKET_TYPE } from '../services/protocol'
+import { Packet, SignupRequest, CreateTableRequest, PACKET_TYPE, PACKET_BALANCE_UPDATE, decodeBalanceUpdateNotification } from '../services/protocol'
 import { getServerConfig } from '../config/server'
 
 // Global connection status state
@@ -10,6 +10,10 @@ let globalConnectionStatus: ConnectionStatus = 'disconnected'
 let globalConnectionMessage: string = ''
 const connectionStatusListeners: Set<(status: ConnectionStatus, message: string) => void> =
   new Set()
+
+// Global user update management
+type UserUpdater = (updater: (prev: User | null) => User | null) => void
+let globalUserUpdater: UserUpdater | null = null
 
 // Create heartbeat service instance
 const heartbeatService = new HeartbeatService({
@@ -44,6 +48,27 @@ const authService = new AuthService({
       heartbeatService.onPongReceived()
       return
     }
+    
+    // Handle balance updates
+    if (packet.header.packet_type === PACKET_BALANCE_UPDATE) {
+      try {
+        const balanceUpdate = decodeBalanceUpdateNotification(packet.data)
+        console.log('Balance update received:', balanceUpdate)
+        // Update user balance in context using global updater
+        if (globalUserUpdater) {
+          globalUserUpdater((prev) => {
+            if (!prev) return null
+            const updated = { ...prev, chips: balanceUpdate.balance }
+            localStorage.setItem('pokerUser', JSON.stringify(updated))
+            return updated
+          })
+        }
+      } catch (error) {
+        console.error('Failed to decode balance update:', error)
+      }
+      return
+    }
+    
     console.log('Received packet:', packet.header.packet_type)
   },
   onConnectionStatusChange: (status: ConnectionStatus, message?: string) => {
@@ -84,6 +109,14 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
+
+  // Register global user updater
+  useEffect(() => {
+    globalUserUpdater = setUser
+    return () => {
+      globalUserUpdater = null
+    }
+  }, [setUser])
 
   useEffect(() => {
     // Check for stored user on mount
@@ -155,6 +188,8 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
       return updated
     })
   }
+  
+
 
   const getTables = async () => {
     try {
