@@ -13,6 +13,7 @@ import {
   SignupRequest,
   SignupResponse,
   GenericResponse,
+  CreateTableResponse,
   BalanceUpdateNotification,
   TableListResponse,
   CreateTableRequest
@@ -140,6 +141,14 @@ export function decodeSignupResponse(data: Uint8Array): SignupResponse {
  */
 export function decodeGenericResponse(data: Uint8Array): GenericResponse {
   return msgpackDecode(data) as GenericResponse
+}
+
+/**
+ * Decode create table response (PACKET_TYPE = 300)
+ * Matches encode_create_table_response() in server/src/protocol.c
+ */
+export function decodeCreateTableResponse(data: Uint8Array): CreateTableResponse {
+  return msgpackDecode(data) as CreateTableResponse
 }
 
 /**

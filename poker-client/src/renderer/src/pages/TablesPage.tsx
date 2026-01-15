@@ -129,10 +129,11 @@ const TablesPage: React.FC = () => {
     try {
       setCreating(true)
       setError(null)
-      await createTable(createForm)
+      const tableId = await createTable(createForm)
       setShowCreateModal(false)
       setCreateForm({ name: '', max_player: 6, min_bet: 10 })
-      await fetchTables()
+      // Redirect to the game page with the created table ID
+      navigate(`/game?tableId=${tableId}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create table')
     } finally {

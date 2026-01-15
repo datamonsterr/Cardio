@@ -183,9 +183,26 @@ const GamePage: React.FC = () => {
   const hasJoinedRef = useRef(false);
   const handResultTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasRequestedRefreshRef = useRef(false);
+  
+  // Friend invite modal state
+  const [showFriendModal, setShowFriendModal] = useState(false);
+  const [friends, setFriends] = useState<any[]>([]);
+  const [loadingFriends, setLoadingFriends] = useState(false);
 
   // Get user ID for checking if it's our turn
   const userId = user?.id ? parseInt(user.id, 10) : 0;
+
+  // Helper functions to check game state
+  const isWaitingForPlayers = () => {
+    if (!gameState.serverState) return false;
+    const activePlayers = gameState.serverState.players.filter(p => p && p.state !== 'empty');
+    return activePlayers.length === 1; // Only one player (us)
+  };
+
+  const getPlayerCount = () => {
+    if (!gameState.serverState) return 0;
+    return gameState.serverState.players.filter(p => p && p.state !== 'empty').length;
+  };
 
   // Handle game state update from server
   const handleGameStateUpdate = useCallback((data: Uint8Array) => {
@@ -650,6 +667,17 @@ const GamePage: React.FC = () => {
             )}
             {player.allIn && <div className="all-in-badge">ALL IN</div>}
             
+            {/* Add Friend button for other players */}
+            {player.playerId !== userId && (
+              <button 
+                className="add-friend-btn"
+                onClick={() => addFriend(player.name)}
+                title={`Add ${player.name} as friend`}
+              >
+                + Friend
+              </button>
+            )}
+            
             {/* Player cards */}
             {player.cards && player.cards.length > 0 && (
               <div className="player-cards">
@@ -711,10 +739,28 @@ const GamePage: React.FC = () => {
           />
           
           {/* Betting round indicator */}
-          {serverState && serverState.betting_round && (
+          {serverState && serverState.betting_round && !isWaitingForPlayers() && (
             <div className="betting-round-indicator">
               <span className="round-name">{serverState.betting_round.toUpperCase()}</span>
               <span className="hand-info">Hand #{serverState.hand_id}</span>
+            </div>
+          )}
+          
+          {/* Waiting for players display */}
+          {isWaitingForPlayers() && (
+            <div className="waiting-for-players">
+              <div className="waiting-box">
+                <h3>Waiting for other players...</h3>
+                <p>You need at least 1 more player to start the game</p>
+                <div className="waiting-actions">
+                  <button 
+                    className="invite-friends-btn"
+                    onClick={openFriendModal}
+                  >
+                    Invite Friends
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -963,6 +1009,50 @@ const GamePage: React.FC = () => {
           />
         ) : (
           renderGame()
+        )}
+        
+        {/* Friend Invite Modal */}
+        {showFriendModal && (
+          <div className="modal-overlay" onClick={() => setShowFriendModal(false)}>
+            <div className="friend-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>Invite Friends to Table</h3>
+                <button className="close-btn" onClick={() => setShowFriendModal(false)}>×</button>
+              </div>
+              <div className="modal-content">
+                {loadingFriends ? (
+                  <div className="loading-friends">
+                    <div className="spinner"></div>
+                    <p>Loading friends...</p>
+                  </div>
+                ) : friends.length === 0 ? (
+                  <div className="no-friends">
+                    <p>No friends found. Add some friends first!</p>
+                  </div>
+                ) : (
+                  <div className="friends-list">
+                    {friends.map(friend => (
+                      <div key={friend.id} className={`friend-item ${friend.online ? 'online' : 'offline'}`}>
+                        <div className="friend-info">
+                          <span className="friend-name">{friend.name}</span>
+                          <span className={`friend-status ${friend.online ? 'online' : 'offline'}`}>
+                            {friend.online ? '● Online' : '○ Offline'}
+                          </span>
+                        </div>
+                        <button 
+                          className="invite-btn"
+                          onClick={() => sendFriendInvite(friend.name)}
+                          disabled={!friend.online}
+                        >
+                          Invite
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

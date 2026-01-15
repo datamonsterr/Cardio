@@ -99,7 +99,7 @@ export interface AuthContextType {
   loading: boolean
   signup?: (request: SignupRequestType) => Promise<void>
   getTables?: () => Promise<any>
-  createTable?: (request: CreateTableRequestType) => Promise<void>
+  createTable?: (request: CreateTableRequestType) => Promise<number>
   getClient?: () => any
 }
 

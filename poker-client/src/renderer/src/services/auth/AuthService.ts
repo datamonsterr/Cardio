@@ -11,6 +11,7 @@ import {
   TableListResponse,
   GenericResponse,
   CreateTableRequest,
+  CreateTableResponse,
   encodePacket,
   encodeLoginRequest,
   encodeSignupRequest,
@@ -20,6 +21,7 @@ import {
   decodeSignupResponse,
   decodeTableListResponse,
   decodeGenericResponse,
+  decodeCreateTableResponse,
   PACKET_TYPE,
   PROTOCOL_V1,
   SignupRequest
@@ -143,7 +145,7 @@ export class AuthService {
             console.log('Table list response decoded:', response);
             break;
           case PACKET_TYPE.CREATE_TABLE_RESPONSE:
-            response = decodeGenericResponse(packet.data);
+            response = decodeCreateTableResponse(packet.data);
             console.log('Create table response decoded:', response);
             break;
           default:
@@ -347,12 +349,12 @@ export class AuthService {
   }
 
   /**
-   * Create a new table
+   * Create a new table and return table_id
    */
-  async createTable(request: CreateTableRequest): Promise<void> {
+  async createTable(request: CreateTableRequest): Promise<number> {
     await this.ensureConnected();
 
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<number>((resolve, reject) => {
       try {
         // Encode create table request
         const payload = encodeCreateTableRequest(request);
@@ -360,10 +362,10 @@ export class AuthService {
 
         // Register pending request
         this.pendingRequests.set(PACKET_TYPE.CREATE_TABLE_RESPONSE, {
-          resolve: (response: GenericResponse) => {
+          resolve: (response: CreateTableResponse) => {
             if (response.res === PACKET_TYPE.R_CREATE_TABLE_OK) {
-              // Table created successfully
-              resolve();
+              // Table created successfully - return table_id
+              resolve(response.table_id || 0);
             } else {
               // Table creation failed
               reject(new Error(response.msg || 'Failed to create table'));

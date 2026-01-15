@@ -130,8 +130,8 @@ int dbSendFriendInvite(PGconn* conn, int from_user_id, const char* to_username)
     }
     PQclear(friend_res);
 
-    // Check if invite already exists
-    const char* invite_check = "SELECT 1 FROM friend_invites WHERE from_user_id = $1 AND to_user_id = $2 AND status = 'pending' LIMIT 1";
+    // Check if invite already exists (any status)
+    const char* invite_check = "SELECT status FROM friend_invites WHERE from_user_id = $1 AND to_user_id = $2 LIMIT 1";
     PGresult* invite_res = PQexecParams(conn, invite_check, 2, NULL, friend_params, NULL, NULL, 0);
 
     if (PQresultStatus(invite_res) != PGRES_TUPLES_OK)
@@ -143,13 +143,39 @@ int dbSendFriendInvite(PGconn* conn, int from_user_id, const char* to_username)
 
     if (PQntuples(invite_res) > 0)
     {
-        // Invite already sent
+        const char* status = PQgetvalue(invite_res, 0, 0);
+        
+        if (strcmp(status, "pending") == 0)
+        {
+            // Invite already sent and pending
+            PQclear(invite_res);
+            return -4;
+        }
+        else if (strcmp(status, "rejected") == 0)
+        {
+            // Previous invite was rejected, update it to pending with new timestamp
+            PQclear(invite_res);
+            
+            const char* update_query = "UPDATE friend_invites SET status = 'pending', created_at = CURRENT_TIMESTAMP WHERE from_user_id = $1 AND to_user_id = $2";
+            PGresult* update_res = PQexecParams(conn, update_query, 2, NULL, friend_params, NULL, NULL, 0);
+            
+            if (PQresultStatus(update_res) != PGRES_COMMAND_OK)
+            {
+                fprintf(stderr, "dbSendFriendInvite update failed: %s\n", PQerrorMessage(conn));
+                PQclear(update_res);
+                return DB_ERROR;
+            }
+            
+            PQclear(update_res);
+            return DB_OK;
+        }
+        // If status is "accepted", this should have been caught by the friend check above
         PQclear(invite_res);
-        return -4;
+        return -3; // Already friends (shouldn't happen)
     }
     PQclear(invite_res);
 
-    // Create the invite
+    // Create new invite
     const char* insert_query = "INSERT INTO friend_invites (from_user_id, to_user_id, status) VALUES ($1, $2, 'pending')";
     PGresult* res = PQexecParams(conn, insert_query, 2, NULL, friend_params, NULL, NULL, 0);
 

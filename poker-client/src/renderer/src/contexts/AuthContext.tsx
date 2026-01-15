@@ -201,14 +201,15 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
     }
   }
 
-  const createTable = async (request: CreateTableRequestType) => {
+  const createTable = async (request: CreateTableRequestType): Promise<number> => {
     try {
       const createRequest: CreateTableRequest = {
         name: request.name,
         max_player: request.max_player,
         min_bet: request.min_bet
       }
-      await authService.createTable(createRequest)
+      const table_id = await authService.createTable(createRequest)
+      return table_id
     } catch (error) {
       console.error('Failed to create table:', error)
       throw error
