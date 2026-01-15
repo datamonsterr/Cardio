@@ -330,8 +330,43 @@ void handle_join_table_request(conn_data_t* conn_data, char* data, size_t data_l
             }
             
             if (table && table->game_state) {
+                GameState* gs = table->game_state;
+                
+                // If hand is complete and not in progress, try to start new hand
+                if (gs->betting_round == BETTING_ROUND_COMPLETE) {
+                    // Ensure hand_in_progress is false
+                    if (gs->hand_in_progress) {
+                        gs->hand_in_progress = false;
+                    }
+                    
+                    snprintf(log_msg, sizeof(log_msg), "Hand complete at table %d - JOIN_TABLE request triggers new hand start (hand_in_progress=%d)", 
+                             table->id, gs->hand_in_progress);
+                    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+                    
+                    // Reset player states to WAITING if needed
+                    for (int i = 0; i < MAX_PLAYERS; i++) {
+                        GamePlayer* p = &gs->players[i];
+                        if (p->state != PLAYER_STATE_EMPTY && 
+                            p->state != PLAYER_STATE_SITTING_OUT &&
+                            p->money > 0) {
+                            p->state = PLAYER_STATE_WAITING;
+                        }
+                    }
+                    
+                    // Start new hand
+                    start_game_if_ready(table);
+                    
+                    // Update gs pointer in case it changed
+                    gs = table->game_state;
+                    
+                    // Broadcast new hand state to all players if hand started
+                    if (gs && gs->hand_in_progress && gs->betting_round != BETTING_ROUND_COMPLETE) {
+                        broadcast_game_state_to_table(table);
+                    }
+                }
+                
                 // Send current game state
-                RawBytes* game_state_data = encode_game_state(table->game_state, conn_data->user_id);
+                RawBytes* game_state_data = encode_game_state(gs, conn_data->user_id);
                 if (game_state_data) {
                     RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_JOIN_TABLE, game_state_data->data, game_state_data->len);
                     if (sendall(conn_data->fd, response->data, (int*) &(response->len)) == -1)
@@ -803,6 +838,53 @@ void handle_action_request(conn_data_t* conn_data, char* data, size_t data_len, 
         return;
     }
     
+    // If hand is complete and player sends an action, start new hand first
+    if (gs->betting_round == BETTING_ROUND_COMPLETE) {
+        // Ensure hand_in_progress is false
+        if (gs->hand_in_progress) {
+            gs->hand_in_progress = false;
+        }
+        
+        snprintf(log_msg, sizeof(log_msg), "Hand complete at table %d - player '%s' action triggers new hand start (hand_in_progress=%d)", 
+                 table->id, conn_data->username, gs->hand_in_progress);
+        logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+        
+        // Reset player states to WAITING if needed
+        for (int i = 0; i < MAX_PLAYERS; i++) {
+            GamePlayer* p = &gs->players[i];
+            if (p->state != PLAYER_STATE_EMPTY && 
+                p->state != PLAYER_STATE_SITTING_OUT &&
+                p->money > 0) {
+                p->state = PLAYER_STATE_WAITING;
+            }
+        }
+        
+        // Start new hand
+        start_game_if_ready(table);
+        
+        // Update gs pointer in case it changed
+        gs = table->game_state;
+        if (!gs) {
+            snprintf(log_msg, sizeof(log_msg), "Error: Game state is NULL after starting new hand");
+            logger_ex(MAIN_LOG, "ERROR", __func__, log_msg, 1);
+            free(action_req);
+            free_packet(packet);
+            return;
+        }
+        
+        // Broadcast new hand state to all players
+        broadcast_game_state_to_table(table);
+        
+        // If new hand started, return early - don't process the action from previous hand
+        if (gs->hand_in_progress && gs->betting_round != BETTING_ROUND_COMPLETE) {
+            snprintf(log_msg, sizeof(log_msg), "New hand started, ignoring action from previous hand");
+            logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+            free(action_req);
+            free_packet(packet);
+            return;
+        }
+    }
+    
     // Validate action
     ActionValidation validation = game_validate_action(gs, conn_data->user_id, &action);
     if (!validation.is_valid) {
@@ -891,11 +973,124 @@ void handle_action_request(conn_data_t* conn_data, char* data, size_t data_len, 
         if (table->game_state->betting_round == BETTING_ROUND_COMPLETE) {
             table->active_seat = -1;
             
-            snprintf(log_msg, sizeof(log_msg), "Hand completed at table %d, preparing for next hand", table->id);
-            logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+            // Remove players who have no money left (busted out)
+            // Only remove after hand is complete, not during play
+            // Iterate backwards to safely remove multiple players
+            for (int i = table->current_player - 1; i >= 0; i--) {
+                if (table->connections[i] != NULL && table->connections[i]->seat >= 0) {
+                    int seat = table->connections[i]->seat;
+                    GamePlayer* p = &table->game_state->players[seat];
+                    
+                    // Only remove if player has no money left and is not already empty
+                    if (p->money == 0 && p->state != PLAYER_STATE_EMPTY) {
+                        snprintf(log_msg, sizeof(log_msg), "Player %s (seat %d) busted out at table %d (money=0), removing from table", 
+                                 table->connections[i]->username, seat, table->id);
+                        logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+                        
+                        // Remove player from game state
+                        game_remove_player(table->game_state, seat);
+                        
+                        // Remove from connection tracking
+                        table->seat_to_conn_idx[seat] = -1;
+                        
+                        // Mark connection as leaving
+                        table->connections[i]->table_id = 0;
+                        table->connections[i]->seat = -1;
+                        table->connections[i] = NULL;
+                        
+                        // Shift connections array to remove gap
+                        for (int j = i; j < table->current_player - 1; j++) {
+                            table->connections[j] = table->connections[j + 1];
+                            if (table->connections[j] != NULL && table->connections[j]->seat >= 0) {
+                                table->seat_to_conn_idx[table->connections[j]->seat] = j;
+                            }
+                        }
+                        table->connections[table->current_player - 1] = NULL;
+                        
+                        // Decrease current_player count
+                        if (table->current_player > 0) {
+                            table->current_player--;
+                        }
+                    }
+                }
+            }
             
-            // Try to start next hand if enough players remain
-            start_game_if_ready(table);
+            // Check if winner cleaned out the lobby
+            // Count players who are not folded and have money > 0 (can continue playing)
+            int players_with_money = 0;
+            int winner_seat = table->game_state->winner_seat;
+            for (int i = 0; i < MAX_PLAYERS; i++) {
+                GamePlayer* p = &table->game_state->players[i];
+                if (p->state != PLAYER_STATE_EMPTY && 
+                    p->state != PLAYER_STATE_FOLDED && 
+                    p->money > 0) {
+                    players_with_money++;
+                }
+            }
+            
+            // If only winner has money (or no one has money but there's a winner), remove table
+            if (players_with_money <= 1 && winner_seat >= 0) {
+                snprintf(log_msg, sizeof(log_msg), "Table %d cleaned out by winner (seat %d, players_with_money=%d, current_player=%d), removing table", 
+                         table->id, winner_seat, players_with_money, table->current_player);
+                logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+                
+                // Mark all connections as leaving the table
+                for (int i = 0; i < table->current_player; i++) {
+                    if (table->connections[i] != NULL) {
+                        table->connections[i]->table_id = 0;
+                        table->connections[i]->seat = -1;
+                    }
+                }
+                
+                // Clean up game state
+                if (table->game_state) {
+                    game_state_destroy(table->game_state);
+                    table->game_state = NULL;
+                }
+                
+                // Remove table from list
+                remove_table(table_list, table->id);
+            } else {
+                snprintf(log_msg, sizeof(log_msg), "Hand completed at table %d (players_with_money=%d, current_player=%d), preparing for next hand", 
+                         table->id, players_with_money, table->current_player);
+                logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+                
+                // Reset player states to WAITING so they can participate in next hand
+                // This is needed because players might be in FOLDED or ALL_IN state after hand complete
+                int reset_count = 0;
+                for (int i = 0; i < MAX_PLAYERS; i++) {
+                    GamePlayer* p = &table->game_state->players[i];
+                    if (p->state != PLAYER_STATE_EMPTY && 
+                        p->state != PLAYER_STATE_SITTING_OUT &&
+                        p->money > 0) {
+                        p->state = PLAYER_STATE_WAITING;
+                        p->bet = 0;
+                        p->total_bet = 0;
+                        p->hole_cards[0] = NULL;
+                        p->hole_cards[1] = NULL;
+                        p->is_dealer = false;
+                        p->is_small_blind = false;
+                        p->is_big_blind = false;
+                        reset_count++;
+                    }
+                }
+                
+                // Ensure hand_in_progress is false before logging and starting new hand
+                table->game_state->hand_in_progress = false;
+                
+                snprintf(log_msg, sizeof(log_msg), "Reset %d players to WAITING state at table %d (hand_in_progress=%d, betting_round=%d)", 
+                         reset_count, table->id, table->game_state->hand_in_progress, table->game_state->betting_round);
+                logger_ex(MAIN_LOG, "DEBUG", __func__, log_msg, 1);
+                
+                // Don't start next hand immediately - give clients time to display HandResult
+                // The next hand will start automatically when a player sends their first action
+                // after the hand completes (handled in handle_action_request when betting_round is COMPLETE)
+                snprintf(log_msg, sizeof(log_msg), "Hand complete at table %d - waiting for player action to start next hand", table->id);
+                logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+                
+                // Don't call start_game_if_ready here - let it start when player acts
+                // This gives clients time to show HandResult before new hand begins
+            }
         }
     }
     

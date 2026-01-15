@@ -39,6 +39,9 @@ GameState* game_state_create(int game_id, int max_players, int small_blind, int 
     state->dealer_seat = -1;
     state->active_seat = -1;
     state->betting_round = BETTING_ROUND_COMPLETE;
+    state->winner_seat = -1;
+    state->amount_won = 0;
+    state->winner_hand_rank = -1;
     
     return state;
 }
@@ -91,10 +94,15 @@ void game_state_reset_for_new_hand(GameState *state) {
     // Reset and shuffle deck
     enqueue_deck(state->deck);
     deck_fill(state->deck);
+    // Re-seed random for additional randomness per hand
+    srand((unsigned int)(time(NULL) + state->hand_id * 1000));
     shuffle(state->deck, 1000);
     
     state->hand_in_progress = false;
     state->betting_round = BETTING_ROUND_COMPLETE;
+    state->winner_seat = -1;
+    state->amount_won = 0;
+    state->winner_hand_rank = -1;
 }
 
 // ===== Player Management =====
@@ -380,19 +388,25 @@ int game_advance_betting_round(GameState *state) {
     // Collect bets into pot
     game_collect_bets_to_pot(state);
     
-    // Check if only one player remains (everyone else folded)
+    // Check how many players remain (active or all-in)
     int active_count = 0;
+    int all_in_count = 0;
     int last_active_seat = -1;
     for (int i = 0; i < MAX_PLAYERS; i++) {
-        if (state->players[i].state == PLAYER_STATE_ACTIVE || 
-            state->players[i].state == PLAYER_STATE_ALL_IN) {
+        if (state->players[i].state == PLAYER_STATE_ACTIVE) {
             active_count++;
             last_active_seat = i;
+        }
+        if (state->players[i].state == PLAYER_STATE_ALL_IN) {
+            all_in_count++;
+            if (last_active_seat < 0) {
+                last_active_seat = i;
+            }
         }
     }
     
     // If only one player remains, they win immediately
-    if (active_count <= 1 && last_active_seat >= 0) {
+    if (active_count + all_in_count <= 1 && last_active_seat >= 0) {
         game_distribute_pot(state, last_active_seat);
         state->winner_seat = last_active_seat;
         state->betting_round = BETTING_ROUND_COMPLETE;
@@ -401,13 +415,44 @@ int game_advance_betting_round(GameState *state) {
         return 0;
     }
     
-    // Reset betting state
+    // If all remaining players are all-in (no one can act),
+    // automatically deal all remaining community cards and go to showdown.
+    if (active_count == 0 && all_in_count >= 2) {
+        switch (state->betting_round) {
+            case BETTING_ROUND_PREFLOP:
+                // Deal flop, turn, and river
+                game_deal_flop(state);
+                game_deal_turn(state);
+                game_deal_river(state);
+                break;
+            case BETTING_ROUND_FLOP:
+                // Deal turn and river
+                game_deal_turn(state);
+                game_deal_river(state);
+                break;
+            case BETTING_ROUND_TURN:
+                // Deal river
+                game_deal_river(state);
+                break;
+            case BETTING_ROUND_RIVER:
+                // Already at river, will go to showdown below
+                break;
+            default:
+                break;
+        }
+        
+        state->betting_round = BETTING_ROUND_SHOWDOWN;
+        game_showdown(state);
+        return 0;
+    }
+    
+    // Reset betting state for next round
     state->current_bet = 0;
     state->min_raise = state->big_blind;
     state->last_aggressor_seat = -1;
     state->players_acted = 0;
     
-    // Advance round
+    // Advance round normally
     switch (state->betting_round) {
         case BETTING_ROUND_PREFLOP:
             game_deal_flop(state);
@@ -733,6 +778,165 @@ int game_distribute_pot(GameState *state, int winning_seat) {
 
 // ===== Showdown =====
 
+// Calculate best 5-card hand value from 7 cards (2 hole + 5 community)
+// Returns hand value using same scale as hand_value() function
+static int calculate_best_hand_value(Card* hole_cards[2], Card* community_cards[5], int num_community) {
+    if (!hole_cards[0] || !hole_cards[1]) return 0;
+    
+    // Collect all 7 cards
+    Card* all_cards[7];
+    int num_cards = 2;
+    all_cards[0] = hole_cards[0];
+    all_cards[1] = hole_cards[1];
+    
+    for (int i = 0; i < num_community && i < 5; i++) {
+        if (community_cards[i]) {
+            all_cards[num_cards++] = community_cards[i];
+        }
+    }
+    
+    if (num_cards < 5) return 0; // Need at least 5 cards
+    
+    int best_value = 0;
+    
+    // Try all combinations of 5 cards from 7 cards (C(7,5) = 21 combinations)
+    // For simplicity, we'll check all combinations
+    for (int c1 = 0; c1 < num_cards; c1++) {
+        for (int c2 = c1 + 1; c2 < num_cards; c2++) {
+            for (int c3 = c2 + 1; c3 < num_cards; c3++) {
+                for (int c4 = c3 + 1; c4 < num_cards; c4++) {
+                    for (int c5 = c4 + 1; c5 < num_cards; c5++) {
+                        // Count suits and ranks for this 5-card combination
+                        int suits[5] = {0};
+                        int ranks[15] = {0};
+                        int highcard = 0;
+                        
+                        Card* combo[5] = {all_cards[c1], all_cards[c2], all_cards[c3], all_cards[c4], all_cards[c5]};
+                        
+                        for (int i = 0; i < 5; i++) {
+                            int suit = combo[i]->suit;
+                            int rank = combo[i]->rank;
+                            if (rank == 1) rank = 14; // Ace high
+                            
+                            suits[suit]++;
+                            ranks[rank]++;
+                            if (rank > highcard) highcard = rank;
+                        }
+                        
+                        // Check for flush
+                        int flush = 0;
+                        int flush_suit = 0;
+                        for (int i = 1; i <= 4; i++) {
+                            if (suits[i] == 5) {
+                                flush = 1;
+                                flush_suit = i;
+                                break;
+                            }
+                        }
+                        
+                        // If flush, recalculate highcard as highest card in flush suit
+                        int flush_highcard = highcard;
+                        if (flush) {
+                            flush_highcard = 0;
+                            for (int i = 0; i < 5; i++) {
+                                int rank = combo[i]->rank;
+                                if (rank == 1) rank = 14; // Ace high
+                                if (combo[i]->suit == flush_suit && rank > flush_highcard) {
+                                    flush_highcard = rank;
+                                }
+                            }
+                        }
+                        
+                        // Check for straight
+                        int straight = 0;
+                        int consecutive = 0;
+                        int max_consecutive = 0;
+                        for (int i = 2; i < 15; i++) {
+                            if (ranks[i] > 0) {
+                                consecutive++;
+                                if (consecutive > max_consecutive) {
+                                    max_consecutive = consecutive;
+                                }
+                                if (consecutive >= 5) {
+                                    straight = 1;
+                                    highcard = i; // Update highcard to end of straight
+                                }
+                            } else {
+                                consecutive = 0;
+                            }
+                        }
+                        // Check for A-2-3-4-5 straight (wheel)
+                        if (!straight && ranks[14] > 0 && ranks[2] > 0 && ranks[3] > 0 && ranks[4] > 0 && ranks[5] > 0) {
+                            straight = 1;
+                            highcard = 5; // 5-high straight
+                        }
+                        
+                        // Check for four of a kind, three of a kind, pairs
+                        int four_kind = 0, three_kind = 0, pair_count = 0;
+                        int four_rank = 0, three_rank = 0, pair1_rank = 0, pair2_rank = 0;
+                        
+                        for (int i = 2; i < 15; i++) {
+                            if (ranks[i] == 4) {
+                                four_kind = 1;
+                                four_rank = i;
+                            } else if (ranks[i] == 3) {
+                                three_kind = 1;
+                                three_rank = i;
+                            } else if (ranks[i] == 2) {
+                                pair_count++;
+                                if (pair1_rank == 0) {
+                                    pair1_rank = i;
+                                } else {
+                                    pair2_rank = i;
+                                }
+                            }
+                        }
+                        
+                        // Calculate hand value (using same scale as hand_value function)
+                        int hand_val = 0;
+                        
+                        if (flush && straight) {
+                            // Straight flush
+                            hand_val = 13 * 8 + flush_highcard - 1; // SFLUSH = 8
+                        } else if (four_kind) {
+                            // Four of a kind
+                            hand_val = 13 * 7 + four_rank - 1; // FOURK = 7
+                        } else if (three_kind && pair_count >= 1) {
+                            // Full house
+                            hand_val = 13 * 6 + three_rank - 1; // FULLHOUSE = 6
+                        } else if (flush) {
+                            // Flush - use flush_highcard (highest card in flush suit)
+                            hand_val = 13 * 5 + flush_highcard - 1; // FLUSH = 5
+                        } else if (straight) {
+                            // Straight
+                            hand_val = 13 * 4 + highcard - 1; // STRAIGHT = 4
+                        } else if (three_kind) {
+                            // Three of a kind
+                            hand_val = 13 * 3 + three_rank - 1; // THREEK = 3
+                        } else if (pair_count >= 2) {
+                            // Two pair
+                            int higher_pair = (pair1_rank > pair2_rank) ? pair1_rank : pair2_rank;
+                            hand_val = 13 * 2 + higher_pair - 1; // TWOPAIR = 2
+                        } else if (pair_count == 1) {
+                            // Pair
+                            hand_val = 13 * 1 + pair1_rank - 1; // PAIR = 1
+                        } else {
+                            // High card
+                            hand_val = 13 * 0 + highcard - 1; // HIGHCARD = 0
+                        }
+                        
+                        if (hand_val > best_value) {
+                            best_value = hand_val;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    return best_value;
+}
+
 int game_determine_winner(GameState *state) {
     if (!state) return -1;
     
@@ -743,26 +947,8 @@ int game_determine_winner(GameState *state) {
     for (int i = 0; i < MAX_PLAYERS; i++) {
         GamePlayer *p = &state->players[i];
         if (p->state == PLAYER_STATE_ACTIVE || p->state == PLAYER_STATE_ALL_IN) {
-            // Calculate hand value without using add_card (which causes ownership issues)
-            // For simplified version, use card ranks directly
-            int hand_val = 0;
-            
-            if (p->hole_cards[0] && p->hole_cards[1]) {
-                // Simple hand evaluation: sum of ranks (Ace=14 is high)
-                int rank1 = p->hole_cards[0]->rank;
-                int rank2 = p->hole_cards[1]->rank;
-                
-                // Convert Ace (rank 1) to 14 for evaluation
-                if (rank1 == 1) rank1 = 14;
-                if (rank2 == 1) rank2 = 14;
-                
-                // Pair bonus
-                if (rank1 == rank2) {
-                    hand_val = 1000 + rank1 * 2;
-                } else {
-                    hand_val = rank1 + rank2;
-                }
-            }
+            // Calculate best 5-card hand from 7 cards (2 hole + 5 community)
+            int hand_val = calculate_best_hand_value(p->hole_cards, state->community_cards, state->num_community_cards);
             
             if (hand_val > best_value) {
                 best_value = hand_val;
@@ -774,6 +960,9 @@ int game_determine_winner(GameState *state) {
     if (best_seat >= 0) {
         game_distribute_pot(state, best_seat);
         state->winner_seat = best_seat;  // Store winner for clients
+        // Extract hand rank from hand value (hand_val = 13 * rank + highcard - 1)
+        // rank = 0 (High Card) to 8 (Straight Flush)
+        state->winner_hand_rank = best_value / 13;
     }
     
     return best_seat;

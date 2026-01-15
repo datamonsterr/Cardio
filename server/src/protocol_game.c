@@ -165,7 +165,7 @@ RawBytes* encode_game_state(GameState* state, int viewer_player_id)
     mpack_writer_t writer;
     mpack_writer_init(&writer, buffer, 16384);
     
-    mpack_start_map(&writer, 20);
+    mpack_start_map(&writer, 21);
     
     // Game identification
     mpack_write_cstr(&writer, "game_id");
@@ -210,6 +210,9 @@ RawBytes* encode_game_state(GameState* state, int viewer_player_id)
     mpack_write_cstr(&writer, "amount_won");
     mpack_write_int(&writer, state->amount_won);
     
+    mpack_write_cstr(&writer, "winner_hand_rank");
+    mpack_write_int(&writer, state->winner_hand_rank);
+    
     // Debug log the active_seat being encoded
     char debug_msg[128];
     snprintf(debug_msg, sizeof(debug_msg), 
@@ -252,10 +255,27 @@ RawBytes* encode_game_state(GameState* state, int viewer_player_id)
         mpack_write_cstr(&writer, "total_bet");
         mpack_write_int(&writer, p->total_bet);
         
-        // Cards - show only to the player themselves or during showdown
+        // Cards - show to player themselves, during showdown, or when all players are all-in
         mpack_write_cstr(&writer, "cards");
         mpack_start_array(&writer, 2);
-        if (p->player_id == viewer_player_id || state->betting_round == BETTING_ROUND_SHOWDOWN) {
+        
+        // Check if all remaining players are all-in
+        int all_in_count = 0;
+        int active_count = 0;
+        for (int j = 0; j < MAX_PLAYERS; j++) {
+            if (state->players[j].state == PLAYER_STATE_ALL_IN) {
+                all_in_count++;
+            }
+            if (state->players[j].state == PLAYER_STATE_ACTIVE) {
+                active_count++;
+            }
+        }
+        int all_players_all_in = (active_count == 0 && all_in_count >= 2);
+        
+        if (p->player_id == viewer_player_id || 
+            state->betting_round == BETTING_ROUND_SHOWDOWN || 
+            state->betting_round == BETTING_ROUND_COMPLETE ||
+            all_players_all_in) {
             mpack_write_int(&writer, encode_card(p->hole_cards[0]));
             mpack_write_int(&writer, encode_card(p->hole_cards[1]));
         } else {
