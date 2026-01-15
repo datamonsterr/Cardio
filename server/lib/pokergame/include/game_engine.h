@@ -120,6 +120,7 @@ typedef struct {
     bool hand_in_progress;
     int winner_seat;            // Winner of the hand (-1 if not determined yet)
     int amount_won;             // Amount won by the winner (0 if not determined)
+    int winner_hand_rank;       // Hand rank of winner (0=High Card, 1=Pair, 2=Two Pair, 3=Three Kind, 4=Straight, 5=Flush, 6=Full House, 7=Four Kind, 8=Straight Flush)
     bool waiting_for_players;   // Waiting for minimum players
 } GameState;
 

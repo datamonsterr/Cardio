@@ -165,7 +165,7 @@ RawBytes* encode_game_state(GameState* state, int viewer_player_id)
     mpack_writer_t writer;
     mpack_writer_init(&writer, buffer, 16384);
     
-    mpack_start_map(&writer, 20);
+    mpack_start_map(&writer, 21);
     
     // Game identification
     mpack_write_cstr(&writer, "game_id");
@@ -209,6 +209,9 @@ RawBytes* encode_game_state(GameState* state, int viewer_player_id)
     
     mpack_write_cstr(&writer, "amount_won");
     mpack_write_int(&writer, state->amount_won);
+    
+    mpack_write_cstr(&writer, "winner_hand_rank");
+    mpack_write_int(&writer, state->winner_hand_rank);
     
     // Debug log the active_seat being encoded
     char debug_msg[128];

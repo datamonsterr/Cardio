@@ -1,7 +1,12 @@
 #include "main.h"
+#include <stdlib.h>
+#include <time.h>
 
 int main(void)
 {
+    // Seed random number generator for deck shuffling
+    srand((unsigned int)time(NULL));
+    
     int listener = get_listener_socket("0.0.0.0", "8080", 100);
 
     if (listener == -1)

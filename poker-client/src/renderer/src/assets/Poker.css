@@ -1232,6 +1232,18 @@ img {
   font-size: 0.9rem;
 }
 
+.winner-hand-rank {
+  background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 .showdown-player-cards {
   display: flex;
   gap: 0.5rem;
@@ -1290,6 +1302,11 @@ img {
   margin: 1rem 0;
 }
 
+.fold-winner .winner-hand-rank {
+  display: inline-block;
+  margin-top: 0.5rem;
+}
+
 .fold-message {
   color: #b8c5d6;
   font-size: 1rem;
@@ -1322,13 +1339,6 @@ img {
 
 .continue-button:active {
   transform: translateY(0);
-}
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 1em;
-  cursor: pointer;
-  transition: all 0.3s;
 }
 
 .error-container button:hover {

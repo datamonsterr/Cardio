@@ -106,6 +106,7 @@ interface ServerGameState {
   active_seat: number;
   winner_seat: number;
   amount_won: number;
+  winner_hand_rank?: number;  // 0=High Card, 1=Pair, 2=Two Pair, 3=Three Kind, 4=Straight, 5=Flush, 6=Full House, 7=Four Kind, 8=Straight Flush
   players: (ServerPlayer | null)[];
   community_cards: number[];
   main_pot: number;
@@ -180,6 +181,8 @@ const GamePage: React.FC = () => {
   const [gameState, setGameState] = useState<LocalGameState>(initialState);
   const clientRef = useRef<any>(null);
   const hasJoinedRef = useRef(false);
+  const handResultTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasRequestedRefreshRef = useRef(false);
 
   // Get user ID for checking if it's our turn
   const userId = user?.id ? parseInt(user.id, 10) : 0;
@@ -195,6 +198,7 @@ const GamePage: React.FC = () => {
       
       const serverState = msgpackDecode(data) as ServerGameState;
       console.log('[GamePage] Decoded game state:', JSON.stringify(serverState, null, 2));
+      console.log('[GamePage] Winner hand rank:', serverState.winner_hand_rank, 'Winner seat:', serverState.winner_seat);
       
       if (!serverState || typeof serverState !== 'object') {
         console.error('[GamePage] Invalid game state received:', serverState);
@@ -207,8 +211,49 @@ const GamePage: React.FC = () => {
         const showResult = serverState.betting_round === 'complete';
         
         // Hide result if betting round changed from complete to something else (new hand started)
-        const hideResult = prev.serverState?.betting_round === 'complete' && 
-                          serverState.betting_round !== 'complete';
+        // Also check if hand_id changed, which indicates a new hand has started
+        const prevHandId = prev.serverState?.hand_id;
+        const currentHandId = serverState.hand_id;
+        const handChanged = prevHandId !== undefined && 
+                           currentHandId !== undefined &&
+                           currentHandId > prevHandId;
+        
+        const bettingRoundChanged = prev.serverState?.betting_round === 'complete' && 
+                                   serverState.betting_round !== 'complete';
+        
+        const hideResult = bettingRoundChanged || handChanged;
+        
+        // If new hand started, always hide result
+        if (hideResult) {
+          console.log('[GamePage] New hand detected - hiding HandResult. Prev hand_id:', prevHandId, 'Current hand_id:', currentHandId, 'Betting round:', serverState.betting_round);
+          // Clear any existing timeout
+          if (handResultTimeoutRef.current) {
+            clearTimeout(handResultTimeoutRef.current);
+            handResultTimeoutRef.current = null;
+          }
+          // Reset refresh flag when new hand starts
+          hasRequestedRefreshRef.current = false;
+        }
+        
+        // If hand is complete and we're showing result, set a timeout to auto-hide after 5 seconds
+        // Only request fresh game state once to avoid infinite loop
+        if (showResult && !hideResult && !prev.showHandResult) {
+          // Clear any existing timeout
+          if (handResultTimeoutRef.current) {
+            clearTimeout(handResultTimeoutRef.current);
+          }
+          // Reset refresh flag when showing new HandResult
+          hasRequestedRefreshRef.current = false;
+          
+          // Auto-hide after 5 seconds
+          // Don't request refresh automatically - server should broadcast UPDATE_GAMESTATE when new hand starts
+          handResultTimeoutRef.current = setTimeout(() => {
+            console.log('[GamePage] HandResult timeout - auto-hiding (server should send UPDATE_GAMESTATE when new hand starts)');
+            // Just hide HandResult - don't spam JOIN_TABLE requests
+            setGameState(prev => ({ ...prev, showHandResult: false }));
+            handResultTimeoutRef.current = null;
+          }, 5000);
+        }
         
         return {
           ...prev,
@@ -254,6 +299,16 @@ const GamePage: React.FC = () => {
     } catch (error) {
       console.error('[GamePage] Failed to decode action result:', error);
     }
+  }, []);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (handResultTimeoutRef.current) {
+        clearTimeout(handResultTimeoutRef.current);
+        handResultTimeoutRef.current = null;
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -868,8 +923,37 @@ const GamePage: React.FC = () => {
             userId={userId || 0}
             decodeCard={decodeCard}
             onContinue={() => {
+              // Hide HandResult immediately when user clicks Continue
+              if (handResultTimeoutRef.current) {
+                clearTimeout(handResultTimeoutRef.current);
+                handResultTimeoutRef.current = null;
+              }
               setGameState(prev => ({ ...prev, showHandResult: false }));
-              // Wait for next hand to start (server will send new game state)
+              
+              // Request fresh game state once to check if new hand started
+              // But only if we haven't requested already
+              if (!hasRequestedRefreshRef.current) {
+                hasRequestedRefreshRef.current = true;
+                const client = clientRef.current;
+                if (client && typeof client.send === 'function' && tableId > 0) {
+                  setTimeout(() => {
+                    try {
+                      const payload = new Uint8Array(msgpackEncode({ tableId: tableId }));
+                      const totalLen = 5 + payload.length;
+                      const packet = new Uint8Array(totalLen);
+                      const view = new DataView(packet.buffer);
+                      view.setUint16(0, totalLen, false);
+                      view.setUint8(2, 0x01);
+                      view.setUint16(3, PACKET_JOIN_TABLE, false);
+                      packet.set(payload, 5);
+                      client.send(packet);
+                      console.log('[GamePage] Requested fresh game state after Continue');
+                    } catch (err) {
+                      console.error('[GamePage] Failed to request fresh game state:', err);
+                    }
+                  }, 500);
+                }
+              }
             }}
           />
         ) : gameState.winnerFound && gameState.amountWon > 0 && gameState.serverState && gameState.serverState.current_player <= 1 ? (

@@ -335,29 +335,45 @@ int broadcast_game_state_to_table(Table* table)
 void start_game_if_ready(Table* table)
 {
     if (!table || !table->game_state) {
+        char msg[256];
+        snprintf(msg, sizeof(msg), "start_game_if_ready: Invalid table or game_state (table=%p, game_state=%p)", 
+                 (void*)table, table ? (void*)table->game_state : NULL);
+        logger(MAIN_LOG, "Debug", msg);
         return;
     }
     
     GameState* gs = table->game_state;
     
     // Need at least 2 players to start
-    if (game_count_active_players(gs) < 2) {
+    int active_count = game_count_active_players(gs);
+    if (active_count < 2) {
+        char msg[256];
+        snprintf(msg, sizeof(msg), "start_game_if_ready: Not enough players (count=%d, need 2) at table %d", 
+                 active_count, table->id);
+        logger(MAIN_LOG, "Debug", msg);
         return;
     }
     
     // Don't restart if game is in progress
     if (gs->hand_in_progress) {
+        char msg[256];
+        snprintf(msg, sizeof(msg), "start_game_if_ready: Hand already in progress (hand_id=%u) at table %d", 
+                 gs->hand_id, table->id);
+        logger(MAIN_LOG, "Debug", msg);
         return;
     }
     
     // Start a new hand
     char msg[256];
-    snprintf(msg, sizeof(msg), "Starting hand %d at table %d", gs->hand_id + 1, table->id);
+    snprintf(msg, sizeof(msg), "Starting hand %d at table %d (active_players=%d)", 
+             gs->hand_id + 1, table->id, active_count);
     logger(MAIN_LOG, "Info", msg);
     
     int result = game_start_hand(gs);
     if (result != 0) {
-        logger(MAIN_LOG, "Error", "start_game_if_ready: Failed to start hand");
+        snprintf(msg, sizeof(msg), "start_game_if_ready: Failed to start hand (result=%d) at table %d", 
+                 result, table->id);
+        logger(MAIN_LOG, "Error", msg);
         return;
     }
     
@@ -370,5 +386,9 @@ void start_game_if_ready(Table* table)
     if (broadcast_count <= 0) {
         snprintf(msg, sizeof(msg), "Warning: No players received game start broadcast at table %d", table->id);
         logger(MAIN_LOG, "Warn", msg);
+    } else {
+        snprintf(msg, sizeof(msg), "Successfully started hand %d at table %d, broadcast to %d players", 
+                 gs->hand_id, table->id, broadcast_count);
+        logger(MAIN_LOG, "Info", msg);
     }
 }
