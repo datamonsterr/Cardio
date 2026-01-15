@@ -1,10 +1,15 @@
 import React, { useEffect, useState, useCallback, useRef, Component, ErrorInfo, ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { FriendService } from '../services/friend/FriendService';
+import { TableInviteService } from '../services/table/TableInviteService';
+import { PACKET_TABLE_INVITE_NOTIFICATION } from '../services/protocol/constants';
+import { decodeTableInviteNotification } from '../services/protocol/codec';
 import Spinner from '../components/Spinner';
 import WinScreen from '../components/WinScreen';
 import HandResult from '../components/HandResult';
 import CardComponent from '../components/card/Card';
+import TableInviteNotification, { TableInvite } from '../components/TableInviteNotification';
 import Handle from '../components/slider/Handle';
 import Track from '../components/slider/Track';
 import { sliderStyle, railStyle } from '../components/slider/types';
@@ -183,11 +188,16 @@ const GamePage: React.FC = () => {
   const hasJoinedRef = useRef(false);
   const handResultTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasRequestedRefreshRef = useRef(false);
-  
+  const friendServiceRef = useRef<FriendService | null>(null);
+  const tableInviteServiceRef = useRef<TableInviteService | null>(null);
+
   // Friend invite modal state
   const [showFriendModal, setShowFriendModal] = useState(false);
   const [friends, setFriends] = useState<any[]>([]);
   const [loadingFriends, setLoadingFriends] = useState(false);
+  
+  // Table invite notifications
+  const [tableInvites, setTableInvites] = useState<TableInvite[]>([]);
 
   // Get user ID for checking if it's our turn
   const userId = user?.id ? parseInt(user.id, 10) : 0;
@@ -220,82 +230,93 @@ const GamePage: React.FC = () => {
   };
 
   const loadFriends = async () => {
-    if (!clientRef.current) return;
+    if (!friendServiceRef.current) {
+      console.warn('Friend service not initialized');
+      return;
+    }
     
     setLoadingFriends(true);
     try {
-      // Send GET_FRIENDS packet (type 910)
-      const payload = new Uint8Array(msgpackEncode({}));
-      const totalLen = 5 + payload.length;
-      const packet = new Uint8Array(totalLen);
-      const view = new DataView(packet.buffer);
-      
-      view.setUint16(0, totalLen, false);
-      view.setUint8(2, 0x01);
-      view.setUint16(3, 910, false); // GET_FRIENDS packet
-      
-      packet.set(payload, 5);
-      clientRef.current.send(packet);
-      
-      // For now, set empty friends list - in real implementation, 
-      // this would be populated by server response
-      setTimeout(() => {
-        setFriends([]);
-        setLoadingFriends(false);
-      }, 1000);
+      const friendList = await friendServiceRef.current.getFriendList();
+      console.log('Loaded friends:', friendList);
+      setFriends(friendList);
     } catch (error) {
       console.error('Failed to load friends:', error);
+      setFriends([]);
+    } finally {
       setLoadingFriends(false);
     }
   };
 
   const addFriend = async (friendName: string) => {
-    if (!clientRef.current || !friendName) return;
+    if (!friendServiceRef.current || !friendName) {
+      console.warn('Friend service not initialized or no friend name provided');
+      return;
+    }
     
     try {
-      // Send ADD_FRIEND packet (type 920)
-      const payload = new Uint8Array(msgpackEncode({ friend_name: friendName }));
-      const totalLen = 5 + payload.length;
-      const packet = new Uint8Array(totalLen);
-      const view = new DataView(packet.buffer);
-      
-      view.setUint16(0, totalLen, false);
-      view.setUint8(2, 0x01);
-      view.setUint16(3, 920, false); // ADD_FRIEND packet
-      
-      packet.set(payload, 5);
-      clientRef.current.send(packet);
-      
-      console.log('Sent friend request to:', friendName);
+      await friendServiceRef.current.addFriend(friendName);
+      console.log('Successfully added friend:', friendName);
+      // Reload friends list
+      await loadFriends();
     } catch (error) {
-      console.error('Failed to send friend request:', error);
+      console.error('Failed to add friend:', error);
+      alert(`Failed to add friend: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
   const sendFriendInvite = async (friendName: string) => {
-    if (!clientRef.current || !friendName || !tableId) return;
+    if (!tableInviteServiceRef.current || !friendName || !tableId) {
+      console.warn('Table invite service not initialized, no friend name, or no table ID');
+      return;
+    }
     
     try {
-      // Send INVITE_FRIEND packet (type 960)
-      const payload = new Uint8Array(msgpackEncode({ 
-        friend_name: friendName,
-        table_id: tableId 
-      }));
-      const totalLen = 5 + payload.length;
-      const packet = new Uint8Array(totalLen);
-      const view = new DataView(packet.buffer);
+      const response = await tableInviteServiceRef.current.inviteToTable(friendName, tableId);
       
-      view.setUint16(0, totalLen, false);
-      view.setUint8(2, 0x01);
-      view.setUint16(3, 960, false); // INVITE_FRIEND packet
-      
-      packet.set(payload, 5);
-      clientRef.current.send(packet);
-      
-      console.log('Sent table invite to:', friendName);
+      if (TableInviteService.isSuccess(response)) {
+        console.log('Successfully sent table invite to:', friendName);
+        alert(`Invited ${friendName} to join your table!`);
+      } else {
+        const errorMsg = TableInviteService.getErrorMessage(response);
+        console.warn('Table invite failed:', errorMsg);
+        alert(`Failed to invite ${friendName}: ${errorMsg}`);
+      }
     } catch (error) {
       console.error('Failed to send table invite:', error);
+      alert(`Failed to invite friend: ${error instanceof Error ? error.message : String(error)}`);
     }
+  };
+
+  // Handle receiving table invite from another player
+  const handleTableInviteReceived = (fromUsername: string, tableId: number, tableName?: string) => {
+    console.log('[GamePage] Received table invite from:', fromUsername, 'table:', tableId);
+    
+    const newInvite: TableInvite = {
+      id: `${fromUsername}-${tableId}-${Date.now()}`,
+      fromUsername,
+      tableId,
+      tableName,
+      timestamp: Date.now()
+    };
+    
+    setTableInvites((prev) => [...prev, newInvite]);
+  };
+
+  const handleAcceptTableInvite = (invite: TableInvite) => {
+    console.log('[GamePage] Accepting table invite:', invite);
+    // TODO: Join the table
+    // navigate(`/game?tableId=${invite.tableId}`);
+    alert(`Joining table ${invite.tableId}...`);
+  };
+
+  const handleRejectTableInvite = (invite: TableInvite) => {
+    console.log('[GamePage] Rejecting table invite:', invite);
+    // Just remove from list - already handled by notification component
+  };
+
+  const handleDismissTableInvite = (inviteId: string) => {
+    setTableInvites((prev) => prev.filter((inv) => inv.id !== inviteId));
   };
 
   // Handle game state update from server
@@ -471,6 +492,21 @@ const GamePage: React.FC = () => {
         clientRef.current = client;
         console.log('[GamePage] Got client, setting up packet handler');
 
+        // Initialize FriendService and TableInviteService
+        try {
+          friendServiceRef.current = new FriendService({ client });
+          console.log('[GamePage] FriendService initialized');
+        } catch (error) {
+          console.error('[GamePage] Failed to initialize FriendService:', error);
+        }
+
+        try {
+          tableInviteServiceRef.current = new TableInviteService({ client });
+          console.log('[GamePage] TableInviteService initialized');
+        } catch (error) {
+          console.error('[GamePage] Failed to initialize TableInviteService:', error);
+        }
+
         // Store original handler - check if method exists
         const originalOnPacket = typeof client.getPacketHandler === 'function' 
           ? client.getPacketHandler() 
@@ -498,6 +534,11 @@ const GamePage: React.FC = () => {
               // Action result
               console.log('[GamePage] Received ACTION_RESULT');
               handleActionResult(packet.data);
+            } else if (packetType === PACKET_TABLE_INVITE_NOTIFICATION) {
+              // Table invite notification
+              console.log('[GamePage] Received TABLE_INVITE_NOTIFICATION');
+              const inviteData = decodeTableInviteNotification(packet.data);
+              handleTableInviteReceived(inviteData.fromUser, inviteData.tableId, inviteData.tableName);
             }
           } catch (err) {
             console.error('[GamePage] Error handling packet:', err);
@@ -1055,6 +1096,13 @@ const GamePage: React.FC = () => {
 
   return (
     <div className="App">
+      <TableInviteNotification
+        invites={tableInvites}
+        onAccept={handleAcceptTableInvite}
+        onReject={handleRejectTableInvite}
+        onDismiss={handleDismissTableInvite}
+      />
+      
       <div className="poker-table--wrapper">
         {gameState.loading ? (
           <Spinner />
@@ -1133,17 +1181,16 @@ const GamePage: React.FC = () => {
                 ) : (
                   <div className="friends-list">
                     {friends.map(friend => (
-                      <div key={friend.id} className={`friend-item ${friend.online ? 'online' : 'offline'}`}>
+                      <div key={friend.user_id} className={`friend-item online`}>
                         <div className="friend-info">
-                          <span className="friend-name">{friend.name}</span>
-                          <span className={`friend-status ${friend.online ? 'online' : 'offline'}`}>
-                            {friend.online ? '● Online' : '○ Offline'}
+                          <span className="friend-name">{friend.username}</span>
+                          <span className={`friend-status online`}>
+                            ● Online
                           </span>
                         </div>
                         <button 
                           className="invite-btn"
-                          onClick={() => sendFriendInvite(friend.name)}
-                          disabled={!friend.online}
+                          onClick={() => sendFriendInvite(friend.username)}
                         >
                           Invite
                         </button>

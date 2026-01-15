@@ -93,6 +93,8 @@ export const PACKET_UPDATE_BUNDLE = 460
 export const PACKET_JOIN_TABLE = 400
 export const PACKET_LEAVE_TABLE = 700
 export const PACKET_BALANCE_UPDATE = 970
+export const PACKET_INVITE_TO_TABLE = 980
+export const PACKET_TABLE_INVITE_NOTIFICATION = 985 // Incoming invite from friend
 
 // Response codes
 export const RESPONSE_CODE = {
@@ -120,7 +122,13 @@ export const RESPONSE_CODE = {
   R_GET_INVITES_OK: 951,
   R_GET_INVITES_NOT_OK: 952,
   R_GET_FRIEND_LIST_OK: 961,
-  R_GET_FRIEND_LIST_NOT_OK: 962
+  R_GET_FRIEND_LIST_NOT_OK: 962,
+
+  // Table Invites
+  R_INVITE_TO_TABLE_OK: 981,
+  R_INVITE_TO_TABLE_NOT_OK: 982,
+  R_INVITE_TO_TABLE_NOT_FRIENDS: 983,
+  R_INVITE_TO_TABLE_ALREADY_IN_GAME: 984
 } as const
 
 // Header size

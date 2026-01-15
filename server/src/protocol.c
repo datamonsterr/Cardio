@@ -684,3 +684,40 @@ RawBytes* encode_friend_list_response(dbFriendList* friends)
     memcpy(raw_bytes->data, buffer, len);
     return raw_bytes;
 }
+
+// ===== Table Invite Protocol Functions =====
+
+/**
+ * Decode table invite request
+ * Client sends: { "friend_username": string, "table_id": int }
+ */
+TableInviteRequest* decode_table_invite_request(char* payload)
+{
+    mpack_reader_t reader;
+    mpack_reader_init_data(&reader, payload, 1024);
+    
+    mpack_expect_map_max(&reader, 2);
+    
+    mpack_expect_cstr_match(&reader, "friend_username");
+    const char* friend_username = mpack_expect_cstr_alloc(&reader, 32);
+    
+    mpack_expect_cstr_match(&reader, "table_id");
+    int table_id = mpack_expect_int(&reader);
+    
+    if (mpack_reader_destroy(&reader) != mpack_ok)
+    {
+        return NULL;
+    }
+    
+    TableInviteRequest* request = malloc(sizeof(TableInviteRequest));
+    if (!request)
+    {
+        return NULL;
+    }
+    
+    strncpy(request->friend_username, friend_username, sizeof(request->friend_username) - 1);
+    request->friend_username[sizeof(request->friend_username) - 1] = '\0';
+    request->table_id = table_id;
+    
+    return request;
+}

@@ -1624,3 +1624,211 @@ void handle_get_friend_list_request(conn_data_t* conn_data, char* data, size_t d
     free(friends);
     free_packet(packet);
 }
+
+// ===== Table Invite Handler =====
+
+void handle_invite_to_table_request(conn_data_t* conn_data, char* data, size_t data_len, TableList* table_list)
+{
+    char log_msg[256];
+    snprintf(log_msg, sizeof(log_msg), "Table invite request from fd=%d user='%s'", 
+             conn_data->fd, conn_data->username);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    
+    // Check if user is logged in
+    if (conn_data->user_id == 0)
+    {
+        RawBytes* raw_bytes = encode_response(R_INVITE_TO_TABLE_NOT_OK);
+        RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_INVITE_TO_TABLE, raw_bytes->data, raw_bytes->len);
+        sendall(conn_data->fd, response->data, (int*) &(response->len));
+        free(response->data);
+        free(response);
+        free(raw_bytes->data);
+        free(raw_bytes);
+        logger_ex(MAIN_LOG, "ERROR", __func__, "User not logged in", 1);
+        return;
+    }
+    
+    Packet* packet = decode_packet(data, data_len);
+    if (!packet || packet->header->packet_type != PACKET_INVITE_TO_TABLE)
+    {
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Invalid packet", 1);
+        if (packet) free_packet(packet);
+        return;
+    }
+    
+    TableInviteRequest* request = decode_table_invite_request(packet->data);
+    if (!request)
+    {
+        RawBytes* raw_bytes = encode_response(R_INVITE_TO_TABLE_NOT_OK);
+        RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_INVITE_TO_TABLE, raw_bytes->data, raw_bytes->len);
+        sendall(conn_data->fd, response->data, (int*) &(response->len));
+        free(response->data);
+        free(response);
+        free(raw_bytes->data);
+        free(raw_bytes);
+        free_packet(packet);
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Failed to decode request", 1);
+        return;
+    }
+    
+    snprintf(log_msg, sizeof(log_msg), "User '%s' inviting '%s' to table %d", 
+             conn_data->username, request->friend_username, request->table_id);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    
+    // Connect to database
+    PGconn* conn = PQconnectdb(dbconninfo);
+    
+    // Get friend's user ID
+    int friend_id = dbGetUserIdByUsername(conn, request->friend_username);
+    if (friend_id < 0)
+    {
+        RawBytes* raw_bytes = encode_response_msg(R_INVITE_TO_TABLE_NOT_OK, "Friend not found");
+        RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_INVITE_TO_TABLE, raw_bytes->data, raw_bytes->len);
+        sendall(conn_data->fd, response->data, (int*) &(response->len));
+        free(response->data);
+        free(response);
+        free(raw_bytes->data);
+        free(raw_bytes);
+        PQfinish(conn);
+        free(request);
+        free_packet(packet);
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Friend not found", 1);
+        return;
+    }
+    
+    // Check if they are friends
+    char check_query[256];
+    snprintf(check_query, sizeof(check_query),
+             "SELECT 1 FROM friend WHERE (u1 = %d AND u2 = %d) OR (u1 = %d AND u2 = %d) LIMIT 1",
+             conn_data->user_id, friend_id, friend_id, conn_data->user_id);
+    
+    PGresult* check_res = PQexec(conn, check_query);
+    if (PQresultStatus(check_res) != PGRES_TUPLES_OK || PQntuples(check_res) == 0)
+    {
+        RawBytes* raw_bytes = encode_response_msg(R_INVITE_TO_TABLE_NOT_FRIENDS, "Not friends with this user");
+        RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_INVITE_TO_TABLE, raw_bytes->data, raw_bytes->len);
+        sendall(conn_data->fd, response->data, (int*) &(response->len));
+        free(response->data);
+        free(response);
+        free(raw_bytes->data);
+        free(raw_bytes);
+        PQclear(check_res);
+        PQfinish(conn);
+        free(request);
+        free_packet(packet);
+        logger_ex(MAIN_LOG, "WARN", __func__, "Not friends with target user", 1);
+        return;
+    }
+    PQclear(check_res);
+    
+    // Verify table exists
+    int table_index = find_table_by_id(table_list, request->table_id);
+    if (table_index < 0)
+    {
+        RawBytes* raw_bytes = encode_response_msg(R_INVITE_TO_TABLE_NOT_OK, "Table not found");
+        RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_INVITE_TO_TABLE, raw_bytes->data, raw_bytes->len);
+        sendall(conn_data->fd, response->data, (int*) &(response->len));
+        free(response->data);
+        free(response);
+        free(raw_bytes->data);
+        free(raw_bytes);
+        PQfinish(conn);
+        free(request);
+        free_packet(packet);
+        logger_ex(MAIN_LOG, "ERROR", __func__, "Table not found", 1);
+        return;
+    }
+    
+    Table* table = &table_list->tables[table_index];
+    
+    // Check if table has space
+    if (table->current_player >= table->max_player)
+    {
+        RawBytes* raw_bytes = encode_response_msg(R_INVITE_TO_TABLE_NOT_OK, "Table is full");
+        RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_INVITE_TO_TABLE, raw_bytes->data, raw_bytes->len);
+        sendall(conn_data->fd, response->data, (int*) &(response->len));
+        free(response->data);
+        free(response);
+        free(raw_bytes->data);
+        free(raw_bytes);
+        PQfinish(conn);
+        free(request);
+        free_packet(packet);
+        logger_ex(MAIN_LOG, "WARN", __func__, "Table is full", 1);
+        return;
+    }
+    
+    // Success - send invite
+    snprintf(log_msg, sizeof(log_msg), "Table invite SUCCESS: user='%s' invited '%s' to table %d", 
+             conn_data->username, request->friend_username, request->table_id);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    
+    // Send response to inviter
+    RawBytes* raw_bytes = encode_response_msg(R_INVITE_TO_TABLE_OK, "Invite sent successfully");
+    RawBytes* response = encode_packet(PROTOCOL_V1, PACKET_INVITE_TO_TABLE, raw_bytes->data, raw_bytes->len);
+    sendall(conn_data->fd, response->data, (int*) &(response->len));
+    
+    free(response->data);
+    free(response);
+    free(raw_bytes->data);
+    free(raw_bytes);
+    
+    // Find the invited friend's connection and send them a notification
+    // Search through all tables to find the user
+    conn_data_t* friend_conn = NULL;
+    for (int t = 0; t < table_list->size; t++) {
+        Table* search_table = &table_list->tables[t];
+        for (int j = 0; j < MAX_PLAYERS; j++) {
+            if (search_table->connections[j] && 
+                strcmp(search_table->connections[j]->username, request->friend_username) == 0) {
+                friend_conn = search_table->connections[j];
+                break;
+            }
+        }
+        if (friend_conn) break;
+    }
+    
+    // If found, send notification
+    if (friend_conn && friend_conn->fd > 0) {
+        mpack_writer_t writer;
+        char buffer[256];
+        mpack_writer_init(&writer, buffer, sizeof(buffer));
+        mpack_start_map(&writer, 3);
+        mpack_write_cstr(&writer, "from_user");
+        mpack_write_cstr(&writer, conn_data->username);
+        mpack_write_cstr(&writer, "table_id");
+        mpack_write_int(&writer, request->table_id);
+        mpack_write_cstr(&writer, "table_name");
+        mpack_write_cstr(&writer, table->name);
+        mpack_finish_map(&writer);
+        
+        if (mpack_writer_destroy(&writer) == mpack_ok) {
+            size_t payload_len = mpack_writer_buffer_used(&writer);
+            RawBytes* notif_raw = malloc(sizeof(RawBytes));
+            notif_raw->len = payload_len;
+            notif_raw->data = malloc(payload_len);
+            memcpy(notif_raw->data, buffer, payload_len);
+            
+            RawBytes* notif_packet = encode_packet(PROTOCOL_V1, PACKET_TABLE_INVITE_NOTIFICATION, 
+                                                   notif_raw->data, notif_raw->len);
+            sendall(friend_conn->fd, notif_packet->data, (int*) &(notif_packet->len));
+            
+            free(notif_packet->data);
+            free(notif_packet);
+            free(notif_raw->data);
+            free(notif_raw);
+            
+            snprintf(log_msg, sizeof(log_msg), "Sent invite notification to '%s' (fd=%d)", 
+                     request->friend_username, friend_conn->fd);
+            logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+        }
+    } else {
+        snprintf(log_msg, sizeof(log_msg), "User '%s' is not currently online, notification not sent", 
+                 request->friend_username);
+        logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    }
+    
+    PQfinish(conn);
+    free(request);
+    free_packet(packet);
+}

@@ -45,6 +45,7 @@ void handle_accept_invite_request(conn_data_t* conn_data, char* data, size_t dat
 void handle_reject_invite_request(conn_data_t* conn_data, char* data, size_t data_len);
 void handle_get_invites_request(conn_data_t* conn_data, char* data, size_t data_len);
 void handle_get_friend_list_request(conn_data_t* conn_data, char* data, size_t data_len);
+void handle_invite_to_table_request(conn_data_t* conn_data, char* data, size_t data_len, TableList* table_list);
 void handle_unknown_request(conn_data_t* conn_data, char* data, size_t data_len);
 void handle_leave_table_request(conn_data_t* conn_data, char* data, size_t data_len, TableList* table_list);
 void handle_action_request(conn_data_t* conn_data, char* data, size_t data_len, TableList* table_list);

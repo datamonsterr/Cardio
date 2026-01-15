@@ -1105,6 +1105,59 @@ typedef struct {
 
 ---
 
+## Table Invites
+
+### INVITE_TO_TABLE (ID: 980)
+
+**Direction**: C2S
+
+Invite a friend to join a specific game table.
+
+**Request Payload** (MessagePack):
+```json
+{
+  "friend_username": "<string>",  // Username of friend to invite
+  "table_id": <int>                // Table ID to invite them to
+}
+```
+
+**Response Codes**:
+- `981` (R_INVITE_TO_TABLE_OK): Invitation sent successfully
+- `982` (R_INVITE_TO_TABLE_NOT_OK): General error
+- `983` (R_INVITE_TO_TABLE_NOT_FRIENDS): Not friends with target user
+- `984` (R_INVITE_TO_TABLE_ALREADY_IN_GAME): Friend is already in a game
+
+**Response Payload** (MessagePack):
+```json
+{
+  "res": <int>,           // Response code
+  "msg"?: "<string>"      // Optional error message
+}
+```
+
+**Success Flow**:
+```
+1. User1 is at table 5
+2. User1 sends INVITE_TO_TABLE {friend_username: "user2", table_id: 5}
+3. Server verifies:
+   - User1 and user2 are friends
+   - user2 is not currently in a game
+   - Table 5 exists and has space
+4. Server creates table invitation record
+5. Server returns R_INVITE_TO_TABLE_OK
+6. user2 receives notification (future enhancement)
+```
+
+**Error Cases**:
+- Not logged in → R_INVITE_TO_TABLE_NOT_OK
+- Friend not found → R_INVITE_TO_TABLE_NOT_OK
+- Not friends → R_INVITE_TO_TABLE_NOT_FRIENDS
+- Friend already in game → R_INVITE_TO_TABLE_ALREADY_IN_GAME
+- Table doesn't exist → R_INVITE_TO_TABLE_NOT_OK
+- Table is full → R_INVITE_TO_TABLE_NOT_OK
+
+---
+
 ## Version History
 
 - **v1.0** (Current): Initial protocol specification

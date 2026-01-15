@@ -506,6 +506,35 @@ TEST(test_encode_action_result)
     free(encoded);
 }
 
+TEST(test_decode_table_invite_request)
+{
+    // Encode a table invite request
+    mpack_writer_t writer;
+    char buffer[1024];
+    mpack_writer_init(&writer, buffer, sizeof(buffer));
+    
+    mpack_start_map(&writer, 2);
+    mpack_write_cstr(&writer, "friend_username");
+    mpack_write_cstr(&writer, "user2");
+    mpack_write_cstr(&writer, "table_id");
+    mpack_write_int(&writer, 5);
+    mpack_finish_map(&writer);
+    
+    if (mpack_writer_destroy(&writer) != mpack_ok)
+    {
+        ASSERT(0);
+    }
+    
+    // Decode it
+    TableInviteRequest* request = decode_table_invite_request(buffer);
+    
+    ASSERT(request != NULL);
+    ASSERT(strcmp(request->friend_username, "user2") == 0);
+    ASSERT(request->table_id == 5);
+    
+    free(request);
+}
+
 int main()
 {
     RUN_TEST(test_db_conn);
@@ -525,4 +554,5 @@ int main()
     RUN_TEST(test_decode_action_request);
     RUN_TEST(test_decode_action_request_signed_seq);
     RUN_TEST(test_encode_action_result);
+    RUN_TEST(test_decode_table_invite_request);
 }
