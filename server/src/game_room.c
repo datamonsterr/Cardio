@@ -200,13 +200,27 @@ int join_table(conn_data_t* conn_data, TableList* table_list, int table_id)
 
 int leave_table(conn_data_t* conn_data, TableList* table_list)
 {
+    char log_msg[256];
+    snprintf(log_msg, sizeof(log_msg), 
+            "leave_table called: user='%s' (id=%d) table_id=%d seat=%d", 
+            conn_data->username, conn_data->user_id, conn_data->table_id, conn_data->seat);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    
     int index = find_table_by_id(table_list, conn_data->table_id);
     if (index == -1)
     {
+        snprintf(log_msg, sizeof(log_msg), 
+                "leave_table: Table %d not found in table_list", conn_data->table_id);
+        logger_ex(MAIN_LOG, "ERROR", __func__, log_msg, 1);
         return -1;
     }
     
     Table* table = &table_list->tables[index];
+    
+    snprintf(log_msg, sizeof(log_msg), 
+            "leave_table: Found table %d with %d current players", 
+            table->id, table->current_player);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
     
     // Remove player from game state if they have a seat
     if (conn_data->seat >= 0) {
@@ -282,6 +296,10 @@ int leave_table(conn_data_t* conn_data, TableList* table_list)
             }
         }
         
+        snprintf(log_msg, sizeof(log_msg), 
+                "leave_table: Removing player from game state (seat=%d)", conn_data->seat);
+        logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+        
         game_remove_player(table->game_state, conn_data->seat);
         
         // Remove from connection tracking
@@ -296,6 +314,11 @@ int leave_table(conn_data_t* conn_data, TableList* table_list)
     if (current_player > 0) {
         table->current_player--;
     }
+    
+    snprintf(log_msg, sizeof(log_msg), 
+            "leave_table: Updated player count from %d to %d", 
+            current_player, table->current_player);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
     
     // Update game state tracking
     if (table->game_state) {
@@ -317,15 +340,36 @@ int leave_table(conn_data_t* conn_data, TableList* table_list)
     // If no players left, clean up the table
     if (table->current_player == 0)
     {
+        char log_msg[256];
+        snprintf(log_msg, sizeof(log_msg), 
+                "Table %d is now empty (current_player=0), removing table from list", 
+                conn_data->table_id);
+        logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+        
         if (table->game_state) {
             game_state_destroy(table->game_state);
             table->game_state = NULL;
         }
-        remove_table(table_list, conn_data->table_id);
+        
+        int remove_result = remove_table(table_list, conn_data->table_id);
+        if (remove_result == 0) {
+            snprintf(log_msg, sizeof(log_msg), "Table %d removed successfully", conn_data->table_id);
+            logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+        } else {
+            snprintf(log_msg, sizeof(log_msg), "Warning: Failed to remove table %d (result=%d)", 
+                     conn_data->table_id, remove_result);
+            logger_ex(MAIN_LOG, "WARN", __func__, log_msg, 1);
+        }
     }
     
     conn_data->table_id = 0;
     conn_data->seat = -1;
+    
+    snprintf(log_msg, sizeof(log_msg), 
+            "leave_table: SUCCESS - Cleared user's table_id and seat (now table_id=%d seat=%d)", 
+            conn_data->table_id, conn_data->seat);
+    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+    
     return 0;
 }
 

@@ -3,8 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { FriendService } from '../services/friend/FriendService';
 import { TableInviteService } from '../services/table/TableInviteService';
-import { PACKET_TABLE_INVITE_NOTIFICATION } from '../services/protocol/constants';
-import { decodeTableInviteNotification } from '../services/protocol/codec';
+import { PACKET_TABLE_INVITE_NOTIFICATION, PACKET_LEAVE_TABLE } from '../services/protocol/constants';
+import { decodeTableInviteNotification, encodeLeaveTableRequest } from '../services/protocol/codec';
 import Spinner from '../components/Spinner';
 import WinScreen from '../components/WinScreen';
 import HandResult from '../components/HandResult';
@@ -1068,7 +1068,36 @@ const GamePage: React.FC = () => {
         {/* Leave table button */}
         <button 
           className="leave-table-button"
-          onClick={() => navigate('/lobby')}
+          onClick={() => {
+            try {
+              const currentTableId = typeof tableId === 'number' ? tableId : parseInt(tableId || '0', 10);
+              
+              // Send leave table packet using existing connection
+              if (clientRef.current && currentTableId > 0) {
+                console.log('[GamePage] Sending LEAVE_TABLE request for table:', currentTableId);
+                
+                const payload = encodeLeaveTableRequest(currentTableId);
+                const totalLen = 5 + payload.length;
+                const packet = new Uint8Array(totalLen);
+                const view = new DataView(packet.buffer);
+                
+                view.setUint16(0, totalLen, false); // packet_len (big endian)
+                view.setUint8(2, 0x01); // protocol_ver
+                view.setUint16(3, PACKET_LEAVE_TABLE, false); // packet_type (big endian)
+                
+                packet.set(payload, 5);
+                
+                clientRef.current.send(packet);
+                console.log('[GamePage] LEAVE_TABLE request sent');
+              }
+            } catch (error) {
+              console.error('[GamePage] Failed to send leave table request:', error);
+            } finally {
+              // Navigate to lobby after sending request
+              // Small delay to allow packet to be sent
+              setTimeout(() => navigate('/lobby'), 100);
+            }
+          }}
         >
           Leave Table
         </button>
