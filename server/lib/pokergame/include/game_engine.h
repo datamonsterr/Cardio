@@ -65,6 +65,8 @@ typedef struct {
     bool is_dealer;             // Is this player the dealer?
     bool is_small_blind;        // Is this player small blind?
     bool is_big_blind;          // Is this player big blind?
+    bool is_bot;                // Is this player a bot (replaced disconnected player)?
+    int original_user_id;       // Original user_id before bot conversion (for chip return)
     uint64_t timer_deadline;    // Timestamp when action timer expires (epoch_ms)
 } GamePlayer;
 
@@ -139,6 +141,7 @@ void game_state_reset_for_new_hand(GameState *state);
 // ===== Player Management =====
 int game_add_player(GameState *state, int player_id, const char *name, int seat, int buy_in);
 int game_remove_player(GameState *state, int seat);
+int game_convert_player_to_bot(GameState *state, int seat);
 GamePlayer* game_get_player_by_id(GameState *state, int player_id);
 GamePlayer* game_get_player_by_seat(GameState *state, int seat);
 int game_get_next_active_seat(GameState *state, int current_seat);

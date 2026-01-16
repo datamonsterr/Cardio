@@ -204,19 +204,19 @@ const GamePage: React.FC = () => {
 
   // Helper functions to check game state
   const isWaitingForPlayers = () => {
-    if (!gameState.serverState) return false;
+    if (!gameState.serverState || !gameState.serverState.players) return false;
     const activePlayers = gameState.serverState.players.filter(p => p && p.state !== 'empty');
     // Need at least 2 players to start a game, and game shouldn't be in progress
     return activePlayers.length < 2 || (activePlayers.length === 1 && gameState.serverState.betting_round === 'complete');
   };
 
   const getPlayerCount = () => {
-    if (!gameState.serverState) return 0;
+    if (!gameState.serverState || !gameState.serverState.players) return 0;
     return gameState.serverState.players.filter(p => p && p.state !== 'empty').length;
   };
 
   const isGameInProgress = () => {
-    if (!gameState.serverState) return false;
+    if (!gameState.serverState || !gameState.serverState.players) return false;
     const activePlayers = gameState.serverState.players.filter(p => p && p.state !== 'empty');
     return activePlayers.length >= 2 && 
            gameState.serverState.betting_round !== 'complete' && 
@@ -342,7 +342,7 @@ const GamePage: React.FC = () => {
         const hasWinner = serverState.betting_round === 'complete' && serverState.winner_seat >= 0;
         
         // Only show hand result if the game actually happened (at least 2 players)
-        const activePlayers = serverState.players.filter(p => p && p.state !== 'empty');
+        const activePlayers = (serverState.players || []).filter(p => p && p.state !== 'empty');
         const showResult = serverState.betting_round === 'complete' && activePlayers.length >= 2;
         
         // Hide result if betting round changed from complete to something else (new hand started)
@@ -775,11 +775,13 @@ const GamePage: React.FC = () => {
       const isDealer = serverPlayer.is_dealer;
       const isSB = serverPlayer.is_small_blind;
       const isBB = serverPlayer.is_big_blind;
+      const isWaiting = serverPlayer.state === 'waiting';
+      const gameInProgress = isGameInProgress();
       
       return (
         <div 
           key={idx}
-          className={`player-spot p${idx} ${isActive ? 'active' : ''} ${player.folded ? 'folded' : ''}`}
+          className={`player-spot p${idx} ${isActive ? 'active' : ''} ${player.folded ? 'folded' : ''} ${isWaiting && gameInProgress ? 'waiting' : ''}`}
         >
           <div className="player-info">
             {/* Dealer/Blind badges */}
@@ -787,6 +789,7 @@ const GamePage: React.FC = () => {
               {isDealer && <span className="badge dealer">D</span>}
               {isSB && <span className="badge sb">SB</span>}
               {isBB && <span className="badge bb">BB</span>}
+              {isWaiting && gameInProgress && <span className="badge waiting">WAIT</span>}
             </div>
             
             <img 
@@ -794,13 +797,27 @@ const GamePage: React.FC = () => {
               alt={player.name} 
               width={60} 
               height={60} 
-              style={{ borderRadius: '50%', border: isActive ? '3px solid #4CAF50' : 'none' }} 
+              style={{ 
+                borderRadius: '50%', 
+                border: isActive ? '3px solid #4CAF50' : 'none',
+                opacity: isWaiting && gameInProgress ? 0.6 : 1
+              }} 
             />
             <div style={{ fontWeight: 'bold', color: isActive ? '#4CAF50' : 'white' }}>
               {player.name}
             </div>
             <div>💰 {player.chips}</div>
-            {player.bet && player.bet > 0 && (
+            {isWaiting && gameInProgress && (
+              <div className="waiting-status" style={{ 
+                color: '#FFA500', 
+                fontSize: '12px', 
+                marginTop: '4px',
+                fontStyle: 'italic' 
+              }}>
+                Waiting for next hand
+              </div>
+            )}
+            {player.bet && player.bet > 0 && !isWaiting && (
               <div className="player-bet">Bet: {player.bet}</div>
             )}
             {player.allIn && <div className="all-in-badge">ALL IN</div>}

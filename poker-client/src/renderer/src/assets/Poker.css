@@ -952,6 +952,13 @@ img {
   background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
 }
 
+.badge.waiting {
+  background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+  font-size: 9px;
+  width: 38px;
+  border-radius: 12px;
+}
+
 .player-bet {
   color: #4caf50 !important;
   font-weight: bold;
@@ -970,6 +977,14 @@ img {
 .player-spot.folded .player-info {
   opacity: 0.5;
   filter: grayscale(50%);
+}
+
+.player-spot.waiting .player-info {
+  opacity: 0.8;
+}
+
+.player-spot.waiting .player-avatar {
+  filter: brightness(0.7);
 }
 
 .player-spot.active .player-info {

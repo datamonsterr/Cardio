@@ -78,6 +78,69 @@ void handle_login_request(conn_data_t* conn_data, char* data, size_t data_len)
     free(login_request);
 }
 
+// Helper function to process bot actions automatically
+void process_bot_actions(Table* table) {
+    if (!table || !table->game_state) return;
+    
+    GameState* gs = table->game_state;
+    char log_msg[256];
+    
+    // Keep processing while the active player is a bot
+    int max_iterations = 10; // Prevent infinite loops
+    int iterations = 0;
+    
+    while (iterations < max_iterations && 
+           gs->active_seat >= 0 && 
+           gs->betting_round != BETTING_ROUND_COMPLETE) {
+        
+        GamePlayer* active_player = &gs->players[gs->active_seat];
+        
+        if (!active_player || active_player->state != PLAYER_STATE_ACTIVE || !active_player->is_bot) {
+            // Active player is not a bot, stop
+            break;
+        }
+        
+        snprintf(log_msg, sizeof(log_msg), "Bot '%s' at seat %d is active - processing auto-action (iteration %d)", 
+                 active_player->name, gs->active_seat, iterations + 1);
+        logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+        
+        // Bot logic: check if possible, otherwise fold
+        Action bot_action = {0};
+        int amount_to_call = gs->current_bet - active_player->bet;
+        
+        if (amount_to_call == 0) {
+            // No bet to call - check
+            bot_action.type = ACTION_CHECK;
+            snprintf(log_msg, sizeof(log_msg), "Bot checking");
+            logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+        } else {
+            // There's a bet - fold
+            bot_action.type = ACTION_FOLD;
+            snprintf(log_msg, sizeof(log_msg), "Bot folding (bet=%d)", amount_to_call);
+            logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+        }
+        
+        // Process bot action
+        int bot_result = game_process_action(gs, active_player->player_id, &bot_action);
+        if (bot_result != 0) {
+            snprintf(log_msg, sizeof(log_msg), "Bot action failed: result=%d", bot_result);
+            logger_ex(MAIN_LOG, "ERROR", __func__, log_msg, 1);
+            break;
+        }
+        
+        // Broadcast updated state after bot action
+        broadcast_game_state_to_table(table);
+        table->active_seat = gs->active_seat;
+        
+        iterations++;
+    }
+    
+    if (iterations >= max_iterations) {
+        snprintf(log_msg, sizeof(log_msg), "WARNING: Bot action loop hit max iterations (%d)", max_iterations);
+        logger_ex(MAIN_LOG, "WARN", __func__, log_msg, 1);
+    }
+}
+
 void handle_signup_request(conn_data_t* conn_data, char* data, size_t data_len)
 {
     char log_msg[256];
@@ -366,6 +429,9 @@ void handle_join_table_request(conn_data_t* conn_data, char* data, size_t data_l
                     // Broadcast new hand state to all players if hand started
                     if (gs && gs->hand_in_progress && gs->betting_round != BETTING_ROUND_COMPLETE) {
                         broadcast_game_state_to_table(table);
+                        
+                        // Process bot actions if any bots are active
+                        process_bot_actions(table);
                     }
                 }
                 
@@ -711,6 +777,102 @@ void handle_leave_table_request(conn_data_t* conn_data, char* data, size_t data_
     free_packet(packet);
 }
 
+// Helper function to process all consecutive bot actions
+// Returns true if game ended (all players became bots)
+bool process_all_bot_actions(Table* table) {
+    if (!table || !table->game_state) return false;
+    
+    GameState* gs = table->game_state;
+    char log_msg[256];
+    int max_iterations = 100; // Prevent infinite loops
+    int iteration = 0;
+    
+    while (iteration++ < max_iterations) {
+        // Check if game is still in progress
+        if (gs->betting_round == BETTING_ROUND_COMPLETE || !gs->hand_in_progress) {
+            break;
+        }
+        
+        // Check if active player is a bot
+        if (gs->active_seat < 0 || gs->active_seat >= MAX_PLAYERS) {
+            break;
+        }
+        
+        GamePlayer* active_player = &gs->players[gs->active_seat];
+        if (!active_player || active_player->state != PLAYER_STATE_ACTIVE || !active_player->is_bot) {
+            break; // Not a bot's turn
+        }
+        
+        // Check if ALL remaining active players are bots (no real players left)
+        int real_players = 0;
+        int bot_players = 0;
+        for (int i = 0; i < MAX_PLAYERS; i++) {
+            GamePlayer* p = &gs->players[i];
+            if (p->state == PLAYER_STATE_ACTIVE || p->state == PLAYER_STATE_ALL_IN) {
+                if (p->is_bot) {
+                    bot_players++;
+                } else {
+                    real_players++;
+                }
+            }
+        }
+        
+        if (real_players == 0 && bot_players > 0) {
+            snprintf(log_msg, sizeof(log_msg), 
+                    "All remaining players are bots at table %d - ending hand", table->id);
+            logger_ex(MAIN_LOG, "WARN", __func__, log_msg, 1);
+            
+            // Force hand to complete - award pot to first bot
+            for (int i = 0; i < MAX_PLAYERS; i++) {
+                if (gs->players[i].is_bot && 
+                    (gs->players[i].state == PLAYER_STATE_ACTIVE || 
+                     gs->players[i].state == PLAYER_STATE_ALL_IN)) {
+                    game_distribute_pot(gs, i);
+                    gs->winner_seat = i;
+                    gs->betting_round = BETTING_ROUND_COMPLETE;
+                    gs->hand_in_progress = false;
+                    break;
+                }
+            }
+            return true; // Game ended
+        }
+        
+        // Bot logic: check if possible, otherwise fold
+        Action bot_action = {0};
+        int amount_to_call = gs->current_bet - active_player->bet;
+        
+        if (amount_to_call == 0) {
+            bot_action.type = ACTION_CHECK;
+            snprintf(log_msg, sizeof(log_msg), "Bot at seat %d checking", gs->active_seat);
+        } else {
+            bot_action.type = ACTION_FOLD;
+            snprintf(log_msg, sizeof(log_msg), "Bot at seat %d folding (bet=%d)", 
+                    gs->active_seat, amount_to_call);
+        }
+        logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+        
+        // Process bot action
+        int result = game_process_action(gs, active_player->player_id, &bot_action);
+        if (result != 0) {
+            snprintf(log_msg, sizeof(log_msg), "Bot action failed: result=%d", result);
+            logger_ex(MAIN_LOG, "ERROR", __func__, log_msg, 1);
+            break;
+        }
+        
+        // Broadcast updated state after bot action
+        broadcast_game_state_to_table(table);
+        table->active_seat = gs->active_seat;
+    }
+    
+    if (iteration >= max_iterations) {
+        snprintf(log_msg, sizeof(log_msg), "WARNING: Bot action loop hit max iterations at table %d", 
+                table->id);
+        logger_ex(MAIN_LOG, "ERROR", __func__, log_msg, 1);
+    }
+    
+    return false;
+}
+
 void handle_action_request(conn_data_t* conn_data, char* data, size_t data_len, TableList* table_list)
 {
     char log_msg[256];
@@ -879,6 +1041,13 @@ void handle_action_request(conn_data_t* conn_data, char* data, size_t data_len, 
         // Broadcast new hand state to all players
         broadcast_game_state_to_table(table);
         
+        // Process all consecutive bot actions
+        bool game_ended = process_all_bot_actions(table);
+        if (game_ended) {
+            logger_ex(MAIN_LOG, "WARN", __func__, "All players were bots, game ended", 1);
+            return;
+        }
+        
         // If new hand started, return early - don't process the action from previous hand
         if (gs->hand_in_progress && gs->betting_round != BETTING_ROUND_COMPLETE) {
             snprintf(log_msg, sizeof(log_msg), "New hand started, ignoring action from previous hand");
@@ -973,9 +1142,46 @@ void handle_action_request(conn_data_t* conn_data, char* data, size_t data_len, 
         // Update table's active_seat tracker after broadcasting
         table->active_seat = table->game_state->active_seat;
         
+        // Process all consecutive bot actions (handles multiple bots in a row)
+        bool all_bots = process_all_bot_actions(table);
+        if (all_bots) {
+            snprintf(log_msg, sizeof(log_msg), 
+                    "All players became bots at table %d - hand force-completed", table->id);
+            logger_ex(MAIN_LOG, "WARN", __func__, log_msg, 1);
+        }
+        
         // Check if hand is complete (showdown finished)
         if (table->game_state->betting_round == BETTING_ROUND_COMPLETE) {
             table->active_seat = -1;
+            
+            // Remove bots after hand completes (they replaced disconnected players)
+            for (int i = 0; i < MAX_PLAYERS; i++) {
+                GamePlayer* p = &table->game_state->players[i];
+                if (p->state != PLAYER_STATE_EMPTY && p->is_bot) {
+                    snprintf(log_msg, sizeof(log_msg), "Bot at seat %d removed after hand complete", i);
+                    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+                    
+                    // Return remaining chips to original player who disconnected
+                    if (p->money > 0 && p->original_user_id > 0) {
+                        PGconn* db_conn = PQconnectdb(dbconninfo);
+                        if (PQstatus(db_conn) == CONNECTION_OK) {
+                            int result = dbAddToBalance(db_conn, p->original_user_id, p->money);
+                            if (result == DB_OK) {
+                                snprintf(log_msg, sizeof(log_msg), 
+                                        "Returned %d chips from bot to user_id=%d", 
+                                        p->money, p->original_user_id);
+                                logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+                            }
+                            PQfinish(db_conn);
+                        }
+                    }
+                    
+                    // Remove bot from game state
+                    game_remove_player(table->game_state, i);
+                    
+                    // No connection to clean up since bots don't have connections
+                }
+            }
             
             // Remove players who have no money left (busted out)
             // Only remove after hand is complete, not during play

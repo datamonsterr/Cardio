@@ -222,7 +222,113 @@ int leave_table(conn_data_t* conn_data, TableList* table_list)
             table->id, table->current_player);
     logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
     
-    // Remove player from game state if they have a seat
+    // Check if player is actively in current hand (not just waiting)
+    bool game_in_progress = table->game_state && table->game_state->hand_in_progress;
+    GamePlayer* player = NULL;
+    bool player_in_hand = false;
+    
+    if (game_in_progress && conn_data->seat >= 0) {
+        player = game_get_player_by_seat(table->game_state, conn_data->seat);
+        // Only convert to bot if player is actively in the hand (not waiting)
+        player_in_hand = player && (player->state == PLAYER_STATE_ACTIVE || 
+                                    player->state == PLAYER_STATE_FOLDED || 
+                                    player->state == PLAYER_STATE_ALL_IN);
+    }
+    
+    if (game_in_progress && player_in_hand && conn_data->seat >= 0) {
+        snprintf(log_msg, sizeof(log_msg), 
+                "leave_table: Player '%s' (seat=%d) actively in hand - converting to bot", 
+                conn_data->username, conn_data->seat);
+        logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+        
+        // IMPORTANT: Save the seat number before we clear conn_data
+        int player_seat = conn_data->seat;
+        bool is_active_player = (table->game_state->active_seat == player_seat);
+        
+        // Return chips to database immediately when player leaves
+        // Bot will continue playing with the table's copy of chips
+        if (player && player->money > 0) {
+            PGconn* db_conn = PQconnectdb(dbconninfo);
+            if (PQstatus(db_conn) == CONNECTION_OK) {
+                int db_result = dbAddToBalance(db_conn, conn_data->user_id, player->money);
+                if (db_result == DB_OK) {
+                    snprintf(log_msg, sizeof(log_msg), 
+                            "Player %s leaving - returned %d chips to database (user_id=%d)", 
+                            conn_data->username, player->money, conn_data->user_id);
+                    logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+                } else {
+                    snprintf(log_msg, sizeof(log_msg), 
+                            "ERROR: Failed to return %d chips to user_id=%d", 
+                            player->money, conn_data->user_id);
+                    logger_ex(MAIN_LOG, "ERROR", __func__, log_msg, 1);
+                }
+                PQfinish(db_conn);
+            } else {
+                logger_ex(MAIN_LOG, "ERROR", __func__, "Failed to connect to database for chip return", 1);
+            }
+        }
+        
+        // Convert player to bot (stores original_user_id for chip return later)
+        game_convert_player_to_bot(table->game_state, player_seat);
+        
+        // IMPORTANT: Clear original_user_id since we already returned chips above
+        // This prevents double-returning chips when bot is removed later
+        // Get player pointer again after conversion
+        GamePlayer* bot_player = game_get_player_by_seat(table->game_state, player_seat);
+        if (bot_player) {
+            bot_player->original_user_id = 0;
+        }
+        
+        // Remove from connection tracking and compact array
+        int conn_idx = table->seat_to_conn_idx[conn_data->seat];
+        if (conn_idx >= 0 && conn_idx < table->current_player) {
+            // Shift all connections after this one down
+            for (int i = conn_idx; i < table->current_player - 1; i++) {
+                table->connections[i] = table->connections[i + 1];
+                // Update seat_to_conn_idx for moved connections
+                if (table->connections[i] != NULL && table->connections[i]->seat >= 0) {
+                    table->seat_to_conn_idx[table->connections[i]->seat] = i;
+                }
+            }
+            table->connections[table->current_player - 1] = NULL;
+            table->seat_to_conn_idx[conn_data->seat] = -1;
+            table->current_player--;
+            
+            snprintf(log_msg, sizeof(log_msg), 
+                    "leave_table: Removed connection, current_player now %d", table->current_player);
+            logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+        }
+        
+        // Clear user's table assignment
+        conn_data->table_id = 0;
+        conn_data->seat = -1;
+        
+        snprintf(log_msg, sizeof(log_msg), 
+                "leave_table: Player converted to bot, will be removed after hand completes");
+        logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+        
+        // Broadcast updated game state so other players see "Bot" name
+        broadcast_game_state_to_table(table);
+        
+        // CRITICAL FIX: If it's this bot's turn, process their action immediately
+        // Otherwise other players will wait forever for the bot to act
+        if (is_active_player) {
+            snprintf(log_msg, sizeof(log_msg), 
+                    "leave_table: Bot's turn detected (seat=%d) - processing bot action immediately", 
+                    player_seat);
+            logger_ex(MAIN_LOG, "WARN", __func__, log_msg, 1);
+            
+            // Process all bot actions (handles sequential bots and all-bot scenario)
+            bool game_ended = process_all_bot_actions(table);
+            if (game_ended) {
+                logger_ex(MAIN_LOG, "WARN", __func__, "All players were bots, game ended", 1);
+            }
+        }
+        
+        return 0;
+    }
+    
+    // Remove player from game state if they have a seat (game not in progress)
     if (conn_data->seat >= 0) {
         // Return remaining chips to player's database balance
         GamePlayer* player = game_get_player_by_seat(table->game_state, conn_data->seat);
@@ -302,38 +408,68 @@ int leave_table(conn_data_t* conn_data, TableList* table_list)
         
         game_remove_player(table->game_state, conn_data->seat);
         
-        // Remove from connection tracking
+        // Remove from connection tracking and compact array (same as bot path)
         int conn_idx = table->seat_to_conn_idx[conn_data->seat];
         if (conn_idx >= 0 && conn_idx < table->current_player) {
-            table->connections[conn_idx] = NULL;
+            // Shift all connections after this one down
+            for (int i = conn_idx; i < table->current_player - 1; i++) {
+                table->connections[i] = table->connections[i + 1];
+                // Update seat_to_conn_idx for moved connections
+                if (table->connections[i] != NULL && table->connections[i]->seat >= 0) {
+                    table->seat_to_conn_idx[table->connections[i]->seat] = i;
+                }
+            }
+            table->connections[table->current_player - 1] = NULL;
             table->seat_to_conn_idx[conn_data->seat] = -1;
+            table->current_player--;
+            
+            snprintf(log_msg, sizeof(log_msg), 
+                    "leave_table: Removed connection and compacted array, current_player now %d", 
+                    table->current_player);
+            logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+        }
+    } else {
+        // Player doesn't have a seat, just decrement counter
+        if (table->current_player > 0) {
+            table->current_player--;
         }
     }
     
-    int current_player = table->current_player;
-    if (current_player > 0) {
-        table->current_player--;
-    }
-    
     snprintf(log_msg, sizeof(log_msg), 
-            "leave_table: Updated player count from %d to %d", 
-            current_player, table->current_player);
+            "leave_table: Player count is now %d", table->current_player);
     logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
     
     // Update game state tracking
     if (table->game_state) {
         int active_players = game_count_active_players(table->game_state);
         
+        snprintf(log_msg, sizeof(log_msg), 
+                "leave_table: Active players remaining: %d", active_players);
+        logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+        
+        // Always broadcast updated state so other players see the change
+        broadcast_game_state_to_table(table);
+        
         // If not enough players to continue, reset game state
         if (active_players < 2) {
             table->game_started = false;
             table->active_seat = -1;
+            
+            snprintf(log_msg, sizeof(log_msg), 
+                    "leave_table: Less than 2 players, game stopped");
+            logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
         } else {
             // Update active_seat from game state
             table->active_seat = table->game_state->active_seat;
             
-            // Broadcast updated game state to remaining players
-            broadcast_game_state_to_table(table);
+            // If game is not in progress but we have enough players, try to start
+            if (!table->game_state->hand_in_progress) {
+                snprintf(log_msg, sizeof(log_msg), 
+                        "leave_table: %d players ready, checking if we can start game", 
+                        active_players);
+                logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
+                start_game_if_ready(table);
+            }
         }
     }
     
@@ -507,10 +643,66 @@ void start_game_if_ready(Table* table)
     
     GameState* gs = table->game_state;
     
+    // Clean up bots and busted players before starting new hand
+    char msg[256];
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+        GamePlayer* p = &gs->players[i];
+        if (p->state != PLAYER_STATE_EMPTY) {
+            // Remove bots (they were replacements for disconnected players)
+            if (p->is_bot) {
+                snprintf(msg, sizeof(msg), "start_game_if_ready: Removing bot at seat %d before new hand", i);
+                logger(MAIN_LOG, "Info", msg);
+                
+                // Return remaining chips to original player who disconnected
+                if (p->money > 0 && p->original_user_id > 0) {
+                    PGconn* db_conn = PQconnectdb(dbconninfo);
+                    if (PQstatus(db_conn) == CONNECTION_OK) {
+                        int result = dbAddToBalance(db_conn, p->original_user_id, p->money);
+                        if (result == DB_OK) {
+                            snprintf(msg, sizeof(msg), 
+                                    "Returned %d chips from bot to user_id=%d", 
+                                    p->money, p->original_user_id);
+                            logger(MAIN_LOG, "Info", msg);
+                        }
+                        PQfinish(db_conn);
+                    }
+                }
+                
+                game_remove_player(gs, i);
+            }
+            // Remove players with no money
+            else if (p->money <= 0) {
+                snprintf(msg, sizeof(msg), "start_game_if_ready: Removing busted player '%s' at seat %d (money=%d)", 
+                         p->name, i, p->money);
+                logger(MAIN_LOG, "Info", msg);
+                game_remove_player(gs, i);
+                
+                // Remove from connection tracking and compact array
+                int conn_idx = table->seat_to_conn_idx[i];
+                if (conn_idx >= 0 && conn_idx < table->current_player) {
+                    if (table->connections[conn_idx] != NULL) {
+                        table->connections[conn_idx]->table_id = 0;
+                        table->connections[conn_idx]->seat = -1;
+                    }
+                    
+                    // Shift connections down
+                    for (int j = conn_idx; j < table->current_player - 1; j++) {
+                        table->connections[j] = table->connections[j + 1];
+                        if (table->connections[j] != NULL && table->connections[j]->seat >= 0) {
+                            table->seat_to_conn_idx[table->connections[j]->seat] = j;
+                        }
+                    }
+                    table->connections[table->current_player - 1] = NULL;
+                    table->seat_to_conn_idx[i] = -1;
+                    table->current_player--;
+                }
+            }
+        }
+    }
+    
     // Need at least 2 players to start
     int active_count = game_count_active_players(gs);
     if (active_count < 2) {
-        char msg[256];
         snprintf(msg, sizeof(msg), "start_game_if_ready: Not enough players (count=%d, need 2) at table %d", 
                  active_count, table->id);
         logger(MAIN_LOG, "Debug", msg);
@@ -519,7 +711,6 @@ void start_game_if_ready(Table* table)
     
     // Don't restart if game is in progress
     if (gs->hand_in_progress) {
-        char msg[256];
         snprintf(msg, sizeof(msg), "start_game_if_ready: Hand already in progress (hand_id=%u) at table %d", 
                  gs->hand_id, table->id);
         logger(MAIN_LOG, "Debug", msg);
@@ -527,7 +718,6 @@ void start_game_if_ready(Table* table)
     }
     
     // Start a new hand
-    char msg[256];
     snprintf(msg, sizeof(msg), "Starting hand %d at table %d (active_players=%d)", 
              gs->hand_id + 1, table->id, active_count);
     logger(MAIN_LOG, "Info", msg);

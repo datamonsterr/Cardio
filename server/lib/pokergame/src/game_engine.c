@@ -122,6 +122,8 @@ int game_add_player(GameState *state, int player_id, const char *name, int seat,
     state->players[seat].total_bet = 0;
     state->players[seat].hole_cards[0] = NULL;
     state->players[seat].hole_cards[1] = NULL;
+    state->players[seat].is_bot = false;
+    state->players[seat].original_user_id = 0;
     
     state->num_players++;
     
@@ -141,6 +143,27 @@ int game_remove_player(GameState *state, int seat) {
     state->players[seat].player_id = 0;
     state->players[seat].money = 0;
     state->num_players--;
+    
+    return 0;
+}
+
+int game_convert_player_to_bot(GameState *state, int seat) {
+    if (!state || seat < 0 || seat >= MAX_PLAYERS) return -1;
+    if (state->players[seat].state == PLAYER_STATE_EMPTY) return -2;
+    
+    GamePlayer *player = &state->players[seat];
+    
+    // Store original user_id for chip return later
+    player->original_user_id = player->player_id;
+    
+    // Mark as bot and rename
+    player->is_bot = true;
+    strncpy(player->name, "Bot", 31);
+    player->name[31] = '\0';
+    player->player_id = -1; // Use -1 to indicate bot (no real player_id)
+    
+    // Keep their current state (ACTIVE, FOLDED, ALL_IN, etc.) and chips
+    // This allows the bot to continue playing the current hand
     
     return 0;
 }

@@ -59,6 +59,7 @@ void broadcast_to_table(int table_id, TableList* table_list, char* data, int len
 int broadcast_game_state_to_table(Table* table);
 void start_game_if_ready(Table* table);
 void process_player_action(conn_data_t* conn_data, Table* table, ActionRequest* action_req);
+bool process_all_bot_actions(Table* table);
 
 // Global connection map for finding users by username
 conn_data_t* find_connection_by_username(const char* username, int epoll_fd);
