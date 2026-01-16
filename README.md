@@ -37,6 +37,26 @@ sudo apt-get install -y clang cmake libpq-dev libcrypt-dev clang-tools
 brew install llvm cmake libpq clang-tools
 ```
 
+### Nix (Alternative - Recommended)
+
+If you have Nix installed, you can use the provided `shell.nix` to automatically set up the development environment:
+
+```bash
+# Enter the nix-shell (downloads and sets up all dependencies)
+nix-shell
+
+# Or if you have direnv installed:
+direnv allow  # This will automatically enter nix-shell when you cd into the directory
+```
+
+The nix-shell provides:
+- clang compiler
+- cmake >= 3.22
+- PostgreSQL client libraries (libpq)
+- libcrypt for password hashing
+- clang-tools (clang-tidy, clang-format)
+- Development tools (gdb, valgrind)
+
 ## How to run
 
 ### Start Database
