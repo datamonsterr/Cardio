@@ -123,9 +123,21 @@ export function decodeLoginResponse(data: Uint8Array): LoginResponse {
 /**
  * Encode signup request payload
  * Matches decode_signup_request() format in protocol.c
+ * IMPORTANT: Server expects fields in this exact order!
  */
 export function encodeSignupRequest(req: SignupRequest): Uint8Array {
-  return new Uint8Array(msgpackEncode(req))
+  // Server expects fields in this specific order: user, pass, fullname, phone, dob, email, country, gender
+  const payload = {
+    user: req.user,
+    pass: req.pass,
+    fullname: req.fullname,
+    phone: req.phone,
+    dob: req.dob,
+    email: req.email,
+    country: req.country,
+    gender: req.gender
+  }
+  return new Uint8Array(msgpackEncode(payload))
 }
 
 /**
@@ -416,9 +428,7 @@ export interface TableInviteNotificationData {
   tableName: string
 }
 
-export function decodeTableInviteNotification(
-  data: Uint8Array
-): TableInviteNotificationData {
+export function decodeTableInviteNotification(data: Uint8Array): TableInviteNotificationData {
   const decoded = msgpackDecode(data) as {
     from_user: string
     table_id: number

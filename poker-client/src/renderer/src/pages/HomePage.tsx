@@ -16,7 +16,7 @@ const HomePage: React.FC = () => {
   useEffect(() => {
     const refreshBalanceOnMount = async () => {
       if (!user || isRefreshing) return
-      
+
       setIsRefreshing(true)
       try {
         await refreshBalance()
@@ -120,7 +120,7 @@ const HomePage: React.FC = () => {
         </button>
       </div>
 
-      {/* User Stats */}
+      {/* User Stats
       <div className="stats-overview">
         <div className="stat-card">
           <div className="stat-value">{mockUserStats.totalGames}</div>
@@ -140,7 +140,6 @@ const HomePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Recent Games */}
       <div className="recent-section">
         <h2>Recent Games</h2>
         <div className="recent-games">
@@ -158,7 +157,7 @@ const HomePage: React.FC = () => {
             </div>
           ))}
         </div>
-      </div>
+      </div> */}
 
       {/* Modal for additional sections */}
       {activeSection && (
