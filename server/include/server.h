@@ -21,6 +21,7 @@ typedef struct conn_data_t
     int seat;                // Seat number at table (-1 if not seated)
     size_t buffer_len;       // Length of valid data in the buffer
     bool is_active;          // Player's activity status
+    struct conn_data_t* next; // For global connection list
 } conn_data_t;
 // Initialize connection data with default values
 conn_data_t* init_connection_data(int client_fd);
@@ -58,3 +59,8 @@ void broadcast_to_table(int table_id, TableList* table_list, char* data, int len
 int broadcast_game_state_to_table(Table* table);
 void start_game_if_ready(Table* table);
 void process_player_action(conn_data_t* conn_data, Table* table, ActionRequest* action_req);
+
+// Global connection map for finding users by username
+conn_data_t* find_connection_by_username(const char* username, int epoll_fd);
+void register_connection(conn_data_t* conn_data);
+void unregister_connection(conn_data_t* conn_data);

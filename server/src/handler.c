@@ -38,9 +38,13 @@ void handle_login_request(conn_data_t* conn_data, char* data, size_t data_len)
         sendall(conn_data->fd, response->data, (int*) &(response->len));
 
         strncpy(conn_data->username, user_info.username, 32);
+        conn_data->username[31] = '\0';
         conn_data->user_id = user_id;
         conn_data->is_active = true;
         conn_data->balance = user_info.balance;
+        
+        // Register connection in global map after successful login
+        register_connection(conn_data);
 
         PQfinish(conn);
 
@@ -1774,18 +1778,22 @@ void handle_invite_to_table_request(conn_data_t* conn_data, char* data, size_t d
     free(raw_bytes);
     
     // Find the invited friend's connection and send them a notification
-    // Search through all tables to find the user
-    conn_data_t* friend_conn = NULL;
-    for (int t = 0; t < table_list->size; t++) {
-        Table* search_table = &table_list->tables[t];
-        for (int j = 0; j < MAX_PLAYERS; j++) {
-            if (search_table->connections[j] && 
-                strcmp(search_table->connections[j]->username, request->friend_username) == 0) {
-                friend_conn = search_table->connections[j];
-                break;
+    // First try to find in global connection map (works even if user is not in a table)
+    conn_data_t* friend_conn = find_connection_by_username(request->friend_username, 0);
+    
+    // If not found in global map, search through all tables as fallback
+    if (!friend_conn) {
+        for (int t = 0; t < table_list->size; t++) {
+            Table* search_table = &table_list->tables[t];
+            for (int j = 0; j < MAX_PLAYERS; j++) {
+                if (search_table->connections[j] && 
+                    strcmp(search_table->connections[j]->username, request->friend_username) == 0) {
+                    friend_conn = search_table->connections[j];
+                    break;
+                }
             }
+            if (friend_conn) break;
         }
-        if (friend_conn) break;
     }
     
     // If found, send notification
