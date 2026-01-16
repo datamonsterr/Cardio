@@ -1,5 +1,9 @@
 #include "main.h"
 
+// Global connection map: simple linked list to store all active connections
+// This allows us to find users even when they're not in a table
+static conn_data_t* global_connections_head = NULL;
+
 // Get sockaddr, IPv4 or IPv6:
 void* get_in_addr(struct sockaddr* sa)
 {
@@ -175,6 +179,7 @@ conn_data_t* init_connection_data(int client_fd)
     conn_data->seat = -1;  // Not seated
     conn_data->buffer_len = 0;
     conn_data->is_active = false;
+    conn_data->next = NULL;  // Initialize linked list pointer
 
     char log_msg[256];
     snprintf(log_msg, sizeof(log_msg), "Initialized connection data for fd=%d", client_fd);
@@ -240,6 +245,9 @@ int close_connection(int epoll_fd, conn_data_t* conn_data)
              conn_data->fd, conn_data->username[0] ? conn_data->username : "<not logged in>");
     logger_ex(MAIN_LOG, "INFO", __func__, log_msg, 1);
     
+    // Unregister from global connection map
+    unregister_connection(conn_data);
+    
     if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, conn_data->fd, NULL) == -1)
     {
         snprintf(log_msg, sizeof(log_msg), "Failed to remove client fd=%d from epoll", conn_data->fd);
@@ -254,4 +262,66 @@ int close_connection(int epoll_fd, conn_data_t* conn_data)
     close(conn_data->fd);
     free(conn_data);
     return 0;
+}
+
+// Find connection by username in global connection map
+conn_data_t* find_connection_by_username(const char* username, int epoll_fd)
+{
+    if (!username || strlen(username) == 0) {
+        return NULL;
+    }
+    
+    conn_data_t* current = global_connections_head;
+    while (current != NULL) {
+        if (current->username[0] != '\0' && strcmp(current->username, username) == 0) {
+            // Verify connection is still valid
+            if (current->fd > 0) {
+                return current;
+            }
+        }
+        current = current->next;
+    }
+    
+    return NULL;
+}
+
+// Register connection in global map (called after login)
+void register_connection(conn_data_t* conn_data)
+{
+    if (!conn_data) return;
+    
+    // Check if already registered
+    conn_data_t* current = global_connections_head;
+    while (current != NULL) {
+        if (current == conn_data) {
+            return; // Already registered
+        }
+        current = current->next;
+    }
+    
+    // Add to head of list
+    conn_data->next = global_connections_head;
+    global_connections_head = conn_data;
+}
+
+// Unregister connection from global map
+void unregister_connection(conn_data_t* conn_data)
+{
+    if (!conn_data) return;
+    
+    if (global_connections_head == conn_data) {
+        global_connections_head = conn_data->next;
+        conn_data->next = NULL;
+        return;
+    }
+    
+    conn_data_t* current = global_connections_head;
+    while (current != NULL && current->next != NULL) {
+        if (current->next == conn_data) {
+            current->next = conn_data->next;
+            conn_data->next = NULL;
+            return;
+        }
+        current = current->next;
+    }
 }

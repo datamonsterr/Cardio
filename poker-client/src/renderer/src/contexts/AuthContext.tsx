@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import type { User, AuthContextType, CreateTableRequestType } from '../types'
 import { AuthService, ConnectionStatus } from '../services/auth/AuthService'
 import { HeartbeatService } from '../services/network/HeartbeatService'
-import { Packet, SignupRequest, CreateTableRequest, PACKET_TYPE, PACKET_BALANCE_UPDATE, decodeBalanceUpdateNotification } from '../services/protocol'
+import { Packet, SignupRequest, CreateTableRequest, PACKET_TYPE, PACKET_BALANCE_UPDATE, decodeBalanceUpdateNotification, PACKET_TABLE_INVITE_NOTIFICATION, decodeTableInviteNotification } from '../services/protocol'
 import { getServerConfig } from '../config/server'
 
 // Global connection status state
@@ -14,6 +14,19 @@ const connectionStatusListeners: Set<(status: ConnectionStatus, message: string)
 // Global user update management
 type UserUpdater = (updater: (prev: User | null) => User | null) => void
 let globalUserUpdater: UserUpdater | null = null
+
+// Global table invite management
+export interface TableInvite {
+  id: string
+  fromUsername: string
+  tableId: number
+  tableName?: string
+  timestamp: number
+}
+
+type TableInviteUpdater = (updater: (prev: TableInvite[]) => TableInvite[]) => void
+let globalTableInviteUpdater: TableInviteUpdater | null = null
+let globalTableInvites: TableInvite[] = []
 
 // Create heartbeat service instance
 const heartbeatService = new HeartbeatService({
@@ -69,6 +82,30 @@ const authService = new AuthService({
       return
     }
     
+    // Handle table invite notifications
+    if (packet.header.packet_type === PACKET_TABLE_INVITE_NOTIFICATION) {
+      try {
+        const inviteData = decodeTableInviteNotification(packet.data)
+        console.log('Table invite notification received:', inviteData)
+        
+        const newInvite: TableInvite = {
+          id: `${inviteData.fromUser}-${inviteData.tableId}-${Date.now()}`,
+          fromUsername: inviteData.fromUser,
+          tableId: inviteData.tableId,
+          tableName: inviteData.tableName,
+          timestamp: Date.now()
+        }
+        
+        globalTableInvites = [...globalTableInvites, newInvite]
+        if (globalTableInviteUpdater) {
+          globalTableInviteUpdater(() => globalTableInvites)
+        }
+      } catch (error) {
+        console.error('Failed to decode table invite notification:', error)
+      }
+      return
+    }
+    
     console.log('Received packet:', packet.header.packet_type)
   },
   onConnectionStatusChange: (status: ConnectionStatus, message?: string) => {
@@ -109,6 +146,7 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
+  const [tableInvites, setTableInvites] = useState<TableInvite[]>([])
 
   // Register global user updater
   useEffect(() => {
@@ -117,6 +155,16 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
       globalUserUpdater = null
     }
   }, [setUser])
+
+  // Register global table invite updater
+  useEffect(() => {
+    globalTableInviteUpdater = setTableInvites
+    // Initialize with current global invites
+    setTableInvites(globalTableInvites)
+    return () => {
+      globalTableInviteUpdater = null
+    }
+  }, [setTableInvites])
 
   useEffect(() => {
     // Check for stored user on mount
@@ -193,20 +241,24 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
     if (!user) return
     
     try {
-      // Re-authenticate to get fresh user data including balance
-      // This is a simple way to ensure we have the latest balance from server
+      // Send a request to get fresh balance from server
+      // For now, we'll use login to refresh user data
       const storedUser = localStorage.getItem('pokerUser')
       if (storedUser) {
         const parsedUser = JSON.parse(storedUser)
-        // For now, just log that we're refreshing
-        // In a real implementation, we might send a specific "get user info" request
         console.log('Refreshing balance for user:', parsedUser.username)
         // The balance should be updated via PACKET_BALANCE_UPDATE notifications
-        // from the server when leaving tables
+        // from the server. We can also trigger a login refresh if needed.
+        // For now, balance updates come automatically from server via PACKET_BALANCE_UPDATE
       }
     } catch (error) {
       console.error('Failed to refresh balance:', error)
     }
+  }
+
+  const removeTableInvite = (inviteId: string): void => {
+    setTableInvites((prev) => prev.filter((inv) => inv.id !== inviteId))
+    globalTableInvites = globalTableInvites.filter((inv) => inv.id !== inviteId)
   }
   
 
@@ -240,24 +292,26 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
     return authService.getClient()
   }
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        login,
-        logout,
-        updateChips,
-        refreshBalance,
-        loading,
-        signup,
-        getTables,
-        createTable,
-        getClient
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  )
+    return (
+      <AuthContext.Provider
+        value={{
+          user,
+          login,
+          logout,
+          updateChips,
+          refreshBalance,
+          loading,
+          signup,
+          getTables,
+          createTable,
+          getClient,
+          tableInvites,
+          removeTableInvite
+        }}
+      >
+        {children}
+      </AuthContext.Provider>
+    )
 }
 
 export function useAuth(): AuthContextType {

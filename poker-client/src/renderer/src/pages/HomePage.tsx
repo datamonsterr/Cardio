@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
-import { mockUserStats, mockRecentGames } from '../data/mockTables'
 import { TablesIcon, ScoreboardIcon, FriendsIcon, PlayNowIcon } from '../components/icons/HomeIcons'
+import TableInviteNotification, { TableInvite } from '../components/TableInviteNotification'
 
 const HomePage: React.FC = () => {
-  const { user, logout, refreshBalance } = useAuth()
+  const { user, logout, refreshBalance, tableInvites = [], removeTableInvite } = useAuth()
   const navigate = useNavigate()
   const [activeSection, setActiveSection] = useState<string | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -56,6 +56,38 @@ const HomePage: React.FC = () => {
     navigate(-1) // Go back in browser history
   }
 
+  const handleRefreshBalance = async (): Promise<void> => {
+    setIsRefreshing(true)
+    try {
+      await refreshBalance()
+    } catch (error) {
+      console.error('Failed to refresh balance:', error)
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
+
+  const handleAcceptTableInvite = (invite: TableInvite): void => {
+    console.log('[HomePage] Accepting table invite:', invite)
+    navigate(`/game?tableId=${invite.tableId}`)
+    if (removeTableInvite) {
+      removeTableInvite(invite.id)
+    }
+  }
+
+  const handleRejectTableInvite = (invite: TableInvite): void => {
+    console.log('[HomePage] Rejecting table invite:', invite)
+    if (removeTableInvite) {
+      removeTableInvite(invite.id)
+    }
+  }
+
+  const handleDismissTableInvite = (inviteId: string): void => {
+    if (removeTableInvite) {
+      removeTableInvite(inviteId)
+    }
+  }
+
   return (
     <div className="home-container">
       <div className="home-header">
@@ -68,6 +100,14 @@ const HomePage: React.FC = () => {
             </p>
           </div>
           <div className="header-actions">
+            <button 
+              className="refresh-button" 
+              onClick={handleRefreshBalance} 
+              title="Refresh balance"
+              disabled={isRefreshing}
+            >
+              {isRefreshing ? 'Refreshing...' : 'Refresh Balance'}
+            </button>
             <button className="return-button" onClick={handleReturn} title="Go back">
               ← Return
             </button>
@@ -158,6 +198,14 @@ const HomePage: React.FC = () => {
           ))}
         </div>
       </div> */}
+
+      {/* Table Invite Notifications */}
+      <TableInviteNotification
+        invites={tableInvites}
+        onAccept={handleAcceptTableInvite}
+        onReject={handleRejectTableInvite}
+        onDismiss={handleDismissTableInvite}
+      />
 
       {/* Modal for additional sections */}
       {activeSection && (

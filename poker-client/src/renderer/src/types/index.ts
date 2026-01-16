@@ -102,6 +102,8 @@ export interface AuthContextType {
   getTables?: () => Promise<any>
   createTable?: (request: CreateTableRequestType) => Promise<number>
   getClient?: () => any
+  tableInvites?: Array<{ id: string; fromUsername: string; tableId: number; tableName?: string; timestamp: number }>
+  removeTableInvite?: (inviteId: string) => void
 }
 
 // Create table request type
